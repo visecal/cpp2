@@ -1,0 +1,75 @@
+﻿@page
+@model SubPhim.Server.Pages.Admin.BackupRestoreModel
+@{
+    ViewData["Title"] = "Backup & Restore";
+    Layout = "~/Pages/Shared/_AdminLayout.cshtml";
+}
+
+<h1>@ViewData["Title"] Dữ liệu Người dùng</h1>
+<hr />
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+
+
+<div class="row g-4">
+    <!-- CỘT BACKUP -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-cloud-download-fill me-2"></i>
+                <strong>SAO LƯU DỮ LIỆU</strong>
+            </div>
+            <div class="card-body">
+                <p>
+                    Nhấn nút bên dưới để tải về một file <strong>.json</strong> chứa toàn bộ thông tin
+                    của tất cả người dùng trong hệ thống.
+                </p>
+                <p>
+                    File này bao gồm cả mật khẩu đã mã hóa, gói thuê bao, ngày hết hạn và các quyền hạn.
+                    Hãy lưu trữ file này ở một nơi an toàn.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent border-top-0 pb-3">
+                <a asp-page-handler="DownloadBackup" class="btn btn-primary btn-lg w-100">
+                    <i class="bi bi-download me-2"></i>Tải File Backup Ngay
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- CỘT RESTORE -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-cloud-upload-fill me-2"></i>
+                <strong>KHÔI PHỤC DỮ LIỆU</strong>
+            </div>
+            <div class="card-body">
+                <p class="text-danger">
+                    <strong>CẢNH BÁO:</strong> Chức năng này sẽ ghi đè lên dữ liệu người dùng hiện có nếu
+                    tên tài khoản (username) trong file backup trùng khớp với tên tài khoản trong database.
+                </p>
+                <p>
+                    Chọn file <code>.json</code> mà bạn đã sao lưu trước đó để nhập lại vào hệ thống.
+                    Hữu ích khi bạn chuyển server hoặc muốn khôi phục lại trạng thái cũ.
+                </p>
+                <form method="post" enctype="multipart/form-data" onsubmit="return confirm('Bạn có chắc chắn muốn thực hiện hành động khôi phục dữ liệu không? Dữ liệu hiện tại có thể bị ghi đè.');">
+                    <div class="mb-3">
+                        <label for="backupFile" class="form-label">Chọn file backup (.json):</label>
+                        <input class="form-control" type="file" name="backupFile" id="backupFile" accept=".json" required>
+                    </div>
+                    <button type="submit" asp-page-handler="Import" class="btn btn-warning btn-lg w-100">
+                        <i class="bi bi-upload me-2"></i>Bắt đầu Khôi Phục
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>```

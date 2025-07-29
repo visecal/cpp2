@@ -1,0 +1,244 @@
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection; 
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using SubPhim.Server.Data;
+using SubPhim.Server.Models;
+using SubPhim.Server.Services;
+using SubPhim.Server.Settings;
+using System.Security.Claims;
+using System.Text;
+using System.Globalization; 
+using Microsoft.AspNetCore.Localization;
+using SubPhim.Server.Middleware;
+
+
+// --- 1. Cấu hình Builder ---
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.Configure<LocalApiSettings>(
+    builder.Configuration.GetSection(LocalApiSettings.SectionName)
+);
+builder.Services.Configure<UsageLimitsSettings>(
+    builder.Configuration.GetSection("UsageLimits")
+);
+builder.Services.AddHttpClient();
+builder.Services.AddHostedService<CleanupService>();
+builder.Services.AddScoped<IEncryptionService, EncryptionService>();
+builder.Services.AddScoped<ITierSettingsService, TierSettingsService>();
+builder.Services.AddControllers();
+builder.Services.AddSingleton<TranslationOrchestratorService>();
+builder.Services.AddMemoryCache();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var supportedCultures = new[] { new CultureInfo("en-US") };
+    options.DefaultRequestCulture = new RequestCulture("en-US");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+});
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AuthorizeFolder("/Admin", "AdminPolicy");
+    options.Conventions.AllowAnonymousToPage("/Admin/Login");
+});
+
+// Cấu hình DB linh hoạt cho Local và Fly.io
+var dbConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FLY_APP_NAME")))
+{
+    dbConnectionString = "Data Source=/data/subphim.db";
+}
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(dbConnectionString));
+
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FLY_APP_NAME")))
+{
+    // Chỉ thực hiện khi chạy trên môi trường Fly.io
+    var dataProtectionPath = new DirectoryInfo("/data/keys");
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(dataProtectionPath)
+        .SetApplicationName("SubPhimApp");
+}
+else
+{
+    // Khi chạy trên máy local, không cần cấu hình đặc biệt.
+    // Hệ thống sẽ tự động lưu key vào một vị trí an toàn trong profile của user.
+    builder.Services.AddDataProtection();
+}
+
+// Lấy khóa bí mật để tạo JWT
+var jwtKey = "SubPhim-Super-Secret-Key-For-JWT-Authentication-2024-@!#$";
+var key = Encoding.ASCII.GetBytes(jwtKey);
+
+// Cấu hình hệ thống xác thực kép (JWT cho API, Cookie cho Web)
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+            ValidateIssuer = false,
+            ValidateAudience = false
+        };
+    })
+    .AddCookie("AdminCookie", options =>
+    {
+        options.Cookie.Name = "SubPhim.AdminAuth";
+        options.LoginPath = "/Admin/Login";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    });
+
+// Cấu hình hệ thống phân quyền (Authorization)
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminPolicy", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.AddAuthenticationSchemes("AdminCookie");
+        policy.RequireClaim("Admin", "true");
+    });
+});
+
+
+// --- 3. Xây dựng ứng dụng ---
+var app = builder.Build();
+
+
+// --- 4. Cấu hình HTTP Request Pipeline ---
+app.UseMiddleware<RequestLoggingMiddleware>();
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
+app.UseRouting();
+app.UseRequestLocalization();
+app.UseAuthentication();
+
+app.UseAuthorization();
+
+app.MapControllers();
+app.MapRazorPages();
+
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        logger.LogInformation("Attempting to connect to the database...");
+        if (context.Database.CanConnect())
+        {
+            logger.LogInformation(">>>>>> DATABASE CONNECTION SUCCESSFUL. <<<<<<");
+        }
+        else
+        {
+            logger.LogCritical("!!!!!!!! DATABASE CONNECTION FAILED. CHECK CONNECTION STRING AND FILE PERMISSIONS. !!!!!!!");
+        }
+        context.Database.Migrate(); // Luôn áp dụng các thay đổi cấu trúc DB
+
+        var adminUsername = "admin";
+        var defaultAdminPassword = "AdminMatKhauMoi123!"; // <-- ĐÂY LÀ MẬT KHẨU MỚI, HÃY NHỚ NÓ
+
+        // SỬA ĐỔI QUAN TRỌNG: TÌM user 'admin' thay vì chỉ kiểm tra tồn tại
+        var adminUser = context.Users.FirstOrDefault(u => u.Username == adminUsername);
+
+        if (adminUser == null)
+        {
+            // TRƯỜNG HỢP 1: TÀI KHOẢN ADMIN CHƯA TỒN TẠI -> TẠO MỚI
+            logger.LogInformation("Admin user not found. Creating a new one.");
+            adminUser = new User
+            {
+                Uid = new Random().Next(100_000_000, 1_000_000_000).ToString(),
+                Username = adminUsername,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(defaultAdminPassword),
+                Tier = SubscriptionTier.Lifetime,
+                SubscriptionExpiry = DateTime.UtcNow.AddYears(100),
+                IsBlocked = false,
+                CreatedAt = DateTime.UtcNow,
+                MaxDevices = 99,
+                GrantedFeatures = (GrantedFeatures)Enum.GetValues(typeof(GrantedFeatures)).Cast<int>().Sum(),
+                AllowedApiAccess = (AllowedApis)Enum.GetValues(typeof(AllowedApis)).Cast<int>().Sum(),
+                IsAdmin = true // Đảm bảo quyền admin
+            };
+            context.Users.Add(adminUser);
+        }
+        else
+        {
+            // TRƯỜNG HỢP 2: TÀI KHOẢN 'admin' ĐÃ TỒN TẠI -> CẬP NHẬT ĐỂ ĐẢM BẢO ĐÚNG QUYỀN
+            logger.LogInformation("Admin user found. Ensuring permissions are correctly set.");
+            adminUser.IsAdmin = true; // Đây là dòng code sửa lỗi trực tiếp
+            adminUser.Tier = SubscriptionTier.Lifetime; // Đảm bảo gói cao nhất
+            adminUser.IsBlocked = false; // Mở khóa nếu tài khoản đang bị khóa
+            // Tùy chọn: Reset lại mật khẩu để bạn chắc chắn có thể đăng nhập
+            // adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(defaultAdminPassword);
+        }
+
+        context.SaveChanges(); // Lưu tất cả các thay đổi (tạo mới hoặc cập nhật)
+        logger.LogInformation("Admin user seeding/update completed successfully.");
+        try
+        {
+            // Chỉ seed nếu bảng TierDefaultSettings đang trống
+            if (!context.TierDefaultSettings.Any())
+            {
+                logger.LogInformation("TierDefaultSettings table is empty. Seeding from appsettings.json...");
+                var usageLimitsSettings = services.GetRequiredService<IOptions<UsageLimitsSettings>>().Value;
+
+                foreach (SubscriptionTier tierValue in Enum.GetValues(typeof(SubscriptionTier)))
+                {
+                    var tierConfigFromFile = tierValue switch
+                    {
+                        SubscriptionTier.Free => usageLimitsSettings.Free,
+                        SubscriptionTier.Daily => usageLimitsSettings.Daily,
+                        SubscriptionTier.Monthly => usageLimitsSettings.Monthly,
+                        SubscriptionTier.Yearly => usageLimitsSettings.Yearly,
+                        SubscriptionTier.Lifetime => usageLimitsSettings.Lifetime,
+                        _ => null
+                    };
+
+                    if (tierConfigFromFile != null)
+                    {
+                        var newDefaultSetting = new TierDefaultSetting
+                        {
+                            Tier = tierValue,
+                            VideoDurationMinutes = tierConfigFromFile.VideoDurationMinutes,
+                            DailyVideoCount = tierConfigFromFile.DailyVideoCount,
+                            DailyTranslationRequests = tierConfigFromFile.DailyTranslationRequests,
+                            DailySrtLineLimit = tierConfigFromFile.DailySrtLineLimit,
+                            AllowedApis = Enum.TryParse<AllowedApis>(tierConfigFromFile.AllowedApis, true, out var apis) ? apis : AllowedApis.None,
+                            GrantedFeatures = Enum.TryParse<GrantedFeatures>(tierConfigFromFile.GrantedFeatures, true, out var features) ? features : GrantedFeatures.None
+                        };
+                        context.TierDefaultSettings.Add(newDefaultSetting);
+                    }
+                }
+                context.SaveChanges();
+                logger.LogInformation("Successfully seeded TierDefaultSettings.");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred during TierDefaultSettings seeding.");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred during DB migration or admin user seeding.");
+    }
+}
+
+
+// --- 6. Chạy ứng dụng ---
+// Cấu hình cổng lắng nghe linh hoạt
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FLY_APP_NAME")))
+{
+    app.Run("http://*:8080");
+}
+else
+{
+    app.Run();
+}

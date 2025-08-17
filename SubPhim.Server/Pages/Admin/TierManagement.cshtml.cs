@@ -33,6 +33,7 @@ namespace SubPhim.Server.Pages.Admin
             public AllowedApis AllowedApis { get; set; }
             public GrantedFeatures GrantedFeatures { get; set; }
             public int DailySrtLineLimit { get; set; }
+            public long TtsCharacterLimit { get; set; }
         }
 
         public async Task OnGetAsync()
@@ -51,13 +52,12 @@ namespace SubPhim.Server.Pages.Admin
                         DailyTranslationRequests = setting.DailyTranslationRequests,
                         AllowedApis = setting.AllowedApis,
                         GrantedFeatures = setting.GrantedFeatures,
-                        DailySrtLineLimit = setting.DailySrtLineLimit
+                        DailySrtLineLimit = setting.DailySrtLineLimit,
+                        TtsCharacterLimit = setting.TtsCharacterLimit
                     });
                 }
             }
         }
-
-        // SỬA LỖI: Handler mới để LƯU CẤU HÌNH MẶC ĐỊNH
         public async Task<IActionResult> OnPostSaveDefaultsAsync()
         {
             await using var transaction = await _context.Database.BeginTransactionAsync();
@@ -77,6 +77,7 @@ namespace SubPhim.Server.Pages.Admin
                         settingInDb.AllowedApis = formConfig.AllowedApis;
                         settingInDb.GrantedFeatures = formConfig.GrantedFeatures;
                         settingInDb.DailySrtLineLimit = formConfig.DailySrtLineLimit;
+                        settingInDb.TtsCharacterLimit = formConfig.TtsCharacterLimit;
                     }
                 }
                 await _context.SaveChangesAsync();
@@ -90,8 +91,6 @@ namespace SubPhim.Server.Pages.Admin
             }
             return RedirectToPage();
         }
-
-        // GIỮ NGUYÊN: Handler để áp dụng cho user hiện có
         public async Task<IActionResult> OnPostApplyToAllUsersAsync(SubscriptionTier tier)
         {
             if (!Configs.TryGetValue(tier, out var configToApply))
@@ -120,6 +119,7 @@ namespace SubPhim.Server.Pages.Admin
                     user.AllowedApiAccess = configToApply.AllowedApis;
                     user.GrantedFeatures = configToApply.GrantedFeatures;
                     user.DailySrtLineLimit = configToApply.DailySrtLineLimit;
+                    user.TtsCharacterLimit = configToApply.TtsCharacterLimit;
                 }
 
                 var count = await _context.SaveChangesAsync();

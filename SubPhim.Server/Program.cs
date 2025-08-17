@@ -22,6 +22,9 @@ builder.Services.Configure<LocalApiSettings>(
 builder.Services.Configure<UsageLimitsSettings>(
     builder.Configuration.GetSection("UsageLimits")
 );
+builder.Services.AddScoped<ITtsOrchestratorService, TtsOrchestratorService>();
+builder.Services.AddScoped<ITtsSettingsService, TtsSettingsService>();
+builder.Services.AddHostedService<TtsKeyResetService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<CleanupService>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
@@ -140,17 +143,14 @@ using (var scope = app.Services.CreateScope())
         {
             logger.LogCritical("!!!!!!!! DATABASE CONNECTION FAILED. CHECK CONNECTION STRING AND FILE PERMISSIONS. !!!!!!!");
         }
-        context.Database.Migrate(); // Luôn áp dụng các thay đổi cấu trúc DB
+        context.Database.Migrate();
 
         var adminUsername = "admin";
-        var defaultAdminPassword = "AdminMatKhauMoi123!"; // <-- ĐÂY LÀ MẬT KHẨU MỚI, HÃY NHỚ NÓ
-
-        // SỬA ĐỔI QUAN TRỌNG: TÌM user 'admin' thay vì chỉ kiểm tra tồn tại
+        var defaultAdminPassword = "AdminMatKhauMoi123!";
         var adminUser = context.Users.FirstOrDefault(u => u.Username == adminUsername);
 
         if (adminUser == null)
         {
-            // TRƯỜNG HỢP 1: TÀI KHOẢN ADMIN CHƯA TỒN TẠI -> TẠO MỚI
             logger.LogInformation("Admin user not found. Creating a new one.");
             adminUser = new User
             {
@@ -229,7 +229,31 @@ using (var scope = app.Services.CreateScope())
     {
         logger.LogError(ex, "An error occurred during DB migration or admin user seeding.");
     }
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        if (!context.TtsModelSettings.Any())
+        {
+            logger.LogInformation("Seeding default TTS Model Settings...");
+
+            var defaultSettings = new List<TtsModelSetting>
+            {
+                new TtsModelSetting { Provider = TtsProvider.Gemini, Identifier = "Pro", ModelName = "gemini-2.5-pro-preview-tts", MaxRequestsPerDay = 100, MaxRequestsPerMinute = 10 },
+                new TtsModelSetting { Provider = TtsProvider.Gemini, Identifier = "Flash", ModelName = "gemini-2.5-flash-preview-tts", MaxRequestsPerDay = 15, MaxRequestsPerMinute = 3 },
+                new TtsModelSetting { Provider = TtsProvider.ElevenLabs, Identifier = "ElevenLabs", ModelName = "eleven_multilingual_v2", MaxRequestsPerDay = -1, MaxRequestsPerMinute = -1 }
+            };
+
+            context.TtsModelSettings.AddRange(defaultSettings);
+            context.SaveChanges();
+            logger.LogInformation("Successfully seeded TTS Model Settings.");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred during TTS Model Settings seeding.");
+    }
 }
+
 
 
 // --- 6. Chạy ứng dụng ---

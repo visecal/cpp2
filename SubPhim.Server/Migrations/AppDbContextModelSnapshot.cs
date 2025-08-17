@@ -202,6 +202,9 @@ namespace SubPhim.Server.Migrations
                     b.Property<int>("Tier")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("AllowedApiAccess")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("AllowedApis")
                         .HasColumnType("INTEGER");
 
@@ -215,6 +218,9 @@ namespace SubPhim.Server.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("GrantedFeatures")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("TtsCharacterLimit")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("VideoDurationMinutes")
@@ -323,6 +329,84 @@ namespace SubPhim.Server.Migrations
                     b.ToTable("TranslationLogs");
                 });
 
+            modelBuilder.Entity("SubPhim.Server.Data.TtsApiKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CharacterLimit")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CharactersUsed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DisabledReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EncryptedApiKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Iv")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LastResetUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModelName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RequestsToday")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TtsApiKeys");
+                });
+
+            modelBuilder.Entity("SubPhim.Server.Data.TtsModelSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Identifier")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("MaxRequestsPerDay")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MaxRequestsPerMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TtsModelSettings");
+                });
+
             modelBuilder.Entity("SubPhim.Server.Data.User", b =>
                 {
                     b.Property<int>("Id")
@@ -372,6 +456,9 @@ namespace SubPhim.Server.Migrations
                     b.Property<DateTime>("LastSrtLineResetUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime>("LastTtsResetUtc")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("LastVideoResetUtc")
                         .HasColumnType("TEXT");
 
@@ -392,6 +479,12 @@ namespace SubPhim.Server.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Tier")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("TtsCharacterLimit")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("TtsCharactersUsed")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Uid")

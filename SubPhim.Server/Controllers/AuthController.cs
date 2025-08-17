@@ -1,15 +1,16 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options; 
 using Microsoft.IdentityModel.Tokens;
 using SubPhim.Server.Data;
+using SubPhim.Server.Services;
+using SubPhim.Server.Settings;
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options; 
-using SubPhim.Server.Settings;
-using SubPhim.Server.Services;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -91,7 +92,8 @@ public class AuthController : ControllerBase
         int RemainingRequests, int VideosProcessedToday,
         int DailyVideoLimit, List<DeviceDto> Devices,
          int SrtLinesUsedToday,
-    int DailySrtLineLimit
+    int DailySrtLineLimit, long TtsCharactersUsed,
+    long TtsCharacterLimit
     );
     public record SrtTranslateCheckRequest(int LineCount);
 
@@ -318,24 +320,25 @@ public class AuthController : ControllerBase
         }
         int remainingRequests = dailyTranslationLimit - user.DailyRequestCount;
         var userDto = new UserDto(
-    user.Id,
-    user.Username,
-    user.Uid,
-    user.Email,
-    user.Tier.ToString(),
-    user.SubscriptionExpiry ?? DateTime.MinValue,
-    token,
-    user.GrantedFeatures,
-    user.AllowedApiAccess,
-    Math.Max(0, remainingRequests),
-    user.VideosProcessedToday,
-    user.DailyVideoLimit,
-    user.Devices.OrderByDescending(d => d.LastLogin)
-                 .Select(d => new DeviceDto(d.Hwid, d.LastLoginIp, d.LastLogin)).ToList(),
-    // --- THÊM 2 DÒNG NÀY ---
-    user.SrtLinesUsedToday,
-    user.DailySrtLineLimit
-);
+        user.Id,
+        user.Username,
+        user.Uid,
+        user.Email,
+        user.Tier.ToString(),
+        user.SubscriptionExpiry ?? DateTime.MinValue,
+        token,
+        user.GrantedFeatures,
+        user.AllowedApiAccess,
+        Math.Max(0, remainingRequests),
+        user.VideosProcessedToday,
+        user.DailyVideoLimit,
+        user.Devices.OrderByDescending(d => d.LastLogin)
+                     .Select(d => new DeviceDto(d.Hwid, d.LastLoginIp, d.LastLogin)).ToList(),
+        user.SrtLinesUsedToday,
+        user.DailySrtLineLimit,
+        user.TtsCharactersUsed,     // <<< THÊM MỚI
+        user.TtsCharacterLimit      // <<< THÊM MỚI
+    );
         return Ok(userDto);
         // --- KẾT THÚC SỬA LOGIC ---
     }
@@ -344,24 +347,27 @@ public class AuthController : ControllerBase
     [Authorize]
     public async Task<IActionResult> RefreshProfile()
     {
+        Debug.WriteLine("[AuthController.RefreshProfile] Received request to refresh user profile.");
         var userIdString = User.FindFirstValue("id");
         if (!int.TryParse(userIdString, out int userId))
         {
+            Debug.WriteLine("[AuthController.RefreshProfile] Unauthorized: Invalid token, cannot parse user ID.");
             return Unauthorized("Token không hợp lệ.");
         }
 
-        // *** SỬA LỖI: Không dùng AsNoTracking() ở đây vì chúng ta cần LƯU thay đổi ***
         var user = await _context.Users
             .Include(u => u.Devices)
             .FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user == null)
         {
+            Debug.WriteLine($"[AuthController.RefreshProfile] NotFound: User with ID {userId} not found.");
             return NotFound("Tài khoản không còn tồn tại.");
         }
 
         if (user.IsBlocked)
         {
+            Debug.WriteLine($"[AuthController.RefreshProfile] Forbidden: User '{user.Username}' is blocked.");
             return StatusCode(403, "Tài khoản của bạn đã bị khóa.");
         }
 
@@ -377,6 +383,7 @@ public class AuthController : ControllerBase
             user.DailyRequestCount = 0;
             user.LastRequestResetUtc = DateTime.UtcNow.Date;
             hasChanges = true;
+            Debug.WriteLine($"[AuthController.RefreshProfile] Resetting DailyRequestCount for user '{user.Username}'.");
         }
 
         // 2. Reset bộ đếm Xử lý Video
@@ -386,6 +393,7 @@ public class AuthController : ControllerBase
             user.VideosProcessedToday = 0;
             user.LastVideoResetUtc = DateTime.UtcNow.Date;
             hasChanges = true;
+            Debug.WriteLine($"[AuthController.RefreshProfile] Resetting VideosProcessedToday for user '{user.Username}'.");
         }
 
         // 3. Reset bộ đếm Dịch SRT
@@ -395,6 +403,7 @@ public class AuthController : ControllerBase
             user.SrtLinesUsedToday = 0;
             user.LastSrtLineResetUtc = DateTime.UtcNow.Date;
             hasChanges = true;
+            Debug.WriteLine($"[AuthController.RefreshProfile] Resetting SrtLinesUsedToday for user '{user.Username}'.");
         }
 
         // 4. Reset bộ đếm Dịch SRT Local
@@ -404,12 +413,26 @@ public class AuthController : ControllerBase
             user.LocalSrtLinesUsedToday = 0;
             user.LastLocalSrtResetUtc = DateTime.UtcNow.Date;
             hasChanges = true;
+            Debug.WriteLine($"[AuthController.RefreshProfile] Resetting LocalSrtLinesUsedToday for user '{user.Username}'.");
         }
+
+        // <<< BẮT ĐẦU THÊM MỚI LOGIC RESET TTS >>>
+        // 5. Reset bộ đếm Ký tự TTS (CHỈ CHO GÓI FREE)
+        var lastTtsResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(user.LastTtsResetUtc, vietnamTimeZone);
+        if (user.Tier == SubscriptionTier.Free && lastTtsResetInVietnam.Date < vietnamNow.Date)
+        {
+            user.TtsCharactersUsed = 0;
+            user.LastTtsResetUtc = DateTime.UtcNow.Date;
+            hasChanges = true;
+            Debug.WriteLine($"[AuthController.RefreshProfile] Resetting TtsCharactersUsed for FREE user '{user.Username}'.");
+        }
+        // <<< KẾT THÚC THÊM MỚI LOGIC RESET TTS >>>
 
         // Chỉ lưu vào DB nếu có sự thay đổi
         if (hasChanges)
         {
             await _context.SaveChangesAsync();
+            Debug.WriteLine($"[AuthController.RefreshProfile] Saved daily reset changes for user '{user.Username}'.");
         }
         // --- KẾT THÚC LOGIC RESET TẬP TRUNG ---
 
@@ -438,7 +461,9 @@ public class AuthController : ControllerBase
             user.Devices.OrderByDescending(d => d.LastLogin)
                          .Select(d => new DeviceDto(d.Hwid, d.LastLoginIp, d.LastLogin)).ToList(),
             user.SrtLinesUsedToday,
-            user.DailySrtLineLimit
+            user.DailySrtLineLimit,
+            user.TtsCharactersUsed,     // <<< THÊM MỚI
+            user.TtsCharacterLimit      // <<< THÊM MỚI
         );
         return Ok(userDto);
     }

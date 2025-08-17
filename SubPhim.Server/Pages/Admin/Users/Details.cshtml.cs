@@ -63,6 +63,8 @@ namespace SubPhim.Server.Pages.Admin.Users
             userInDb.DailyVideoLimit = User.DailyVideoLimit;
             userInDb.DailySrtLineLimit = User.DailySrtLineLimit;
             userInDb.SrtLinesUsedToday = User.SrtLinesUsedToday;
+            userInDb.TtsCharacterLimit = User.TtsCharacterLimit;
+            userInDb.TtsCharactersUsed = User.TtsCharactersUsed;
             var selectedApis = AllowedApis.None;
             if (Request.Form.ContainsKey("allowedApis"))
             {

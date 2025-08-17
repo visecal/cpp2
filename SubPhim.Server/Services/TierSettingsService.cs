@@ -2,6 +2,7 @@
 using SubPhim.Server.Data;
 using SubPhim.Server.Settings;
 using System;
+using System.Diagnostics;
 
 namespace SubPhim.Server.Services
 {
@@ -17,6 +18,8 @@ namespace SubPhim.Server.Services
 
         public void ApplyTierSettings(User user, SubscriptionTier tier)
         {
+            Debug.WriteLine($"[TierSettingsService] Applying settings for Tier '{tier}' to User '{user.Username}'.");
+
             // Tạo một scope riêng để lấy DbContext, tránh lỗi lifetime
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -28,17 +31,27 @@ namespace SubPhim.Server.Services
             {
                 // Fallback an toàn nếu không tìm thấy setting trong DB
                 // (trường hợp này hiếm khi xảy ra sau khi đã seed)
+                Debug.WriteLine($"[TierSettingsService] WARNING: No default settings found for Tier '{tier}'. Applying safe defaults.");
                 ApplySafeDefaults(user, tier);
                 return;
             }
 
             user.Tier = tier;
             user.GrantedFeatures = defaultSettings.GrantedFeatures;
-            user.AllowedApiAccess = defaultSettings.AllowedApis;
+            user.AllowedApiAccess = defaultSettings.AllowedApiAccess;
             user.VideoDurationLimitMinutes = defaultSettings.VideoDurationMinutes;
             user.DailyVideoLimit = defaultSettings.DailyVideoCount;
             user.DailyRequestLimitOverride = defaultSettings.DailyTranslationRequests;
             user.DailySrtLineLimit = defaultSettings.DailySrtLineLimit;
+
+            // <<< BẮT ĐẦU SỬA ĐỔI >>>
+            user.TtsCharacterLimit = defaultSettings.TtsCharacterLimit;
+            // Khi đổi gói, reset lại số ký tự đã dùng
+            user.TtsCharactersUsed = 0;
+            user.LastTtsResetUtc = DateTime.UtcNow;
+            Debug.WriteLine($"[TierSettingsService] Applied TTS Character Limit: {user.TtsCharacterLimit}. Usage reset.");
+            // <<< KẾT THÚC SỬA ĐỔI >>>
+
             user.MaxDevices = (tier == SubscriptionTier.Free) ? 1 : 1;
 
             if (tier == SubscriptionTier.Free)
@@ -46,7 +59,6 @@ namespace SubPhim.Server.Services
                 user.SubscriptionExpiry = null;
             }
         }
-
         private void ApplySafeDefaults(User user, SubscriptionTier tier)
         {
             user.Tier = tier;

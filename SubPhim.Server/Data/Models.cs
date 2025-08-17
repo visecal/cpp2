@@ -4,6 +4,19 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SubPhim.Server.Data
 {
+    public enum TtsProvider
+    {
+        ElevenLabs = 1,
+        Gemini = 2
+    }
+
+    public enum GeminiModelType
+    {
+        None = 0, // Dùng cho các provider không phải Gemini
+        Flash = 1, // gemini-2.5-flash-preview-tts
+        Pro = 2    // gemini-2.5-pro-preview-tts
+    }
+
     [Flags]
     public enum GrantedFeatures
     {
@@ -89,8 +102,78 @@ namespace SubPhim.Server.Data
         [Display(Name = "Lần cuối reset bộ đếm SRT (UTC)")]
         public DateTime LastSrtLineResetUtc { get; set; } = DateTime.UtcNow;
         public bool IsAdmin { get; set; } = false;
-    }
+        [Display(Name = "Giới hạn ký tự TTS")]
+        public long TtsCharacterLimit { get; set; } = 500; // Mặc định cho Free
 
+        [Display(Name = "Số ký tự TTS đã dùng")]
+        public long TtsCharactersUsed { get; set; } = 0;
+
+        [Display(Name = "Lần cuối reset bộ đếm TTS (UTC)")]
+        public DateTime LastTtsResetUtc { get; set; } = DateTime.UtcNow;
+    }
+    public class TtsApiKey
+    {
+        public int Id { get; set; }
+
+        [Required]
+        public string EncryptedApiKey { get; set; }
+        [Required]
+        public string Iv { get; set; }
+
+        [Display(Name = "Nhà cung cấp")]
+        public TtsProvider Provider { get; set; }
+
+        [Display(Name = "Tên Model (chỉ cho Gemini)")]
+        [StringLength(100)]
+        public string? ModelName { get; set; } // Sửa thành nullable, vì ElevenLabs không cần
+
+        [Display(Name = "Đang hoạt động")]
+        public bool IsEnabled { get; set; } = true;
+
+        [Display(Name = "Số Request Hôm Nay (Gemini)")]
+        public int RequestsToday { get; set; } = 0;
+
+        // <<< BẮT ĐẦU THÊM/SỬA CÁC TRƯỜNG CHO ELEVENLABS >>>
+        [Display(Name = "Giới hạn Ký tự")]
+        public long CharacterLimit { get; set; } = 10000; // Mặc định 10,000 cho ElevenLabs
+
+        [Display(Name = "Ký tự Đã dùng")]
+        public long CharactersUsed { get; set; } = 0;
+        // <<< KẾT THÚC THÊM/SỬA CÁC TRƯỜNG CHO ELEVENLABS >>>
+
+        [Display(Name = "Lần cuối reset (UTC)")]
+        public DateTime LastResetUtc { get; set; } = DateTime.UtcNow;
+
+        [Display(Name = "Lý do bị vô hiệu hóa")]
+        [StringLength(200)]
+        public string? DisabledReason { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+    public class TtsModelSetting
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [Display(Name = "Tên Model (chỉ cho Gemini)")]
+        [StringLength(100)]
+        public string? ModelName { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "Mã nhận dạng (Flash/Pro)")]
+        public string Identifier { get; set; }
+
+        [Display(Name = "Giới hạn Request/Ngày (RPD)")]
+        public int MaxRequestsPerDay { get; set; }
+
+        [Display(Name = "Giới hạn Request/Phút (RPM)")]
+        public int MaxRequestsPerMinute { get; set; }
+
+        [Display(Name = "Nhà cung cấp")]
+        public TtsProvider Provider { get; set; } 
+
+    }
     public class Device
     {
         public int Id { get; set; }
@@ -129,15 +212,13 @@ namespace SubPhim.Server.Data
         [Display(Name = "Tổng Tokens Đã Dùng")]
         public long TotalTokensUsed { get; set; } = 0;
 
-        // === BẮT ĐẦU THÊM CÁC TRƯỜNG MỚI ===
         [Display(Name = "Số Request Hôm Nay")]
         public int RequestsToday { get; set; } = 0;
 
         [Display(Name = "Lần cuối reset bộ đếm Request (UTC)")]
         public DateTime LastRequestCountResetUtc { get; set; } = DateTime.UtcNow;
-        // === KẾT THÚC THÊM CÁC TRƯỜNG MỚI ===
 
-        [Display(Name = "Nhóm API")]
+        [Display(Name = "Nhóm API (Local)")]
         public ApiPoolType PoolType { get; set; } = ApiPoolType.Paid;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -193,8 +274,11 @@ namespace SubPhim.Server.Data
         public int DailyVideoCount { get; set; }
         public int DailyTranslationRequests { get; set; }
         public AllowedApis AllowedApis { get; set; }
+        public AllowedApis AllowedApiAccess { get; set; }
         public GrantedFeatures GrantedFeatures { get; set; }
         public int DailySrtLineLimit { get; set; }
+        [Display(Name = "Giới hạn ký tự TTS")]
+        public long TtsCharacterLimit { get; set; }
     }
     public class AvailableApiModel
     {

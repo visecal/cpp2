@@ -16,7 +16,9 @@ namespace SubPhim.Server.Data
         public DbSet<TranslationJobDb> TranslationJobs { get; set; }
         public DbSet<OriginalSrtLineDb> OriginalSrtLines { get; set; }
         public DbSet<TranslatedSrtLineDb> TranslatedSrtLines { get; set; }
+        public DbSet<TtsApiKey> TtsApiKeys { get; set; }
 
+        public DbSet<TtsModelSetting> TtsModelSettings { get; set; }
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options){}
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

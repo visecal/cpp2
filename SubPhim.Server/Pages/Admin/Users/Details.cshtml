@@ -84,7 +84,7 @@
 
                     <!-- *** KHÔI PHỤC CHỨC NĂNG TẠI ĐÂY *** -->
                     <hr />
-                    <h6 class="text-muted">Giới hạn Dịch Thuật</h6>
+                    <h6 class="text-muted">Giới hạn Dịch Thuật & TTS</h6>
                     <div class="mb-3">
                         <label class="form-label" asp-for="User.DailyRequestLimitOverride"></label>
                         <input type="number" class="form-control" asp-for="User.DailyRequestLimitOverride" />
@@ -100,7 +100,16 @@
                             <input type="number" class="form-control" asp-for="User.SrtLinesUsedToday" />
                         </div>
                     </div>
-
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" asp-for="User.TtsCharacterLimit"></label>
+                            <input type="number" class="form-control" asp-for="User.TtsCharacterLimit" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" asp-for="User.TtsCharactersUsed"></label>
+                            <input type="number" class="form-control" asp-for="User.TtsCharactersUsed" />
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="card mb-4">

@@ -57,18 +57,27 @@
                             </div>
                         </div>
 
-                        <h5 class="mt-4"><i class="bi bi-translate me-2"></i>Giới hạn dịch truyện</h5>
+                        <h5 class="mt-4"><i class="bi bi-translate me-2"></i>Giới hạn dịch & TTS</h5>
                         <div class="row mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
+                                @* Sửa col-md-6 thành 4 *@
                                 <label class="form-label">Số request dịch / ngày</label>
                                 <input type="number" name="Configs[@tier].DailyTranslationRequests" value="@config.DailyTranslationRequests" class="form-control" />
-                                <div class="form-text">Áp dụng cho các gói giới hạn. Nhập -1 để không giới hạn.</div>
+                                <div class="form-text">Áp dụng cho dịch truyện.</div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
+                                @* Sửa col-md-6 thành 4 *@
                                 <label class="form-label">Số dòng dịch SRT / ngày</label>
                                 <input type="number" name="Configs[@tier].DailySrtLineLimit" value="@config.DailySrtLineLimit" class="form-control" />
-                                <div class="form-text">Áp dụng cho dịch file SRT. Nhập số rất lớn để coi như không giới hạn.</div>
+                                <div class="form-text">Áp dụng cho dịch file SRT.</div>
                             </div>
+                            @* <<< BẮT ĐẦU THÊM MỚI >>> *@
+                            <div class="col-md-4">
+                                <label class="form-label">Giới hạn ký tự TTS</label>
+                                <input type="number" name="Configs[@tier].TtsCharacterLimit" value="@config.TtsCharacterLimit" class="form-control" />
+                                <div class="form-text">Gói Free reset hàng ngày, gói trả phí là tổng.</div>
+                            </div>
+                            @* <<< KẾT THÚC THÊM MỚI >>> *@
                         </div>
 
                         <h5 class="mt-4"><i class="bi bi-key me-2"></i>Quyền truy cập API</h5>

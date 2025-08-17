@@ -3,10 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using SubPhim.Server.Data;
 using SubPhim.Server.Services;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using PagedList.Core;
 
 namespace SubPhim.Server.Pages.Admin.Users
 {
@@ -21,15 +18,21 @@ namespace SubPhim.Server.Pages.Admin.Users
         }
 
         [BindProperty(SupportsGet = true)]
-        public string SearchString { get; set; }
+        public string? SearchString { get; set; }
 
-        public IList<UserViewModel> Users { get; set; } = new List<UserViewModel>();
+        [BindProperty(SupportsGet = true)]
+        public int PageNumber { get; set; } = 1;
+
+        public IPagedList<UserViewModel>? Users { get; set; }
+
         public List<string> AllFeatureNames => Enum.GetNames(typeof(GrantedFeatures)).Where(f => f != "None").ToList();
         public List<string> AllApiNames => Enum.GetNames(typeof(AllowedApis)).Where(a => a != "None").ToList();
 
         public async Task OnGetAsync()
         {
-            var query = _context.Users.AsQueryable();
+            IQueryable<User> query = _context.Users
+                .AsNoTracking()
+                .Include(u => u.Devices); // Thêm Include ở đây
 
             if (!string.IsNullOrEmpty(SearchString))
             {
@@ -39,31 +42,41 @@ namespace SubPhim.Server.Pages.Admin.Users
                                          u.Uid.Contains(SearchString));
             }
 
-            Users = await query
-                .AsNoTracking()
+            var totalItemCount = await query.CountAsync();
+            const int pageSize = 20;
+
+            var usersForCurrentPage = await query
                 .OrderByDescending(u => u.CreatedAt)
-                .Select(u => new UserViewModel
-                {
-                    Id = u.Id,
-                    Uid = u.Uid,
-                    Username = u.Username,
-                    Email = u.Email,
-                    Tier = u.Tier.ToString(),
-                    SubscriptionExpiry = u.SubscriptionExpiry,
-                    IsBlocked = u.IsBlocked,
-                    VideosProcessedToday = u.VideosProcessedToday,
-                    DailyVideoLimit = u.DailyVideoLimit,
-                    DailyRequestCount = u.DailyRequestCount,
-                    DailyRequestLimitOverride = u.DailyRequestLimitOverride,
-                    AllowedApiAccess = u.AllowedApiAccess,
-                    GrantedFeatures = u.GrantedFeatures,
-                    LastLogin = u.Devices.Any() ? u.Devices.Max(d => d.LastLogin) : (DateTime?)null,
-                    SrtLinesUsedToday = u.SrtLinesUsedToday,
-                    DailySrtLineLimit = u.DailySrtLineLimit,
-                    DailyLocalSrtLimit = u.DailyLocalSrtLimit
-                })
+                .Skip((PageNumber - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
+
+            var userViewModels = usersForCurrentPage.Select(u => new UserViewModel
+            {
+                Id = u.Id,
+                Uid = u.Uid,
+                Username = u.Username,
+                Email = u.Email,
+                Tier = u.Tier.ToString(),
+                SubscriptionExpiry = u.SubscriptionExpiry,
+                IsBlocked = u.IsBlocked,
+                VideosProcessedToday = u.VideosProcessedToday,
+                DailyVideoLimit = u.DailyVideoLimit,
+                DailyRequestCount = u.DailyRequestCount,
+                DailyRequestLimitOverride = u.DailyRequestLimitOverride,
+                AllowedApiAccess = u.AllowedApiAccess,
+                GrantedFeatures = u.GrantedFeatures,
+                LastLogin = u.Devices.Any() ? u.Devices.Max(d => d.LastLogin) : (DateTime?)null, // Bây giờ sẽ hoạt động đúng
+                SrtLinesUsedToday = u.SrtLinesUsedToday,
+                DailySrtLineLimit = u.DailySrtLineLimit,
+                DailyLocalSrtLimit = u.DailyLocalSrtLimit,
+                TtsCharactersUsed = u.TtsCharactersUsed,
+                TtsCharacterLimit = u.TtsCharacterLimit
+            }).ToList();
+
+            Users = new StaticPagedList<UserViewModel>(userViewModels, PageNumber, pageSize, totalItemCount);
         }
+
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> OnPostResetAllDevicesAsync()
         {
@@ -282,6 +295,10 @@ namespace SubPhim.Server.Pages.Admin.Users
         public int DailyLocalSrtLimit { get; set; }
         public int SrtLinesUsedToday { get; set; }
         public int DailySrtLineLimit { get; set; }
+
+        //tts
+        public long TtsCharactersUsed { get; set; }
+        public long TtsCharacterLimit { get; set; }
 
     }
 

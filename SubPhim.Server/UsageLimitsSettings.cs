@@ -21,5 +21,6 @@ namespace SubPhim.Server.Settings
         public string AllowedApis { get; set; } // Giữ là string để dễ parse
         public string GrantedFeatures { get; set; } // Giữ là string để dễ parse
         public int DailySrtLineLimit { get; set; }
+        public long TtsCharacterLimit { get; set; }
     }
 }

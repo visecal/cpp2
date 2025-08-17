@@ -3,12 +3,13 @@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
 @using SubPhim.Server.Utils
 @using SubPhim.Server.Data
+@using PagedList.Core.Mvc;
+
 @{
     ViewData["Title"] = "Quản lý người dùng";
     Layout = "~/Pages/Shared/_AdminLayout.cshtml";
 }
 
-@* SỬA LỖI: Thêm TempData để hiển thị thông báo từ nút Reset *@
 @if (TempData["SuccessMessage"] != null)
 {
     <div class="alert alert-success">@TempData["SuccessMessage"]</div>
@@ -18,18 +19,15 @@
     <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
 }
 
-
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h1>@ViewData["Title"]</h1>
     <div class="d-flex gap-2">
-        @* THÊM MỚI: Nút Reset Tất Cả Thiết Bị *@
-        <form method="post" asp-page-handler="ResetAllDevices" onsubmit="return confirm('CẢNH BÁO CỰC KỲ NGUY HIỂM!\n\nHành động này sẽ xóa TOÀN BỘ thông tin đăng nhập thiết bị của TẤT CẢ người dùng.\nTất cả mọi người sẽ bị buộc đăng xuất khỏi ứng dụng.\n\nBạn có chắc chắn muốn tiếp tục không?');">
+        <form method="post" asp-page-handler="ResetAllDevices" onsubmit="return confirm('CẢNH BÁO!\n\nHành động này sẽ xóa TOÀN BỘ thông tin đăng nhập thiết bị của TẤT CẢ người dùng.\n\nBạn có chắc chắn muốn tiếp tục không?');">
             @Html.AntiForgeryToken()
             <button type="submit" class="btn btn-danger">
                 <i class="bi bi-hdd-stack-x-fill"></i> Reset Tất Cả Thiết Bị
             </button>
         </form>
-
         <a asp-page="Create" class="btn btn-success">
             <i class="bi bi-person-plus-fill"></i> Tạo User Mới
         </a>
@@ -60,6 +58,7 @@
                         <th>Dịch Truyện (dùng/tổng)</th>
                         <th>Dịch SRT (dùng/tổng)</th>
                         <th>Dịch SRT Local</th>
+                        <th>TTS (dùng/tổng)</th>
                         <th style="min-width: 200px;">Quyền API</th>
                         <th style="min-width: 200px;">Quyền Tính Năng</th>
                         <th>Đăng nhập cuối</th>
@@ -67,7 +66,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @if (Model.Users.Any())
+                    @if (Model.Users != null && Model.Users.Any())
                     {
                         @foreach (var user in Model.Users)
                         {
@@ -86,21 +85,16 @@
                                 <td id="request-limit-cell-@user.Id">@user.DailyRequestCount / @(user.DailyRequestLimitOverride == -1 ? "∞" : user.DailyRequestLimitOverride)</td>
                                 <td id="srt-limit-cell-@user.Id">@user.SrtLinesUsedToday / @user.DailySrtLineLimit</td>
                                 <td id="local-srt-limit-cell-@user.Id">@user.DailyLocalSrtLimit</td>
+                                <td id="tts-limit-cell-@user.Id">@user.TtsCharactersUsed / @user.TtsCharacterLimit</td>
                                 <td id="apis-cell-@user.Id">@Html.Raw(DisplayHelper.FormatFlags(user.AllowedApiAccess))</td>
                                 <td id="features-cell-@user.Id">@Html.Raw(DisplayHelper.FormatFlags(user.GrantedFeatures))</td>
                                 <td>@(user.LastLogin?.ToVietNamTimeString("g") ?? "Chưa đăng nhập")</td>
                                 <td class="text-center">
-                                    <button class="btn btn-sm btn-warning manage-permissions-btn"
-                                            data-bs-toggle="modal" data-bs-target="#permissionsModal"
-                                            data-user-id="@user.Id"
-                                            data-user-name="@user.Username"
-                                            data-user-tier="@user.Tier"
-                                            data-granted-features="@user.GrantedFeatures"
-                                            data-allowed-apis="@user.AllowedApiAccess"
-                                            data-daily-video-limit="@user.DailyVideoLimit"
-                                            data-daily-request-limit="@user.DailyRequestLimitOverride"
-                                            data-daily-srt-limit="@user.DailySrtLineLimit"
-                                            data-daily-local-srt-limit="@user.DailyLocalSrtLimit">
+                                    <button class="btn btn-sm btn-warning manage-permissions-btn" data-bs-toggle="modal" data-bs-target="#permissionsModal"
+                                            data-user-id="@user.Id" data-user-name="@user.Username" data-user-tier="@user.Tier"
+                                            data-granted-features="@user.GrantedFeatures" data-allowed-apis="@user.AllowedApiAccess"
+                                            data-daily-video-limit="@user.DailyVideoLimit" data-daily-request-limit="@user.DailyRequestLimitOverride"
+                                            data-daily-srt-limit="@user.DailySrtLineLimit" data-daily-local-srt-limit="@user.DailyLocalSrtLimit">
                                         <i class="bi bi-key-fill"></i> Sửa quyền
                                     </button>
                                 </td>
@@ -117,7 +111,7 @@
 
         <!-- CHẾ ĐỘ CARD CHO MOBILE -->
         <div class="d-lg-none">
-            @if (Model.Users.Any())
+            @if (Model.Users != null && Model.Users.Any())
             {
                 @foreach (var user in Model.Users)
                 {
@@ -153,17 +147,11 @@
                             </div>
                         </div>
                         <div class="card-footer bg-transparent border-0 pt-0">
-                            <button class="btn btn-sm btn-warning w-100 manage-permissions-btn"
-                                    data-bs-toggle="modal" data-bs-target="#permissionsModal"
-                                    data-user-id="@user.Id"
-                                    data-user-name="@user.Username"
-                                    data-user-tier="@user.Tier"
-                                    data-granted-features="@user.GrantedFeatures"
-                                    data-allowed-apis="@user.AllowedApiAccess"
-                                    data-daily-video-limit="@user.DailyVideoLimit"
-                                    data-daily-request-limit="@user.DailyRequestLimitOverride"
-                                    data-daily-srt-limit="@user.DailySrtLineLimit"
-                                    data-daily-local-srt-limit="@user.DailyLocalSrtLimit">
+                            <button class="btn btn-sm btn-warning w-100 manage-permissions-btn" data-bs-toggle="modal" data-bs-target="#permissionsModal"
+                                    data-user-id="@user.Id" data-user-name="@user.Username" data-user-tier="@user.Tier"
+                                    data-granted-features="@user.GrantedFeatures" data-allowed-apis="@user.AllowedApiAccess"
+                                    data-daily-video-limit="@user.DailyVideoLimit" data-daily-request-limit="@user.DailyRequestLimitOverride"
+                                    data-daily-srt-limit="@user.DailySrtLineLimit" data-daily-local-srt-limit="@user.DailyLocalSrtLimit">
                                 <i class="bi bi-key-fill"></i> Sửa quyền
                             </button>
                         </div>
@@ -176,8 +164,16 @@
             }
         </div>
     </div>
+    @if (Model.Users != null && Model.Users.PageCount > 1)
+    {
+        <div class="card-footer d-flex justify-content-center">
+            <!-- SỬA LỖI: Dùng tùy chọn Bootstrap4PageNumbersOnly -->
+            <pager class="pager-container" list="@Model.Users"
+                   asp-route-searchString="@Model.SearchString"
+                   options="@PagedListRenderOptions.Bootstrap4PageNumbersOnly" />
+        </div>
+    }
 </div>
-
 <!-- Modal Chỉnh sửa quyền -->
 <div class="modal fade" id="permissionsModal" tabindex="-1" aria-labelledby="permissionsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">

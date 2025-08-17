@@ -1,0 +1,1270 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\subphimv1\\SubPhim.Server\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\ttskeyresetservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\ttskeyresetservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\ttsorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\ttsorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\controllers\\ttscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\controllers\\ttscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\ittsorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\ittsorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\ttsmanagement.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\ttsmanagement.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\data\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\data\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\tiersettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\tiersettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\users\\details.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\users\\details.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\users\\details.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\users\\details.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\users\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\users\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\users\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\users\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\tiermanagement.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\tiermanagement.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\tiermanagement.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\tiermanagement.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\usagelimitssettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\usagelimitssettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\ttsmanagement.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\ttsmanagement.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\ttssettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\ttssettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\ittssettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\ittssettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\ttsmodelsettings.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\ttsmodelsettings.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\data\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\data\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\shared\\_adminlayout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\shared\\_adminlayout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\ttsmodelsettings.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\ttsmodelsettings.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\cleanupservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\cleanupservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\translationorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\translationorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\controllers\\launcheraiocontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\controllers\\launcheraiocontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\localapi\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\localapi\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\localapi\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\localapi\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\models\\insufficientquotaexception.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\models\\insufficientquotaexception.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\models\\translationsession.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\models\\translationsession.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\_viewimports.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\_viewimports.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\fly||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\fly||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\middleware\\requestloggingmiddleware.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\middleware\\requestloggingmiddleware.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\backuprestore.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\backuprestore.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\backuprestore.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\backuprestore.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Program Files\\dotnet\\sdk\\9.0.300\\Sdks\\Microsoft.NET.Sdk.StaticWebAssets\\targets\\Microsoft.NET.Sdk.StaticWebAssets.targets||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\data\\configseeder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\data\\configseeder.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\users\\create.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\users\\create.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\users\\create.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\users\\create.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\servercontrol.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\servercontrol.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\login.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\login.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\login.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\login.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\itiersettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\itiersettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\servercontrol.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\servercontrol.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\helper\\localapisettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\helper\\localapisettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\encryptionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\encryptionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\iencryptionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\iencryptionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\views\\_viewimports.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\views\\_viewimports.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\views\\_viewstart.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\views\\_viewstart.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\helper\\displayhelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\helper\\displayhelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\shared\\_adminlayout.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\shared\\_adminlayout.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\data\\seeddata.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\data\\seeddata.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\dockerfile||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\dockerfile||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\models\\errorviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\models\\errorviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\helper\\timezonehelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\helper\\timezonehelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\controllers\\homecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\controllers\\homecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\banning\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\banning\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\banning\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\banning\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\subphim.server.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\subphim.server.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\views\\home\\privacy.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\views\\home\\privacy.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\SrtTranslatorApp\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181303_Add_UserMaxDevices_And_DeviceIp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250717192650_add_email_and_devicename.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250717192650_add_email_and_devicename.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250717183532_allownull_lastloginip.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250717183532_allownull_lastloginip.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250717181343_add_usermanagement_features.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250717181343_add_usermanagement_features.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250717180105_add_maxdevices_and_ipaddress.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250717180105_add_maxdevices_and_ipaddress.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250717145528_initialcreate.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250717145528_initialcreate.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250719092216_addrequesttrackingtouser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250719092216_addrequesttrackingtouser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250719172659_addusagelimittracking.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250719172659_addusagelimittracking.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250725125304_addisadminflagtouser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250725125304_addisadminflagtouser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250728165648_addtierdefaultsettingstable121.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250728165648_addtierdefaultsettingstable121.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250728163649_addlocalapisettingstablesssss.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250728163649_addlocalapisettingstablesssss.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250729102758_addapipooltype.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250729102758_addapipooltype.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250729030436_addsr3131231.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250729030436_addsr3131231.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250810162636_addsrtlimitfields54346\u002B45.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250810162636_addsrtlimitfields54346\u002B45.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250810160146_addsrtlimitfields31414156468797.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250810160146_addsrtlimitfields31414156468797.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250810152224_addsrtlimitfields5646846541.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250810152224_addsrtlimitfields5646846541.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 635,
+          "SelectedChildIndex": 8,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\appsettings.json",
+              "RelativeDocumentMoniker": "SubPhim.Server\\appsettings.json",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\appsettings.json",
+              "RelativeToolTip": "SubPhim.Server\\appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAC4AAAAkAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2025-08-12T01:20:10.717Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "Models.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\Models.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Data\\Models.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\Models.cs",
+              "RelativeToolTip": "SubPhim.Server\\Data\\Models.cs",
+              "ViewState": "AgIAAJAAAAAAAAAAAAAqwJ8AAAAuAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T14:44:32.059Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "TierSettingsService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TierSettingsService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TierSettingsService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TierSettingsService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\TierSettingsService.cs",
+              "ViewState": "AgIAAAgAAAAAAAAAAIA0wBIAAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-25T12:26:54.806Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "Index.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml.cs",
+              "ViewState": "AgIAABYAAAAAAAAAAAAcwEcAAAA6AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T15:21:05.634Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml",
+              "ViewState": "AgIAADYAAAAAAAAAAAAUwFcAAAB3AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-17T15:20:43.745Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "TtsManagement.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml.cs",
+              "ViewState": "AgIAAFIAAAAAAAAAAAAcwHkAAAARAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T15:24:16.239Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "Details.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml.cs",
+              "ViewState": "AgIAABUAAAAAAAAAAAAcwEIAAABAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T15:21:45Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Program.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Program.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Program.cs",
+              "RelativeToolTip": "SubPhim.Server\\Program.cs",
+              "ViewState": "AgIAAG8AAAAAAAAAAAAowJEAAAAjAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T14:40:23.267Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "TtsKeyResetService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TtsKeyResetService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TtsKeyResetService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TtsKeyResetService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\TtsKeyResetService.cs",
+              "ViewState": "AgIAAC8AAAAAAAAAAAAswG4AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T15:26:13.691Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "TtsOrchestratorService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TtsOrchestratorService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TtsOrchestratorService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TtsOrchestratorService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\TtsOrchestratorService.cs",
+              "ViewState": "AgIAAOwAAAAAAAAAAAAewA0BAADeAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T15:25:31.054Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ITtsOrchestratorService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\ITtsOrchestratorService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\ITtsOrchestratorService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\ITtsOrchestratorService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\ITtsOrchestratorService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T15:25:18.204Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "TtsController.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\TtsController.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\TtsController.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\TtsController.cs",
+              "RelativeToolTip": "SubPhim.Server\\Controllers\\TtsController.cs",
+              "ViewState": "AgIAAD4AAAAAAAAAAAAvwF0AAACvAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T15:26:40.386Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "TierManagement.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
+              "ViewState": "AgIAAB8AAAAAAAAAAAAAwDsAAABlAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-19T20:05:19.522Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "TierManagement.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
+              "ViewState": "AgIAAD8AAAAAAAAAAAApwHkAAABNAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-19T20:05:53.72Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "AuthController.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\AuthController.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\AuthController.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\AuthController.cs",
+              "RelativeToolTip": "SubPhim.Server\\Controllers\\AuthController.cs",
+              "ViewState": "AgIAAKABAAAAAAAAAAAowNQBAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T14:56:04.968Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "UsageLimitsSettings.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\UsageLimitsSettings.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\UsageLimitsSettings.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\UsageLimitsSettings.cs",
+              "RelativeToolTip": "SubPhim.Server\\UsageLimitsSettings.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAAzAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-25T11:23:24.062Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "Details.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml",
+              "ViewState": "AgIAADsAAAAAAAAAAAAkwG8AAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-17T15:21:36.195Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 19,
+              "Title": "ITtsSettingsService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\ITtsSettingsService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\ITtsSettingsService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\ITtsSettingsService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\ITtsSettingsService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T15:49:53.649Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "TtsManagement.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml",
+              "ViewState": "AgIAAGIAAAAAAAAAAAAowIUAAABDAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-08-10T15:24:12.108Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 75,
+              "Title": "20250810162636_AddSrtLimitFields54346\u002B45.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250810162636_AddSrtLimitFields54346\u002B45.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250810162636_AddSrtLimitFields54346\u002B45.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250810162636_AddSrtLimitFields54346\u002B45.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250810162636_AddSrtLimitFields54346\u002B45.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T16:26:36.917Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 18,
+              "Title": "TtsSettingsService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TtsSettingsService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TtsSettingsService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TtsSettingsService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\TtsSettingsService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABYAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T15:50:08.154Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 20,
+              "Title": "TtsModelSettings.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAFwAAAAGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-08-10T15:53:29.772Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 76,
+              "Title": "20250810160146_AddSrtLimitFields31414156468797.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250810160146_AddSrtLimitFields31414156468797.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250810160146_AddSrtLimitFields31414156468797.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250810160146_AddSrtLimitFields31414156468797.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250810160146_AddSrtLimitFields31414156468797.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T16:01:46.507Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 22,
+              "Title": "_AdminLayout.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAB4AAAAZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-17T15:20:10.141Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 23,
+              "Title": "TtsModelSettings.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAEAAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T15:53:40.904Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 21,
+              "Title": "AppDbContext.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\AppDbContext.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Data\\AppDbContext.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\AppDbContext.cs",
+              "RelativeToolTip": "SubPhim.Server\\Data\\AppDbContext.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T14:44:50.717Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 26,
+              "Title": "LauncherAioController.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\LauncherAioController.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\LauncherAioController.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\LauncherAioController.cs",
+              "RelativeToolTip": "SubPhim.Server\\Controllers\\LauncherAioController.cs",
+              "ViewState": "AgIAABMAAAAAAAAAAAAgwEAAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-29T03:07:35.58Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 25,
+              "Title": "TranslationOrchestratorService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TranslationOrchestratorService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TranslationOrchestratorService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TranslationOrchestratorService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\TranslationOrchestratorService.cs",
+              "ViewState": "AgIAALEAAAAAAAAAAAAQwM8AAAA0AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-29T05:35:59.166Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 77,
+              "Title": "20250810152224_AddSrtLimitFields5646846541.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250810152224_AddSrtLimitFields5646846541.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250810152224_AddSrtLimitFields5646846541.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250810152224_AddSrtLimitFields5646846541.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250810152224_AddSrtLimitFields5646846541.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-10T15:22:24.723Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 27,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml",
+              "ViewState": "AgIAAMkAAAAAAAAAAAAqwAYBAAAGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-24T15:16:38.064Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 28,
+              "Title": "Index.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml.cs",
+              "ViewState": "AgIAANMAAAAAAAAAAAAIwAUBAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-24T15:16:45.621Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 24,
+              "Title": "CleanupService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\CleanupService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\CleanupService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\CleanupService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\CleanupService.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAIBJwCAAAABCAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-29T12:43:29.458Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 29,
+              "Title": "InsufficientQuotaException.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Models\\InsufficientQuotaException.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Models\\InsufficientQuotaException.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Models\\InsufficientQuotaException.cs",
+              "RelativeToolTip": "SubPhim.Server\\Models\\InsufficientQuotaException.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-29T10:30:47.756Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 73,
+              "Title": "20250729102758_AddApiPoolType.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250729102758_AddApiPoolType.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250729102758_AddApiPoolType.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250729102758_AddApiPoolType.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250729102758_AddApiPoolType.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-29T10:27:59.167Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 30,
+              "Title": "TranslationSession.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Models\\TranslationSession.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Models\\TranslationSession.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Models\\TranslationSession.cs",
+              "RelativeToolTip": "SubPhim.Server\\Models\\TranslationSession.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACMAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-29T05:35:35.605Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 31,
+              "Title": "_ViewImports.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\_ViewImports.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\_ViewImports.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\_ViewImports.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\_ViewImports.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-17T17:50:39.782Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 33,
+              "Title": "RequestLoggingMiddleware.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Middleware\\RequestLoggingMiddleware.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Middleware\\RequestLoggingMiddleware.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Middleware\\RequestLoggingMiddleware.cs",
+              "RelativeToolTip": "SubPhim.Server\\Middleware\\RequestLoggingMiddleware.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-29T03:59:44.491Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 32,
+              "Title": "fly",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\fly",
+              "RelativeDocumentMoniker": "SubPhim.Server\\fly",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\fly",
+              "RelativeToolTip": "SubPhim.Server\\fly",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-07-29T04:13:50.028Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 74,
+              "Title": "20250729030436_AddSr3131231.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250729030436_AddSr3131231.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250729030436_AddSr3131231.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250729030436_AddSr3131231.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250729030436_AddSr3131231.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-29T03:04:36.776Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 34,
+              "Title": "BackupRestore.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAArAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-18T09:49:20.06Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 35,
+              "Title": "BackupRestore.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml",
+              "ViewState": "AgIAABUAAAAAAAAAAAAIwEsAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-18T09:48:56.099Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 71,
+              "Title": "20250728165648_AddTierDefaultSettingsTable121.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250728165648_AddTierDefaultSettingsTable121.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250728165648_AddTierDefaultSettingsTable121.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250728165648_AddTierDefaultSettingsTable121.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250728165648_AddTierDefaultSettingsTable121.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-28T16:56:49.015Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 36,
+              "Title": "Microsoft.NET.Sdk.StaticWebAssets.targets",
+              "DocumentMoniker": "C:\\Program Files\\dotnet\\sdk\\9.0.300\\Sdks\\Microsoft.NET.Sdk.StaticWebAssets\\targets\\Microsoft.NET.Sdk.StaticWebAssets.targets",
+              "ToolTip": "C:\\Program Files\\dotnet\\sdk\\9.0.300\\Sdks\\Microsoft.NET.Sdk.StaticWebAssets\\targets\\Microsoft.NET.Sdk.StaticWebAssets.targets",
+              "ViewState": "AgIAAEMCAAAAAAAAAAAqwGYCAAAEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003801|",
+              "WhenOpened": "2025-07-17T22:39:29.277Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 72,
+              "Title": "20250728163649_AddLocalApiSettingsTablesssss.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250728163649_AddLocalApiSettingsTablesssss.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250728163649_AddLocalApiSettingsTablesssss.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250728163649_AddLocalApiSettingsTablesssss.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250728163649_AddLocalApiSettingsTablesssss.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-28T16:36:49.477Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 37,
+              "Title": "ConfigSeeder.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\ConfigSeeder.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Data\\ConfigSeeder.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\ConfigSeeder.cs",
+              "RelativeToolTip": "SubPhim.Server\\Data\\ConfigSeeder.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-28T16:33:13.651Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 38,
+              "Title": "Create.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml",
+              "ViewState": "AgIAACcAAAAAAAAAAAAAwGMAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-19T17:56:43.605Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 39,
+              "Title": "Create.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml.cs",
+              "ViewState": "AgIAAFcAAAAAAAAAAAAQwJMAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-19T17:57:40.266Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 40,
+              "Title": "ServerControl.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml",
+              "ViewState": "AgIAAAMAAAAAAAAAAIBJwDwAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-25T10:29:34.368Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 41,
+              "Title": "Login.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Login.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Login.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Login.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Login.cshtml.cs",
+              "ViewState": "AgIAAAgAAAAAAAAAAAAUwEEAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T15:32:48.024Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 42,
+              "Title": "Login.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Login.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Login.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Login.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Login.cshtml",
+              "ViewState": "AgIAABQAAAAAAAAAAAAAwFAAAAAHAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-17T15:32:35.179Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 43,
+              "Title": "ITierSettingsService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\ITierSettingsService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\ITierSettingsService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\ITierSettingsService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\ITierSettingsService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-25T12:26:26.882Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 70,
+              "Title": "20250725125304_AddIsAdminFlagToUser.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250725125304_AddIsAdminFlagToUser.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250725125304_AddIsAdminFlagToUser.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250725125304_AddIsAdminFlagToUser.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250725125304_AddIsAdminFlagToUser.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-25T12:53:05.043Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 44,
+              "Title": "ServerControl.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAMAAAAjAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-25T10:29:43.597Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 45,
+              "Title": "LocalApiSettings.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Helper\\LocalApiSettings.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Helper\\LocalApiSettings.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Helper\\LocalApiSettings.cs",
+              "RelativeToolTip": "SubPhim.Server\\Helper\\LocalApiSettings.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-24T22:03:42.729Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 46,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\Home\\Index.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Views\\Home\\Index.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\Home\\Index.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Views\\Home\\Index.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-17T20:26:12.265Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 47,
+              "Title": "EncryptionService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\EncryptionService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\EncryptionService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\EncryptionService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\EncryptionService.cs",
+              "ViewState": "AgIAABwAAAAAAAAAAAAuwFkAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-24T15:13:43.75Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 48,
+              "Title": "IEncryptionService.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\IEncryptionService.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Services\\IEncryptionService.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\IEncryptionService.cs",
+              "RelativeToolTip": "SubPhim.Server\\Services\\IEncryptionService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-24T15:14:31.851Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 50,
+              "Title": "_ViewStart.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\_ViewStart.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Views\\_ViewStart.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\_ViewStart.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Views\\_ViewStart.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-17T20:26:20.957Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 49,
+              "Title": "_ViewImports.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\_ViewImports.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Views\\_ViewImports.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\_ViewImports.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Views\\_ViewImports.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAIAAAA0AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-17T20:26:17.557Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 51,
+              "Title": "DisplayHelper.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Helper\\DisplayHelper.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Helper\\DisplayHelper.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Helper\\DisplayHelper.cs",
+              "RelativeToolTip": "SubPhim.Server\\Helper\\DisplayHelper.cs",
+              "ViewState": "AgIAAB4AAAAAAAAAAAAUwE8AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-24T16:25:50.79Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 52,
+              "Title": "_AdminLayout.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T16:15:15.35Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 53,
+              "Title": "SeedData.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\SeedData.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Data\\SeedData.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\SeedData.cs",
+              "RelativeToolTip": "SubPhim.Server\\Data\\SeedData.cs",
+              "ViewState": "AgIAABAAAAAAAAAAAAAYwEYAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-19T14:06:59.256Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 54,
+              "Title": "Dockerfile",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Dockerfile",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Dockerfile",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Dockerfile",
+              "RelativeToolTip": "SubPhim.Server\\Dockerfile",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-07-24T15:15:25.91Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 55,
+              "Title": "ErrorViewModel.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Models\\ErrorViewModel.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Models\\ErrorViewModel.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Models\\ErrorViewModel.cs",
+              "RelativeToolTip": "SubPhim.Server\\Models\\ErrorViewModel.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T17:57:59.089Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 56,
+              "Title": "TimeZoneHelper.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Helper\\TimeZoneHelper.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Helper\\TimeZoneHelper.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Helper\\TimeZoneHelper.cs",
+              "RelativeToolTip": "SubPhim.Server\\Helper\\TimeZoneHelper.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAIwDUAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-18T10:23:15.597Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 57,
+              "Title": "HomeController.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\HomeController.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\HomeController.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\HomeController.cs",
+              "RelativeToolTip": "SubPhim.Server\\Controllers\\HomeController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T14:56:50.795Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 69,
+              "Title": "20250719172659_AddUsageLimitTracking.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250719172659_AddUsageLimitTracking.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250719172659_AddUsageLimitTracking.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250719172659_AddUsageLimitTracking.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250719172659_AddUsageLimitTracking.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-19T17:26:59.735Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 58,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml",
+              "ViewState": "AgIAABgAAAAAAAAAAAAAwFYAAAAGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-19T13:11:50.697Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 59,
+              "Title": "Index.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml.cs",
+              "ViewState": "AgIAAAUAAAAAAAAAAAAqwBQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-19T13:11:55.392Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 68,
+              "Title": "20250719092216_AddRequestTrackingToUser.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250719092216_AddRequestTrackingToUser.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250719092216_AddRequestTrackingToUser.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250719092216_AddRequestTrackingToUser.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250719092216_AddRequestTrackingToUser.cs",
+              "ViewState": "AgIAAAsAAAAAAAAAAAAxwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-19T09:22:16.266Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 60,
+              "Title": "SubPhim.Server.csproj",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\SubPhim.Server.csproj",
+              "RelativeDocumentMoniker": "SubPhim.Server\\SubPhim.Server.csproj",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\SubPhim.Server.csproj",
+              "RelativeToolTip": "SubPhim.Server\\SubPhim.Server.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-07-18T10:22:57.407Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 61,
+              "Title": "Privacy.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\Home\\Privacy.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Views\\Home\\Privacy.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\Home\\Privacy.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Views\\Home\\Privacy.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-17T20:26:15.469Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 63,
+              "Title": "20250717192650_Add_Email_And_DeviceName.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717192650_Add_Email_And_DeviceName.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717192650_Add_Email_And_DeviceName.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717192650_Add_Email_And_DeviceName.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250717192650_Add_Email_And_DeviceName.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T19:26:50.592Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 64,
+              "Title": "20250717183532_AllowNull_LastLoginIp.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717183532_AllowNull_LastLoginIp.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717183532_AllowNull_LastLoginIp.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717183532_AllowNull_LastLoginIp.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250717183532_AllowNull_LastLoginIp.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T18:35:32.562Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 65,
+              "Title": "20250717181343_Add_UserManagement_Features.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181343_Add_UserManagement_Features.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717181343_Add_UserManagement_Features.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181343_Add_UserManagement_Features.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250717181343_Add_UserManagement_Features.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T18:13:43.192Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 62,
+              "Title": "20250717181303_Add_UserMaxDevices_And_DeviceIp.cs",
+              "DocumentMoniker": "D:\\SrtTranslatorApp\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181303_Add_UserMaxDevices_And_DeviceIp.cs",
+              "RelativeDocumentMoniker": "..\\..\\SrtTranslatorApp\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181303_Add_UserMaxDevices_And_DeviceIp.cs",
+              "ToolTip": "D:\\SrtTranslatorApp\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181303_Add_UserMaxDevices_And_DeviceIp.cs",
+              "RelativeToolTip": "..\\..\\SrtTranslatorApp\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181303_Add_UserMaxDevices_And_DeviceIp.cs",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T18:13:03.478Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 66,
+              "Title": "20250717180105_Add_MaxDevices_And_IPAddress.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717180105_Add_MaxDevices_And_IPAddress.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717180105_Add_MaxDevices_And_IPAddress.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717180105_Add_MaxDevices_And_IPAddress.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250717180105_Add_MaxDevices_And_IPAddress.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T18:01:06.47Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 67,
+              "Title": "20250717145528_InitialCreate.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717145528_InitialCreate.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717145528_InitialCreate.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717145528_InitialCreate.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250717145528_InitialCreate.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T14:55:29.072Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

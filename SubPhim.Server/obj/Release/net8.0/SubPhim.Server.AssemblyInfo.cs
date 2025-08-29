@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SubPhim.Server")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ff080ebb8feb2961856094fcb362ee96d42d565f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6defc74147478bcf52a87e974e92996a8b820283")]
 [assembly: System.Reflection.AssemblyProductAttribute("SubPhim.Server")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SubPhim.Server")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

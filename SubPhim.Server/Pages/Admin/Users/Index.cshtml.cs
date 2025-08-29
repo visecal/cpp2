@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SubPhim.Server.Data;
 using SubPhim.Server.Services;
 using PagedList.Core;
+using SubPhim.Server.Utils; // Thêm using này để dùng DisplayHelper
 
 namespace SubPhim.Server.Pages.Admin.Users
 {
@@ -23,32 +24,63 @@ namespace SubPhim.Server.Pages.Admin.Users
         [BindProperty(SupportsGet = true)]
         public int PageNumber { get; set; } = 1;
 
-        public IPagedList<UserViewModel>? Users { get; set; }
+        [BindProperty(SupportsGet = true)]
+        public string Tab { get; set; } = "premium";
+
+        public IPagedList<UserViewModel>? DisplayUsers { get; set; }
+
+        public int PremiumUserCount { get; set; }
+        public int MonthlyUserCount { get; set; }
+        public int FreeUserCount { get; set; }
 
         public List<string> AllFeatureNames => Enum.GetNames(typeof(GrantedFeatures)).Where(f => f != "None").ToList();
+        // === SỬA LỖI TYPO TẠI ĐÂY ===
         public List<string> AllApiNames => Enum.GetNames(typeof(AllowedApis)).Where(a => a != "None").ToList();
+
+        private const int PageSize = 20;
 
         public async Task OnGetAsync()
         {
-            IQueryable<User> query = _context.Users
-                .AsNoTracking()
-                .Include(u => u.Devices); // Thêm Include ở đây
+            IQueryable<User> baseQuery = _context.Users.AsNoTracking().Include(u => u.Devices);
 
             if (!string.IsNullOrEmpty(SearchString))
             {
                 var searchLower = SearchString.ToLower();
-                query = query.Where(u => u.Username.ToLower().Contains(searchLower) ||
-                                         (u.Email != null && u.Email.ToLower().Contains(searchLower)) ||
-                                         u.Uid.Contains(SearchString));
+                var searchQuery = baseQuery.Where(u => u.Username.ToLower().Contains(searchLower) ||
+                                                     (u.Email != null && u.Email.ToLower().Contains(searchLower)) ||
+                                                     u.Uid.Contains(SearchString));
+                await PaginateQuery(searchQuery);
             }
+            else
+            {
+                PremiumUserCount = await baseQuery.CountAsync(u => u.Tier == SubscriptionTier.Yearly || u.Tier == SubscriptionTier.Lifetime);
+                MonthlyUserCount = await baseQuery.CountAsync(u => u.Tier == SubscriptionTier.Monthly || u.Tier == SubscriptionTier.Daily);
+                FreeUserCount = await baseQuery.CountAsync(u => u.Tier == SubscriptionTier.Free);
 
+                IQueryable<User> tabQuery;
+                switch (Tab)
+                {
+                    case "monthly":
+                        tabQuery = baseQuery.Where(u => u.Tier == SubscriptionTier.Monthly || u.Tier == SubscriptionTier.Daily);
+                        break;
+                    case "free":
+                        tabQuery = baseQuery.Where(u => u.Tier == SubscriptionTier.Free);
+                        break;
+                    default:
+                        tabQuery = baseQuery.Where(u => u.Tier == SubscriptionTier.Yearly || u.Tier == SubscriptionTier.Lifetime);
+                        break;
+                }
+                await PaginateQuery(tabQuery);
+            }
+        }
+
+        private async Task PaginateQuery(IQueryable<User> query)
+        {
             var totalItemCount = await query.CountAsync();
-            const int pageSize = 20;
-
             var usersForCurrentPage = await query
                 .OrderByDescending(u => u.CreatedAt)
-                .Skip((PageNumber - 1) * pageSize)
-                .Take(pageSize)
+                .Skip((PageNumber - 1) * PageSize)
+                .Take(PageSize)
                 .ToListAsync();
 
             var userViewModels = usersForCurrentPage.Select(u => new UserViewModel
@@ -66,7 +98,7 @@ namespace SubPhim.Server.Pages.Admin.Users
                 DailyRequestLimitOverride = u.DailyRequestLimitOverride,
                 AllowedApiAccess = u.AllowedApiAccess,
                 GrantedFeatures = u.GrantedFeatures,
-                LastLogin = u.Devices.Any() ? u.Devices.Max(d => d.LastLogin) : (DateTime?)null, // Bây giờ sẽ hoạt động đúng
+                LastLogin = u.Devices.Any() ? u.Devices.Max(d => d.LastLogin) : (DateTime?)null,
                 SrtLinesUsedToday = u.SrtLinesUsedToday,
                 DailySrtLineLimit = u.DailySrtLineLimit,
                 DailyLocalSrtLimit = u.DailyLocalSrtLimit,
@@ -74,7 +106,7 @@ namespace SubPhim.Server.Pages.Admin.Users
                 TtsCharacterLimit = u.TtsCharacterLimit
             }).ToList();
 
-            Users = new StaticPagedList<UserViewModel>(userViewModels, PageNumber, pageSize, totalItemCount);
+            DisplayUsers = new StaticPagedList<UserViewModel>(userViewModels, PageNumber, PageSize, totalItemCount);
         }
 
         [ValidateAntiForgeryToken]
@@ -82,18 +114,13 @@ namespace SubPhim.Server.Pages.Admin.Users
         {
             try
             {
-                // Sử dụng ExecuteDeleteAsync() để xóa tất cả các dòng trong bảng Devices
-                // một cách hiệu quả mà không cần tải chúng vào bộ nhớ.
-                var devicesDeletedCount = await _context.Devices.ExecuteDeleteAsync();
-
-                TempData["SuccessMessage"] = $"Thao tác thành công! Đã xóa toàn bộ {devicesDeletedCount} thiết bị khỏi hệ thống. Tất cả người dùng sẽ cần đăng nhập lại.";
+                await _context.Devices.ExecuteDeleteAsync();
+                TempData["SuccessMessage"] = "Thao tác thành công! Đã xóa toàn bộ thiết bị khỏi hệ thống.";
             }
             catch (Exception ex)
             {
-                // Ghi lại log lỗi nếu cần
-                TempData["ErrorMessage"] = "Đã có lỗi xảy ra trong quá trình reset thiết bị: " + ex.Message;
+                TempData["ErrorMessage"] = "Đã có lỗi xảy ra: " + ex.Message;
             }
-
             return RedirectToPage();
         }
 
@@ -109,12 +136,7 @@ namespace SubPhim.Server.Pages.Admin.Users
 
             userToUpdate.SubscriptionExpiry = startTime.AddDays(days);
             await _context.SaveChangesAsync();
-
-            return new JsonResult(new
-            {
-                message = $"Đã thêm thành công {days} ngày.",
-                newExpiry = userToUpdate.SubscriptionExpiry
-            });
+            return new JsonResult(new { message = $"Đã thêm thành công {days} ngày.", newExpiry = userToUpdate.SubscriptionExpiry });
         }
 
         [ValidateAntiForgeryToken]
@@ -134,7 +156,7 @@ namespace SubPhim.Server.Pages.Admin.Users
             if (newExpiryDate <= DateTime.UtcNow)
             {
                 userToUpdate.SubscriptionExpiry = null;
-                userToUpdate.Tier = SubscriptionTier.Free; // Tự động hạ cấp về Free
+                _tierSettingsService.ApplyTierSettings(userToUpdate, SubscriptionTier.Free);
                 successMessage = $"Đã trừ {days} ngày. Tài khoản đã hết hạn và được chuyển về gói Free.";
             }
             else
@@ -144,12 +166,7 @@ namespace SubPhim.Server.Pages.Admin.Users
             }
 
             await _context.SaveChangesAsync();
-            return new JsonResult(new
-            {
-                message = successMessage,
-                newExpiry = userToUpdate.SubscriptionExpiry,
-                newTier = userToUpdate.Tier.ToString()
-            });
+            return new JsonResult(new { message = successMessage, newExpiry = userToUpdate.SubscriptionExpiry, newTier = userToUpdate.Tier.ToString() });
         }
 
         [ValidateAntiForgeryToken]
@@ -174,8 +191,7 @@ namespace SubPhim.Server.Pages.Admin.Users
 
             foreach (var device in userToBan.Devices)
             {
-                bool isAlreadyBanned = await _context.BannedDevices.AnyAsync(b => b.Hwid == device.Hwid);
-                if (!isAlreadyBanned)
+                if (!await _context.BannedDevices.AnyAsync(b => b.Hwid == device.Hwid))
                 {
                     _context.BannedDevices.Add(new BannedDevice
                     {
@@ -187,26 +203,21 @@ namespace SubPhim.Server.Pages.Admin.Users
                     });
                 }
             }
-
             await _context.SaveChangesAsync();
             return new JsonResult(new { message = $"Đã cấm tài khoản '{userToBan.Username}' và {userToBan.Devices.Count} thiết bị liên quan." });
         }
+
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> OnPostUpdatePermissionsAsync([FromForm] UpdatePermissionsRequest request)
         {
             var userInDb = await _context.Users.FindAsync(request.Id);
-            if (userInDb == null)
-            {
-                return NotFound(new { message = "Không tìm thấy người dùng." });
-            }
+            if (userInDb == null) return NotFound(new { message = "Không tìm thấy người dùng." });
 
-            var oldTier = userInDb.Tier;
-            var newTier = request.Tier;
-            if (oldTier != newTier)
+            if (userInDb.Tier != request.Tier)
             {
-                _tierSettingsService.ApplyTierSettings(userInDb, newTier);
+                _tierSettingsService.ApplyTierSettings(userInDb, request.Tier);
                 DateTime startTime = DateTime.UtcNow;
-                switch (newTier)
+                switch (request.Tier)
                 {
                     case SubscriptionTier.Daily: userInDb.SubscriptionExpiry = startTime.AddDays(1); break;
                     case SubscriptionTier.Monthly: userInDb.SubscriptionExpiry = startTime.AddMonths(1); break;
@@ -214,25 +225,12 @@ namespace SubPhim.Server.Pages.Admin.Users
                     case SubscriptionTier.Lifetime: userInDb.SubscriptionExpiry = startTime.AddYears(100); break;
                 }
             }
-            GrantedFeatures newFeatures = GrantedFeatures.None;
-            if (request.Features != null)
-            {
-                foreach (var featureName in request.Features)
-                {
-                    if (Enum.TryParse<GrantedFeatures>(featureName, out var feature)) { newFeatures |= feature; }
-                }
-            }
-            userInDb.GrantedFeatures = newFeatures;
 
-            AllowedApis newApis = AllowedApis.None;
-            if (request.Apis != null)
-            {
-                foreach (var apiName in request.Apis)
-                {
-                    if (Enum.TryParse<AllowedApis>(apiName, out var api)) { newApis |= api; }
-                }
-            }
-            userInDb.AllowedApiAccess = newApis;
+            userInDb.GrantedFeatures = request.Features?.Aggregate(GrantedFeatures.None, (current, featureName) =>
+                Enum.TryParse<GrantedFeatures>(featureName, out var feature) ? current | feature : current) ?? GrantedFeatures.None;
+
+            userInDb.AllowedApiAccess = request.Apis?.Aggregate(AllowedApis.None, (current, apiName) =>
+                Enum.TryParse<AllowedApis>(apiName, out var api) ? current | api : current) ?? AllowedApis.None;
 
             userInDb.DailyVideoLimit = request.DailyVideoLimit;
             userInDb.DailyRequestLimitOverride = request.DailyRequestLimitOverride;
@@ -240,113 +238,41 @@ namespace SubPhim.Server.Pages.Admin.Users
             userInDb.DailyLocalSrtLimit = request.DailyLocalSrtLimit;
 
             await _context.SaveChangesAsync();
-
-            // Trả về dữ liệu mới nhất để JavaScript cập nhật UI
-            return new JsonResult(new
-            {
-                message = "Cập nhật thành công!",
-                newTier = userInDb.Tier.ToString(), // Trả về tier mới
-                newExpiry = userInDb.SubscriptionExpiry, // Trả về hạn dùng mới
-                grantedFeatures = userInDb.GrantedFeatures.ToString(),
-                allowedApis = userInDb.AllowedApiAccess.ToString(),
-                dailyVideoLimit = userInDb.DailyVideoLimit,
-                dailyRequestLimitOverride = userInDb.DailyRequestLimitOverride,
-                dailySrtLineLimit = userInDb.DailySrtLineLimit,
-                dailyLocalSrtLimit = userInDb.DailyLocalSrtLimit
-            });
+            return new JsonResult(new { message = "Cập nhật thành công!" });
         }
     }
-
-
     public class UpdatePermissionsRequest
     {
         public int Id { get; set; }
-        public List<string> Features { get; set; }
-        public List<string> Apis { get; set; }
+        public List<string>? Features { get; set; }
+        public List<string>? Apis { get; set; }
         public SubscriptionTier Tier { get; set; }
         public int DailyVideoLimit { get; set; }
         public int DailyRequestLimitOverride { get; set; }
         public int DailyLocalSrtLimit { get; set; }
-        public int SrtLinesUsedToday { get; set; }
         public int DailySrtLineLimit { get; set; }
     }
+
     public class UserViewModel
     {
         public int Id { get; set; }
         public string Uid { get; set; }
         public string Username { get; set; }
-        public string Email { get; set; }
+        public string? Email { get; set; }
         public string Tier { get; set; }
         public DateTime? SubscriptionExpiry { get; set; }
         public bool IsBlocked { get; set; }
         public DateTime? LastLogin { get; set; }
-
-        // Thông tin giới hạn
         public int VideosProcessedToday { get; set; }
         public int DailyVideoLimit { get; set; }
         public int DailyRequestCount { get; set; }
         public int DailyRequestLimitOverride { get; set; }
-
-        // Thông tin quyền
         public AllowedApis AllowedApiAccess { get; set; }
         public GrantedFeatures GrantedFeatures { get; set; }
-
-        public List<DeviceViewModel> Devices { get; set; } = new();
         public int DailyLocalSrtLimit { get; set; }
         public int SrtLinesUsedToday { get; set; }
         public int DailySrtLineLimit { get; set; }
-
-        //tts
         public long TtsCharactersUsed { get; set; }
         public long TtsCharacterLimit { get; set; }
-
-    }
-
-    public class DeviceViewModel
-    {
-        public string Hwid { get; set; }
-    }
-
-    public static class UserDisplayHelper
-    {
-        public static string GetSubscriptionStatus(SubscriptionTier tier, DateTime? expiry)
-        {
-            if (tier == SubscriptionTier.Lifetime)
-            {
-                return "Vĩnh viễn";
-            }
-
-            if (tier == SubscriptionTier.Free)
-            {
-                return "Tự do";
-            }
-
-            if (expiry == null)
-            {
-                return "Không xác định";
-            }
-
-            if (expiry.Value < DateTime.UtcNow)
-            {
-                return "Đã hết hạn";
-            }
-
-            var timeLeft = expiry.Value - DateTime.UtcNow;
-
-            if (timeLeft.TotalDays >= 1)
-            {
-                return $"Còn {timeLeft.Days} ngày";
-            }
-            if (timeLeft.TotalHours >= 1)
-            {
-                return $"Còn {timeLeft.Hours} giờ";
-            }
-            if (timeLeft.TotalMinutes > 1)
-            {
-                return $"Còn {timeLeft.Minutes} phút";
-            }
-
-            return "Sắp hết hạn";
-        }
     }
 }

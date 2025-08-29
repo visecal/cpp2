@@ -2,7 +2,6 @@
 
 namespace SubPhim.Server.Data
 {
-    // Lớp này là cầu nối trực tiếp giữa code C# và database
     public class AppDbContext : DbContext
     {
         public DbSet<TierDefaultSetting> TierDefaultSettings { get; set; }
@@ -23,20 +22,17 @@ namespace SubPhim.Server.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-
-            // Cấu hình mối quan hệ giữa TranslationJobDb và OriginalSrtLineDb
             modelBuilder.Entity<TranslationJobDb>()
-                .HasMany(j => j.OriginalLines) // Một Job có nhiều Dòng Gốc
-                .WithOne(l => l.Job)           // Một Dòng Gốc thuộc về một Job
-                .HasForeignKey(l => l.SessionId) // Khóa ngoại là SessionId
-                .OnDelete(DeleteBehavior.Cascade); // <<< ĐÂY LÀ DÒNG QUAN TRỌNG NHẤT
+                .HasMany(j => j.OriginalLines) 
+                .WithOne(l => l.Job)        
+                .HasForeignKey(l => l.SessionId) 
+                .OnDelete(DeleteBehavior.Cascade); 
 
-            // Cấu hình mối quan hệ giữa TranslationJobDb và TranslatedSrtLineDb
             modelBuilder.Entity<TranslationJobDb>()
-                .HasMany(j => j.TranslatedLines) // Một Job có nhiều Dòng Đã Dịch
-                .WithOne(l => l.Job)              // Một Dòng Đã Dịch thuộc về một Job
-                .HasForeignKey(l => l.SessionId)  // Khóa ngoại là SessionId
-                .OnDelete(DeleteBehavior.Cascade); // <<< VÀ DÒNG NÀY
+                .HasMany(j => j.TranslatedLines) 
+                .WithOne(l => l.Job)   
+                .HasForeignKey(l => l.SessionId)  
+                .OnDelete(DeleteBehavior.Cascade); 
             modelBuilder.Entity<User>()
                 .HasMany(u => u.Devices)
                 .WithOne(d => d.User)

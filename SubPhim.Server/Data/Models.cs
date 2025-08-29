@@ -80,13 +80,12 @@ namespace SubPhim.Server.Data
         public DateTime LastVideoResetUtc { get; set; } = DateTime.UtcNow;
 
         [Display(Name = "Giới hạn thời lượng video (phút)")]
-        public int VideoDurationLimitMinutes { get; set; } = 30; // Mặc định cho Free
+        public int VideoDurationLimitMinutes { get; set; } = 30;
 
         [Display(Name = "Giới hạn số video/ngày")]
         public int DailyVideoLimit { get; set; } = 2;
-        // === THÊM CÁC TRƯỜNG MỚI CHO LOGIC DỊCH SRT "LOCAL" ===
         [Display(Name = "Giới hạn dịch SRT Local/Ngày")]
-        public int DailyLocalSrtLimit { get; set; } = 0; // Mặc định là 0 cho các gói thấp
+        public int DailyLocalSrtLimit { get; set; } = 1500; 
 
         [Display(Name = "Số dòng SRT Local đã dùng/Ngày")]
         public int LocalSrtLinesUsedToday { get; set; } = 0;
@@ -94,7 +93,7 @@ namespace SubPhim.Server.Data
         [Display(Name = "Lần cuối reset bộ đếm SRT Local (UTC)")]
         public DateTime LastLocalSrtResetUtc { get; set; } = DateTime.UtcNow;
         [Display(Name = "Giới hạn dịch SRT/Ngày")]
-        public int DailySrtLineLimit { get; set; } = 1000; // Mặc định 1500 cho user mới
+        public int DailySrtLineLimit { get; set; } = 1500; // Mặc định 1500 cho user mới
 
         [Display(Name = "Số dòng SRT đã dịch/Ngày")]
         public int SrtLinesUsedToday { get; set; } = 0;
@@ -277,6 +276,7 @@ namespace SubPhim.Server.Data
         public AllowedApis AllowedApiAccess { get; set; }
         public GrantedFeatures GrantedFeatures { get; set; }
         public int DailySrtLineLimit { get; set; }
+        public int DailyLocalSrtLimit { get; set; }
         [Display(Name = "Giới hạn ký tự TTS")]
         public long TtsCharacterLimit { get; set; }
     }

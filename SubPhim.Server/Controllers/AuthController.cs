@@ -415,9 +415,6 @@ public class AuthController : ControllerBase
             hasChanges = true;
             Debug.WriteLine($"[AuthController.RefreshProfile] Resetting LocalSrtLinesUsedToday for user '{user.Username}'.");
         }
-
-        // <<< BẮT ĐẦU THÊM MỚI LOGIC RESET TTS >>>
-        // 5. Reset bộ đếm Ký tự TTS (CHỈ CHO GÓI FREE)
         var lastTtsResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(user.LastTtsResetUtc, vietnamTimeZone);
         if (user.Tier == SubscriptionTier.Free && lastTtsResetInVietnam.Date < vietnamNow.Date)
         {
@@ -426,16 +423,11 @@ public class AuthController : ControllerBase
             hasChanges = true;
             Debug.WriteLine($"[AuthController.RefreshProfile] Resetting TtsCharactersUsed for FREE user '{user.Username}'.");
         }
-        // <<< KẾT THÚC THÊM MỚI LOGIC RESET TTS >>>
-
-        // Chỉ lưu vào DB nếu có sự thay đổi
         if (hasChanges)
         {
             await _context.SaveChangesAsync();
             Debug.WriteLine($"[AuthController.RefreshProfile] Saved daily reset changes for user '{user.Username}'.");
         }
-        // --- KẾT THÚC LOGIC RESET TẬP TRUNG ---
-
         var currentToken = HttpContext.Request.Headers["Authorization"]
                                       .ToString()
                                       .Replace("Bearer ", "");
@@ -462,8 +454,8 @@ public class AuthController : ControllerBase
                          .Select(d => new DeviceDto(d.Hwid, d.LastLoginIp, d.LastLogin)).ToList(),
             user.SrtLinesUsedToday,
             user.DailySrtLineLimit,
-            user.TtsCharactersUsed,     // <<< THÊM MỚI
-            user.TtsCharacterLimit      // <<< THÊM MỚI
+            user.TtsCharactersUsed,
+            user.TtsCharacterLimit 
         );
         return Ok(userDto);
     }

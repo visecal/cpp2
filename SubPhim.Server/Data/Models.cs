@@ -266,7 +266,7 @@ namespace SubPhim.Server.Data
     }
     public class TierDefaultSetting
     {
-        [Key] // Dùng chính SubscriptionTier làm khóa chính
+        [Key] 
         public SubscriptionTier Tier { get; set; }
 
         public int VideoDurationMinutes { get; set; }

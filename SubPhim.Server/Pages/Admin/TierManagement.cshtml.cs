@@ -34,11 +34,13 @@ namespace SubPhim.Server.Pages.Admin
             public GrantedFeatures GrantedFeatures { get; set; }
             public int DailySrtLineLimit { get; set; }
             public long TtsCharacterLimit { get; set; }
+
+            // === THÊM MỚI ===
+            public int DailyLocalSrtLimit { get; set; }
         }
 
         public async Task OnGetAsync()
         {
-            // SỬA LỖI: Đọc cấu hình mặc định từ Database
             var defaultSettings = await _context.TierDefaultSettings.ToListAsync();
 
             foreach (var setting in defaultSettings)
@@ -53,7 +55,9 @@ namespace SubPhim.Server.Pages.Admin
                         AllowedApis = setting.AllowedApis,
                         GrantedFeatures = setting.GrantedFeatures,
                         DailySrtLineLimit = setting.DailySrtLineLimit,
-                        TtsCharacterLimit = setting.TtsCharacterLimit
+                        TtsCharacterLimit = setting.TtsCharacterLimit,
+                        // === THÊM MỚI ===
+                        DailyLocalSrtLimit = setting.DailyLocalSrtLimit
                     });
                 }
             }
@@ -78,11 +82,13 @@ namespace SubPhim.Server.Pages.Admin
                         settingInDb.GrantedFeatures = formConfig.GrantedFeatures;
                         settingInDb.DailySrtLineLimit = formConfig.DailySrtLineLimit;
                         settingInDb.TtsCharacterLimit = formConfig.TtsCharacterLimit;
+                        // === THÊM MỚI ===
+                        settingInDb.DailyLocalSrtLimit = formConfig.DailyLocalSrtLimit;
                     }
                 }
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
-                SuccessMessage = "Đã lưu thành công cấu hình mặc định. Các tài khoản mới đăng ký sẽ được áp dụng cài đặt này.";
+                SuccessMessage = "Đã lưu thành công cấu hình mặc định. Các tài khoản mới hoặc được áp dụng tier sẽ nhận cài đặt này.";
             }
             catch (Exception ex)
             {
@@ -120,6 +126,8 @@ namespace SubPhim.Server.Pages.Admin
                     user.GrantedFeatures = configToApply.GrantedFeatures;
                     user.DailySrtLineLimit = configToApply.DailySrtLineLimit;
                     user.TtsCharacterLimit = configToApply.TtsCharacterLimit;
+                    // === THÊM MỚI ===
+                    user.DailyLocalSrtLimit = configToApply.DailyLocalSrtLimit;
                 }
 
                 var count = await _context.SaveChangesAsync();

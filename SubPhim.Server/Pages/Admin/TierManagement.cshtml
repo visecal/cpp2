@@ -43,7 +43,6 @@
                 <div id="@collapseId" class="accordion-collapse collapse" aria-labelledby="@headerId" data-bs-parent="#tierAccordion">
                     <div class="accordion-body">
 
-                        @* Các input fields giữ nguyên *@
                         <h5><i class="bi bi-camera-video me-2"></i>Giới hạn xử lý Video</h5>
                         <div class="row mb-3">
                             <div class="col-md-6">
@@ -59,25 +58,24 @@
 
                         <h5 class="mt-4"><i class="bi bi-translate me-2"></i>Giới hạn dịch & TTS</h5>
                         <div class="row mb-3">
-                            <div class="col-md-4">
-                                @* Sửa col-md-6 thành 4 *@
-                                <label class="form-label">Số request dịch / ngày</label>
+                            <div class="col-md-6">
+                                <label class="form-label">Số request dịch truyện / ngày</label>
                                 <input type="number" name="Configs[@tier].DailyTranslationRequests" value="@config.DailyTranslationRequests" class="form-control" />
-                                <div class="form-text">Áp dụng cho dịch truyện.</div>
                             </div>
-                            <div class="col-md-4">
-                                @* Sửa col-md-6 thành 4 *@
-                                <label class="form-label">Số dòng dịch SRT / ngày</label>
-                                <input type="number" name="Configs[@tier].DailySrtLineLimit" value="@config.DailySrtLineLimit" class="form-control" />
-                                <div class="form-text">Áp dụng cho dịch file SRT.</div>
-                            </div>
-                            @* <<< BẮT ĐẦU THÊM MỚI >>> *@
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <label class="form-label">Giới hạn ký tự TTS</label>
                                 <input type="number" name="Configs[@tier].TtsCharacterLimit" value="@config.TtsCharacterLimit" class="form-control" />
                                 <div class="form-text">Gói Free reset hàng ngày, gói trả phí là tổng.</div>
                             </div>
-                            @* <<< KẾT THÚC THÊM MỚI >>> *@
+                            <div class="col-md-6">
+                                <label class="form-label">Số dòng dịch SRT (API bên thứ 3) / ngày</label>
+                                <input type="number" name="Configs[@tier].DailySrtLineLimit" value="@config.DailySrtLineLimit" class="form-control" />
+                            </div>
+                            <!-- === THÊM MỚI === -->
+                            <div class="col-md-6">
+                                <label class="form-label">Số dòng dịch SRT (Local API) / ngày</label>
+                                <input type="number" name="Configs[@tier].DailyLocalSrtLimit" value="@config.DailyLocalSrtLimit" class="form-control" />
+                            </div>
                         </div>
 
                         <h5 class="mt-4"><i class="bi bi-key me-2"></i>Quyền truy cập API</h5>
@@ -110,7 +108,6 @@
 
                         <hr />
                         <div class="d-flex justify-content-end">
-                            <!-- SỬA LỖI: Thay đổi Page Handler và thông báo confirm -->
                             <button type="submit" class="btn btn-warning" asp-page-handler="ApplyToAllUsers" asp-route-tier="@tier"
                                     onclick="return confirm('CẢNH BÁO!\nHành động này sẽ GHI ĐÈ các giới hạn và quyền hạn hiện tại của TẤT CẢ người dùng thuộc nhóm [@tier].\n\nBạn có chắc chắn muốn tiếp tục?');">
                                 <i class="bi bi-people-fill me-2"></i>Áp dụng cho tất cả User '@tier'
@@ -123,9 +120,8 @@
         }
     </div>
     <div class="mt-4 d-grid">
-        <!-- SỬA LỖI: Nút này sẽ lưu các thay đổi trên vào DB làm mặc định mới -->
         <button type="submit" class="btn btn-primary btn-lg" asp-page-handler="SaveDefaults">
-            <i class="bi bi-save-fill me-2"></i>Lưu Cấu Hình Mặc Định (Cho User Mới)
+            <i class="bi bi-save-fill me-2"></i>Lưu Cấu Hình Mặc Định (Cho User Mới & Áp dụng Tier)
         </button>
     </div>
 </form>

@@ -3,16 +3,24 @@
   "WorkspaceRootPath": "D:\\subphimv1\\SubPhim.Server\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\tiermanagement.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\tiermanagement.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\tiermanagement.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\tiermanagement.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\data\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\data\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\users\\_userlist.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\users\\_userlist.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\newusersettings.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -25,10 +33,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\newusersettings.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\newusersettings.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\data\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\data\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\shared\\_adminlayout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
@@ -85,14 +89,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\users\\details.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\users\\details.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\tiermanagement.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
-      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\tiermanagement.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\pages\\admin\\tiermanagement.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\pages\\admin\\tiermanagement.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\usagelimitssettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -331,6 +327,10 @@
     {
       "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250810152224_addsrtlimitfields5646846541.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250810152224_addsrtlimitfields5646846541.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20250829045258_add_dailylocalsrtlimit_to_tierdefaults.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20250829045258_add_dailylocalsrtlimit_to_tierdefaults.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -340,50 +340,15 @@
       "DocumentGroups": [
         {
           "DockedWidth": 635,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 7,
           "Children": [
             {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
-              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
-              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
-              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
-              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-08-29T04:52:59.122Z",
-              "EditorCaption": ""
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "NewUserSettings.cshtml.cs",
-              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml.cs",
-              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml.cs",
-              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml.cs",
-              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml.cs",
-              "ViewState": "AgIAAEAAAAAAAAAAAAAAwG0AAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-08-29T04:41:00.331Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "NewUserSettings.cshtml",
-              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml",
-              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml",
-              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml",
-              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml",
-              "ViewState": "AgIAADwAAAAAAAAAAAAkwGsAAAAHAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-08-29T04:40:35.432Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 6,
               "Title": "_UserList.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\_UserList.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\_UserList.cshtml.cs",
@@ -391,12 +356,11 @@
               "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Users\\_UserList.cshtml.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-08-29T04:29:21.945Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-08-29T04:29:21.945Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 3,
               "Title": "_UserList.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\_UserList.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\_UserList.cshtml",
@@ -409,7 +373,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "Index.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml.cs",
@@ -417,12 +381,11 @@
               "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml.cs",
               "ViewState": "AgIAAH8AAAAAAAAAAAA6wPIAAAAFAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-17T15:21:05.634Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-07-17T15:21:05.634Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 4,
               "Title": "Program.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Program.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Program.cs",
@@ -430,12 +393,86 @@
               "RelativeToolTip": "SubPhim.Server\\Program.cs",
               "ViewState": "AgIAAH4AAAAAAAAAAAAowJQAAAAkAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-17T14:40:23.267Z",
+              "WhenOpened": "2025-07-17T14:40:23.267Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Models.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\Models.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Data\\Models.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\Models.cs",
+              "RelativeToolTip": "SubPhim.Server\\Data\\Models.cs",
+              "ViewState": "AgIAAPYAAAAAAAAAAAA8wAwBAAAOAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-17T14:44:32.059Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "TierManagement.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
+              "ViewState": "AgIAAF0AAAAAAAAAAAAowI8AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-19T20:05:53.72Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "TierManagement.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
+              "ViewState": "AgIAAEkAAAAAAAAAAAAkwH4AAAAHAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-19T20:05:19.522Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 7,
+              "Title": "NewUserSettings.cshtml",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml",
+              "ViewState": "AgIAADwAAAAAAAAAAAAkwGsAAAAHAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-08-29T04:40:35.432Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "NewUserSettings.cshtml.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml.cs",
+              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\NewUserSettings.cshtml.cs",
+              "ViewState": "AgIAAEAAAAAAAAAAAAAAwG0AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-29T04:41:00.331Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 82,
+              "Title": "20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20250829045258_Add_DailyLocalSrtLimit_To_TierDefaults.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-29T04:52:59.122Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
               "Title": "_AdminLayout.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml",
@@ -443,25 +480,11 @@
               "RelativeToolTip": "SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml",
               "ViewState": "AgIAAGgAAAAAAAAAAAArwIoAAAAVAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-07-17T15:20:10.141Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-07-17T15:20:10.141Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "Models.cs",
-              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\Models.cs",
-              "RelativeDocumentMoniker": "SubPhim.Server\\Data\\Models.cs",
-              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\Models.cs",
-              "RelativeToolTip": "SubPhim.Server\\Data\\Models.cs",
-              "ViewState": "AgIAAPMAAAAAAAAAAAA8wBYBAAAzAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-17T14:44:32.059Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 13,
               "Title": "AuthController.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\AuthController.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\AuthController.cs",
@@ -473,7 +496,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 14,
               "Title": "AppDbContext.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\AppDbContext.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Data\\AppDbContext.cs",
@@ -484,12 +507,8 @@
               "WhenOpened": "2025-07-17T14:44:50.717Z"
             },
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
-            },
-            {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 15,
               "Title": "TtsController.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\TtsController.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\TtsController.cs",
@@ -501,7 +520,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 10,
               "Title": "Index.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml",
@@ -509,12 +528,11 @@
               "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml",
               "ViewState": "AgIAABYBAAAAAAAAAAAkwEUBAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-07-17T15:20:43.745Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-07-17T15:20:43.745Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 12,
               "Title": "Details.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml.cs",
@@ -526,7 +544,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 11,
               "Title": "TtsManagement.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml.cs",
@@ -538,7 +556,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 18,
+              "DocumentIndex": 19,
               "Title": "TierSettingsService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TierSettingsService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TierSettingsService.cs",
@@ -550,7 +568,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 19,
+              "DocumentIndex": 20,
               "Title": "appsettings.json",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\appsettings.json",
               "RelativeDocumentMoniker": "SubPhim.Server\\appsettings.json",
@@ -562,7 +580,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 15,
+              "DocumentIndex": 16,
               "Title": "TtsKeyResetService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TtsKeyResetService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TtsKeyResetService.cs",
@@ -574,7 +592,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 16,
+              "DocumentIndex": 17,
               "Title": "TtsOrchestratorService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TtsOrchestratorService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TtsOrchestratorService.cs",
@@ -586,7 +604,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 17,
+              "DocumentIndex": 18,
               "Title": "ITtsOrchestratorService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\ITtsOrchestratorService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\ITtsOrchestratorService.cs",
@@ -598,31 +616,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 21,
-              "Title": "TierManagement.cshtml",
-              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
-              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
-              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
-              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml",
-              "ViewState": "AgIAAB8AAAAAAAAAAAAAwDsAAABlAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-07-19T20:05:19.522Z"
-            },
-            {
-              "$type": "Document",
               "DocumentIndex": 22,
-              "Title": "TierManagement.cshtml.cs",
-              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
-              "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
-              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
-              "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\TierManagement.cshtml.cs",
-              "ViewState": "AgIAAD8AAAAAAAAAAAApwHkAAABNAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-19T20:05:53.72Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 23,
               "Title": "UsageLimitsSettings.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\UsageLimitsSettings.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\UsageLimitsSettings.cs",
@@ -634,7 +628,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 20,
+              "DocumentIndex": 21,
               "Title": "Details.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Details.cshtml",
@@ -646,7 +640,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 26,
+              "DocumentIndex": 25,
               "Title": "ITtsSettingsService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\ITtsSettingsService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\ITtsSettingsService.cs",
@@ -658,7 +652,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 24,
+              "DocumentIndex": 23,
               "Title": "TtsManagement.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TtsManagement.cshtml",
@@ -670,7 +664,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 80,
+              "DocumentIndex": 79,
               "Title": "20250810162636_AddSrtLimitFields54346\u002B45.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250810162636_AddSrtLimitFields54346\u002B45.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250810162636_AddSrtLimitFields54346\u002B45.cs",
@@ -682,7 +676,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 25,
+              "DocumentIndex": 24,
               "Title": "TtsSettingsService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TtsSettingsService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TtsSettingsService.cs",
@@ -694,7 +688,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 27,
+              "DocumentIndex": 26,
               "Title": "TtsModelSettings.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml",
@@ -706,7 +700,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 81,
+              "DocumentIndex": 80,
               "Title": "20250810160146_AddSrtLimitFields31414156468797.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250810160146_AddSrtLimitFields31414156468797.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250810160146_AddSrtLimitFields31414156468797.cs",
@@ -718,7 +712,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 28,
+              "DocumentIndex": 27,
               "Title": "TtsModelSettings.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\TtsModelSettings.cshtml.cs",
@@ -730,7 +724,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 31,
+              "DocumentIndex": 30,
               "Title": "LauncherAioController.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\LauncherAioController.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\LauncherAioController.cs",
@@ -742,7 +736,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 30,
+              "DocumentIndex": 29,
               "Title": "TranslationOrchestratorService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TranslationOrchestratorService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TranslationOrchestratorService.cs",
@@ -754,7 +748,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 82,
+              "DocumentIndex": 81,
               "Title": "20250810152224_AddSrtLimitFields5646846541.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250810152224_AddSrtLimitFields5646846541.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250810152224_AddSrtLimitFields5646846541.cs",
@@ -766,7 +760,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 32,
+              "DocumentIndex": 31,
               "Title": "Index.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml",
@@ -778,7 +772,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 33,
+              "DocumentIndex": 32,
               "Title": "Index.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml.cs",
@@ -790,7 +784,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 29,
+              "DocumentIndex": 28,
               "Title": "CleanupService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\CleanupService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\CleanupService.cs",
@@ -802,7 +796,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 34,
+              "DocumentIndex": 33,
               "Title": "InsufficientQuotaException.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Models\\InsufficientQuotaException.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Models\\InsufficientQuotaException.cs",
@@ -814,7 +808,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 78,
+              "DocumentIndex": 77,
               "Title": "20250729102758_AddApiPoolType.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250729102758_AddApiPoolType.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250729102758_AddApiPoolType.cs",
@@ -826,7 +820,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 35,
+              "DocumentIndex": 34,
               "Title": "TranslationSession.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Models\\TranslationSession.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Models\\TranslationSession.cs",
@@ -838,7 +832,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 36,
+              "DocumentIndex": 35,
               "Title": "_ViewImports.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\_ViewImports.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\_ViewImports.cshtml",
@@ -850,7 +844,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 38,
+              "DocumentIndex": 37,
               "Title": "RequestLoggingMiddleware.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Middleware\\RequestLoggingMiddleware.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Middleware\\RequestLoggingMiddleware.cs",
@@ -862,7 +856,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 37,
+              "DocumentIndex": 36,
               "Title": "fly",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\fly",
               "RelativeDocumentMoniker": "SubPhim.Server\\fly",
@@ -874,7 +868,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 79,
+              "DocumentIndex": 78,
               "Title": "20250729030436_AddSr3131231.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250729030436_AddSr3131231.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250729030436_AddSr3131231.cs",
@@ -886,7 +880,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 39,
+              "DocumentIndex": 38,
               "Title": "BackupRestore.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml.cs",
@@ -898,7 +892,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 40,
+              "DocumentIndex": 39,
               "Title": "BackupRestore.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml",
@@ -910,7 +904,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 76,
+              "DocumentIndex": 75,
               "Title": "20250728165648_AddTierDefaultSettingsTable121.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250728165648_AddTierDefaultSettingsTable121.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250728165648_AddTierDefaultSettingsTable121.cs",
@@ -922,7 +916,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 41,
+              "DocumentIndex": 40,
               "Title": "Microsoft.NET.Sdk.StaticWebAssets.targets",
               "DocumentMoniker": "C:\\Program Files\\dotnet\\sdk\\9.0.300\\Sdks\\Microsoft.NET.Sdk.StaticWebAssets\\targets\\Microsoft.NET.Sdk.StaticWebAssets.targets",
               "ToolTip": "C:\\Program Files\\dotnet\\sdk\\9.0.300\\Sdks\\Microsoft.NET.Sdk.StaticWebAssets\\targets\\Microsoft.NET.Sdk.StaticWebAssets.targets",
@@ -932,7 +926,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 77,
+              "DocumentIndex": 76,
               "Title": "20250728163649_AddLocalApiSettingsTablesssss.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250728163649_AddLocalApiSettingsTablesssss.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250728163649_AddLocalApiSettingsTablesssss.cs",
@@ -944,7 +938,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 42,
+              "DocumentIndex": 41,
               "Title": "ConfigSeeder.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\ConfigSeeder.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Data\\ConfigSeeder.cs",
@@ -956,7 +950,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 43,
+              "DocumentIndex": 42,
               "Title": "Create.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml",
@@ -968,7 +962,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 44,
+              "DocumentIndex": 43,
               "Title": "Create.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml.cs",
@@ -980,7 +974,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 45,
+              "DocumentIndex": 44,
               "Title": "ServerControl.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml",
@@ -992,7 +986,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 46,
+              "DocumentIndex": 45,
               "Title": "Login.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Login.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Login.cshtml.cs",
@@ -1004,7 +998,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 47,
+              "DocumentIndex": 46,
               "Title": "Login.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Login.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Login.cshtml",
@@ -1016,7 +1010,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 48,
+              "DocumentIndex": 47,
               "Title": "ITierSettingsService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\ITierSettingsService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\ITierSettingsService.cs",
@@ -1028,7 +1022,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 75,
+              "DocumentIndex": 74,
               "Title": "20250725125304_AddIsAdminFlagToUser.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250725125304_AddIsAdminFlagToUser.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250725125304_AddIsAdminFlagToUser.cs",
@@ -1040,7 +1034,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 49,
+              "DocumentIndex": 48,
               "Title": "ServerControl.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\ServerControl.cshtml.cs",
@@ -1052,7 +1046,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 50,
+              "DocumentIndex": 49,
               "Title": "LocalApiSettings.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Helper\\LocalApiSettings.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Helper\\LocalApiSettings.cs",
@@ -1064,7 +1058,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 51,
+              "DocumentIndex": 50,
               "Title": "Index.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\Home\\Index.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Views\\Home\\Index.cshtml",
@@ -1076,7 +1070,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 52,
+              "DocumentIndex": 51,
               "Title": "EncryptionService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\EncryptionService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\EncryptionService.cs",
@@ -1088,7 +1082,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 53,
+              "DocumentIndex": 52,
               "Title": "IEncryptionService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\IEncryptionService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\IEncryptionService.cs",
@@ -1100,7 +1094,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 55,
+              "DocumentIndex": 54,
               "Title": "_ViewStart.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\_ViewStart.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Views\\_ViewStart.cshtml",
@@ -1112,7 +1106,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 54,
+              "DocumentIndex": 53,
               "Title": "_ViewImports.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\_ViewImports.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Views\\_ViewImports.cshtml",
@@ -1124,7 +1118,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 56,
+              "DocumentIndex": 55,
               "Title": "DisplayHelper.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Helper\\DisplayHelper.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Helper\\DisplayHelper.cs",
@@ -1136,7 +1130,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 57,
+              "DocumentIndex": 56,
               "Title": "_AdminLayout.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml.cs",
@@ -1148,7 +1142,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 58,
+              "DocumentIndex": 57,
               "Title": "SeedData.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\SeedData.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Data\\SeedData.cs",
@@ -1160,7 +1154,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 59,
+              "DocumentIndex": 58,
               "Title": "Dockerfile",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Dockerfile",
               "RelativeDocumentMoniker": "SubPhim.Server\\Dockerfile",
@@ -1172,7 +1166,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 60,
+              "DocumentIndex": 59,
               "Title": "ErrorViewModel.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Models\\ErrorViewModel.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Models\\ErrorViewModel.cs",
@@ -1184,7 +1178,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 61,
+              "DocumentIndex": 60,
               "Title": "TimeZoneHelper.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Helper\\TimeZoneHelper.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Helper\\TimeZoneHelper.cs",
@@ -1196,7 +1190,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 62,
+              "DocumentIndex": 61,
               "Title": "HomeController.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\HomeController.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\HomeController.cs",
@@ -1208,7 +1202,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 74,
+              "DocumentIndex": 73,
               "Title": "20250719172659_AddUsageLimitTracking.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250719172659_AddUsageLimitTracking.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250719172659_AddUsageLimitTracking.cs",
@@ -1220,7 +1214,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 63,
+              "DocumentIndex": 62,
               "Title": "Index.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml",
@@ -1232,7 +1226,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 64,
+              "DocumentIndex": 63,
               "Title": "Index.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Banning\\Index.cshtml.cs",
@@ -1244,7 +1238,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 73,
+              "DocumentIndex": 72,
               "Title": "20250719092216_AddRequestTrackingToUser.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250719092216_AddRequestTrackingToUser.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250719092216_AddRequestTrackingToUser.cs",
@@ -1256,7 +1250,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 65,
+              "DocumentIndex": 64,
               "Title": "SubPhim.Server.csproj",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\SubPhim.Server.csproj",
               "RelativeDocumentMoniker": "SubPhim.Server\\SubPhim.Server.csproj",
@@ -1268,7 +1262,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 66,
+              "DocumentIndex": 65,
               "Title": "Privacy.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Views\\Home\\Privacy.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Views\\Home\\Privacy.cshtml",
@@ -1280,7 +1274,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 68,
+              "DocumentIndex": 67,
               "Title": "20250717192650_Add_Email_And_DeviceName.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717192650_Add_Email_And_DeviceName.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717192650_Add_Email_And_DeviceName.cs",
@@ -1292,7 +1286,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 69,
+              "DocumentIndex": 68,
               "Title": "20250717183532_AllowNull_LastLoginIp.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717183532_AllowNull_LastLoginIp.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717183532_AllowNull_LastLoginIp.cs",
@@ -1304,7 +1298,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 70,
+              "DocumentIndex": 69,
               "Title": "20250717181343_Add_UserManagement_Features.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181343_Add_UserManagement_Features.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717181343_Add_UserManagement_Features.cs",
@@ -1316,7 +1310,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 67,
+              "DocumentIndex": 66,
               "Title": "20250717181303_Add_UserMaxDevices_And_DeviceIp.cs",
               "DocumentMoniker": "D:\\SrtTranslatorApp\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181303_Add_UserMaxDevices_And_DeviceIp.cs",
               "RelativeDocumentMoniker": "..\\..\\SrtTranslatorApp\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717181303_Add_UserMaxDevices_And_DeviceIp.cs",
@@ -1327,7 +1321,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 71,
+              "DocumentIndex": 70,
               "Title": "20250717180105_Add_MaxDevices_And_IPAddress.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717180105_Add_MaxDevices_And_IPAddress.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717180105_Add_MaxDevices_And_IPAddress.cs",
@@ -1339,7 +1333,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 72,
+              "DocumentIndex": 71,
               "Title": "20250717145528_InitialCreate.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250717145528_InitialCreate.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250717145528_InitialCreate.cs",

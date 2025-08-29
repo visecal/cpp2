@@ -1,5 +1,4 @@
-﻿// VỊ TRÍ: Pages/Admin/TierManagement.cshtml.cs
-
+﻿
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;

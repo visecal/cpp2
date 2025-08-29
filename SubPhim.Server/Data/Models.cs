@@ -85,7 +85,7 @@ namespace SubPhim.Server.Data
         [Display(Name = "Giới hạn số video/ngày")]
         public int DailyVideoLimit { get; set; } = 2;
         [Display(Name = "Giới hạn dịch SRT Local/Ngày")]
-        public int DailyLocalSrtLimit { get; set; } = 1500; 
+        public int DailyLocalSrtLimit { get; set; } = 500; 
 
         [Display(Name = "Số dòng SRT Local đã dùng/Ngày")]
         public int LocalSrtLinesUsedToday { get; set; } = 0;
@@ -131,15 +131,11 @@ namespace SubPhim.Server.Data
 
         [Display(Name = "Số Request Hôm Nay (Gemini)")]
         public int RequestsToday { get; set; } = 0;
-
-        // <<< BẮT ĐẦU THÊM/SỬA CÁC TRƯỜNG CHO ELEVENLABS >>>
         [Display(Name = "Giới hạn Ký tự")]
-        public long CharacterLimit { get; set; } = 10000; // Mặc định 10,000 cho ElevenLabs
+        public long CharacterLimit { get; set; } = 10000;
 
         [Display(Name = "Ký tự Đã dùng")]
         public long CharactersUsed { get; set; } = 0;
-        // <<< KẾT THÚC THÊM/SỬA CÁC TRƯỜNG CHO ELEVENLABS >>>
-
         [Display(Name = "Lần cuối reset (UTC)")]
         public DateTime LastResetUtc { get; set; } = DateTime.UtcNow;
 

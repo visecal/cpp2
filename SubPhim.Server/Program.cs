@@ -14,7 +14,6 @@ using Microsoft.AspNetCore.Localization;
 using SubPhim.Server.Middleware;
 
 
-// --- 1. Cấu hình Builder ---
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<LocalApiSettings>(
     builder.Configuration.GetSection(LocalApiSettings.SectionName)
@@ -44,8 +43,6 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Admin", "AdminPolicy");
     options.Conventions.AllowAnonymousToPage("/Admin/Login");
 });
-
-// Cấu hình DB linh hoạt cho Local và Fly.io
 var dbConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FLY_APP_NAME")))
 {
@@ -56,7 +53,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FLY_APP_NAME")))
 {
-    // Chỉ thực hiện khi chạy trên môi trường Fly.io
     var dataProtectionPath = new DirectoryInfo("/data/keys");
     builder.Services.AddDataProtection()
         .PersistKeysToFileSystem(dataProtectionPath)
@@ -64,16 +60,10 @@ if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FLY_APP_NAME")))
 }
 else
 {
-    // Khi chạy trên máy local, không cần cấu hình đặc biệt.
-    // Hệ thống sẽ tự động lưu key vào một vị trí an toàn trong profile của user.
     builder.Services.AddDataProtection();
 }
-
-// Lấy khóa bí mật để tạo JWT
 var jwtKey = "SubPhim-Super-Secret-Key-For-JWT-Authentication-2024-@!#$";
 var key = Encoding.ASCII.GetBytes(jwtKey);
-
-// Cấu hình hệ thống xác thực kép (JWT cho API, Cookie cho Web)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -93,8 +83,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.LoginPath = "/Admin/Login";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
     });
-
-// Cấu hình hệ thống phân quyền (Authorization)
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminPolicy", policy =>
@@ -104,13 +92,7 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim("Admin", "true");
     });
 });
-
-
-// --- 3. Xây dựng ứng dụng ---
 var app = builder.Build();
-
-
-// --- 4. Cấu hình HTTP Request Pipeline ---
 app.UseMiddleware<RequestLoggingMiddleware>();
 if (app.Environment.IsDevelopment())
 {
@@ -170,20 +152,16 @@ using (var scope = app.Services.CreateScope())
         }
         else
         {
-            // TRƯỜNG HỢP 2: TÀI KHOẢN 'admin' ĐÃ TỒN TẠI -> CẬP NHẬT ĐỂ ĐẢM BẢO ĐÚNG QUYỀN
             logger.LogInformation("Admin user found. Ensuring permissions are correctly set.");
-            adminUser.IsAdmin = true; // Đây là dòng code sửa lỗi trực tiếp
-            adminUser.Tier = SubscriptionTier.Lifetime; // Đảm bảo gói cao nhất
-            adminUser.IsBlocked = false; // Mở khóa nếu tài khoản đang bị khóa
-            // Tùy chọn: Reset lại mật khẩu để bạn chắc chắn có thể đăng nhập
-            // adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(defaultAdminPassword);
+            adminUser.IsAdmin = true; 
+            adminUser.Tier = SubscriptionTier.Lifetime; 
+            adminUser.IsBlocked = false; 
         }
 
-        context.SaveChanges(); // Lưu tất cả các thay đổi (tạo mới hoặc cập nhật)
+        context.SaveChanges(); 
         logger.LogInformation("Admin user seeding/update completed successfully.");
         try
         {
-            // Chỉ seed nếu bảng TierDefaultSettings đang trống
             if (!context.TierDefaultSettings.Any())
             {
                 logger.LogInformation("TierDefaultSettings table is empty. Seeding from appsettings.json...");

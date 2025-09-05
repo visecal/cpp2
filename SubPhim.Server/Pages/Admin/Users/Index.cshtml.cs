@@ -32,9 +32,38 @@ namespace SubPhim.Server.Pages.Admin.Users
         public int PremiumUserCount { get; set; }
         public int MonthlyUserCount { get; set; }
         public int FreeUserCount { get; set; }
+        [HttpGet]
+        public async Task<IActionResult> OnGetTierDefaultsAsync(SubscriptionTier tier)
+        {
+            var settings = await _context.TierDefaultSettings.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Tier == tier);
 
+            if (settings == null)
+            {
+                return NotFound(new { message = "Không tìm thấy cấu hình mặc định cho gói này." });
+            }
+            var features = Enum.GetValues<GrantedFeatures>()
+                .Where(f => f != GrantedFeatures.None && settings.GrantedFeatures.HasFlag(f))
+                .Select(f => f.ToString())
+                .ToList();
+
+            var apis = Enum.GetValues<AllowedApis>()
+                .Where(a => a != AllowedApis.None && settings.AllowedApis.HasFlag(a))
+                .Select(a => a.ToString())
+                .ToList();
+
+            return new JsonResult(new
+            {
+                settings.VideoDurationMinutes,
+                settings.DailyVideoCount,
+                settings.DailyTranslationRequests,
+                settings.DailySrtLineLimit,
+                settings.DailyLocalSrtLimit,
+                AllowedApis = apis,
+                GrantedFeatures = features
+            });
+        }
         public List<string> AllFeatureNames => Enum.GetNames(typeof(GrantedFeatures)).Where(f => f != "None").ToList();
-        // === SỬA LỖI TYPO TẠI ĐÂY ===
         public List<string> AllApiNames => Enum.GetNames(typeof(AllowedApis)).Where(a => a != "None").ToList();
 
         private const int PageSize = 20;
@@ -275,4 +304,5 @@ namespace SubPhim.Server.Pages.Admin.Users
         public long TtsCharactersUsed { get; set; }
         public long TtsCharacterLimit { get; set; }
     }
+
 }

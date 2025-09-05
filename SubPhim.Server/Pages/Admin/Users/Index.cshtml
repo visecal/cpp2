@@ -183,12 +183,40 @@
 
 @section Scripts {
     <script>
-        // --- SCRIPT GIỮ NGUYÊN, KHÔNG THAY ĐỔI ---
         document.addEventListener('DOMContentLoaded', function () {
             const modalElement = document.getElementById('permissionsModal');
             if (!modalElement) return;
 
             const antiforgeryToken = "@Xsrf.GetAndStoreTokens(HttpContext).RequestToken";
+            const modalTierSelector = document.getElementById('modalTier');
+            async function applyTierDefaults(tier) {
+                try {
+                    const response = await fetch(`/Admin/Users?handler=TierDefaults&tier=${tier}`);
+                    if (!response.ok) {
+                        showAlert('warning', 'Không thể tải cài đặt mặc định cho gói này.');
+                        return;
+                    }
+                    const data = await response.json();
+                    document.getElementById('modalDailyVideoLimit').value = data.dailyVideoCount;
+                    document.getElementById('modalDailyRequestLimit').value = data.dailyTranslationRequests;
+                    document.getElementById('modalDailySrtLimit').value = data.dailySrtLineLimit;
+                    document.getElementById('modalDailyLocalSrtLimit').value = data.dailyLocalSrtLimit;
+                    document.querySelectorAll('#permissionsModal input[id^="api-check-"]').forEach(checkbox => {
+                        checkbox.checked = data.allowedApis.includes(checkbox.value);
+                    });
+                    document.querySelectorAll('#permissionsModal input[id^="feature-check-"]').forEach(checkbox => {
+                        checkbox.checked = data.grantedFeatures.includes(checkbox.value);
+                    });
+
+                } catch (error) {
+                    showAlert('danger', 'Lỗi kết nối khi lấy cài đặt mặc định.');
+                    console.error("Fetch tier defaults error:", error);
+                }
+            }
+
+            modalTierSelector.addEventListener('change', function (event) {
+                applyTierDefaults(event.target.value);
+            });
 
             function parseFlags(flagsString) {
                 if (!flagsString || flagsString === 'None') return [];

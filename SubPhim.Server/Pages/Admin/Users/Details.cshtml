@@ -81,8 +81,6 @@
                         <label class="form-label" asp-for="User.VideosProcessedToday"></label>
                         <input type="number" class="form-control" asp-for="User.VideosProcessedToday" />
                     </div>
-
-                    <!-- *** KHÔI PHỤC CHỨC NĂNG TẠI ĐÂY *** -->
                     <hr />
                     <h6 class="text-muted">Giới hạn Dịch Thuật & TTS</h6>
                     <div class="mb-3">
@@ -179,13 +177,10 @@
             </div>
         </div>
     </div>
-
-    <!-- CỘT PHẢI - THAO TÁC NHANH -->
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">Thao Tác Nhanh</div>
             <div class="card-body">
-                <!-- Thêm thời gian -->
                 <form method="post" asp-page-handler="AddSubTime" asp-route-id="@Model.User.Id" class="mb-4">
                     <label class="form-label" asp-for="DaysToAdd"></label>
                     <div class="input-group">
@@ -198,12 +193,10 @@
                       onsubmit="return confirm('CẢNH BÁO!\nHành động này sẽ TRỪ đi số ngày sử dụng của tài khoản này.\n\nBạn có chắc chắn muốn tiếp tục?');">
                     <label class="form-label">Số ngày muốn trừ</label>
                     <div class="input-group">
-                        <!-- Chúng ta vẫn có thể dùng chung thuộc tính DaysToAdd -->
                         <input type="number" name="DaysToAdd" value="30" class="form-control" />
                         <button type="submit" class="btn btn-warning">Trừ</button>
                     </div>
                 </form>
-                <!-- Reset mật khẩu -->
                 <hr />
                 <form method="post" asp-page-handler="ResetPassword" asp-route-id="@Model.User.Id" class="mb-4">
                     <label class="form-label" asp-for="NewPassword"></label>
@@ -213,7 +206,6 @@
                     </div>
                 </form>
                 <hr />
-                <!-- Các nút hành động khác -->
                 <div class="d-grid gap-2">
                     <form method="post" asp-page-handler="BanUser" asp-route-id="@Model.User.Id"
                           onsubmit="return confirm('CẢNH BÁO!\nHành động này sẽ CHẶN tài khoản và CẤM TẤT CẢ các thiết bị đã đăng nhập của người dùng này.\n\nBạn có chắc chắn muốn tiếp tục?');">
@@ -235,15 +227,41 @@
 
 @section Scripts {
     <script>
-        // Giữ nguyên phần script của bạn, không cần thay đổi
         document.addEventListener('DOMContentLoaded', function () {
             const tierSelector = document.getElementById('tierSelector');
             const expiryDateInput = document.getElementById('expiryDateInput');
+            async function applyTierDefaultsOnDetailsPage(tier) {
+                try {
+                    const response = await fetch(`/Admin/Users?handler=TierDefaults&tier=${tier}`);
+                    if (!response.ok) {
+                        alert('Không thể tải cài đặt mặc định cho gói này.');
+                        return;
+                    }
+                    const data = await response.json();
+                    document.querySelector('[name="User.DailyVideoLimit"]').value = data.dailyVideoCount;
+                    document.querySelector('[name="User.DailyRequestLimitOverride"]').value = data.dailyTranslationRequests;
+                    document.querySelector('[name="User.DailySrtLineLimit"]').value = data.dailySrtLineLimit;
+                    //document.querySelector('[name="User.DailyLocalSrtLimit"]').value = data.dailyLocalSrtLimit;
 
-            tierSelector.addEventListener('change', function() {
-                // Khi thay đổi tier, cho phép admin chỉnh sửa ngày tự do
-                expiryDateInput.readOnly = false;
-            });
+                    document.querySelectorAll('input[name="allowedApis"]').forEach(checkbox => {
+                        checkbox.checked = data.allowedApis.includes(checkbox.value);
+                    });
+                    document.querySelectorAll('input[name="features"]').forEach(checkbox => {
+                        checkbox.checked = data.grantedFeatures.includes(checkbox.value);
+                    });
+
+                } catch (error) {
+                    alert('Lỗi kết nối khi lấy cài đặt mặc định.');
+                    console.error("Fetch tier defaults error:", error);
+                }
+            }
+
+            if (tierSelector) {
+                tierSelector.addEventListener('change', function (event) {
+                    expiryDateInput.readOnly = false;
+                    applyTierDefaultsOnDetailsPage(event.target.value);
+                });
+            }
         });
     </script>
 }

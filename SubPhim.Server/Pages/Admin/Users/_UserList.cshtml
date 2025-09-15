@@ -16,8 +16,8 @@
                     <th>Hạn đăng ký</th>
                     <th>Video (dùng/tổng)</th>
                     <th>Dịch Truyện (dùng/tổng)</th>
+                    <th>AIO (dùng/tổng)</th> <!-- THÊM MỚI -->
                     <th>Dịch SRT (dùng/tổng)</th>
-                    <th>Dịch SRT Local</th>
                     <th>TTS (dùng/tổng)</th>
                     <th style="min-width: 200px;">Quyền API</th>
                     <th style="min-width: 200px;">Quyền Tính Năng</th>
@@ -41,20 +41,25 @@
                         <td id="expiry-cell-@user.Id">@DisplayHelper.GetSubscriptionStatus(Enum.Parse<SubscriptionTier>(user.Tier), user.SubscriptionExpiry)</td>
                         <td id="video-limit-cell-@user.Id">@user.VideosProcessedToday / @(user.DailyVideoLimit == -1 ? "∞" : user.DailyVideoLimit)</td>
                         <td id="request-limit-cell-@user.Id">@user.DailyRequestCount / @(user.DailyRequestLimitOverride == -1 ? "∞" : user.DailyRequestLimitOverride)</td>
+                        <!-- === BẮT ĐẦU THÊM MỚI === -->
+                        <td id="aio-limit-cell-@user.Id">@user.AioCharactersUsedToday.ToString("N0") / @user.AioCharacterLimit.ToString("N0")</td>
+                        <!-- === KẾT THÚC THÊM MỚI === -->
                         <td id="srt-limit-cell-@user.Id">@user.SrtLinesUsedToday / @user.DailySrtLineLimit</td>
-                        <td id="local-srt-limit-cell-@user.Id">@user.DailyLocalSrtLimit</td>
                         <td id="tts-limit-cell-@user.Id">@user.TtsCharactersUsed / @user.TtsCharacterLimit</td>
                         <td id="apis-cell-@user.Id">@Html.Raw(DisplayHelper.FormatFlags(user.AllowedApiAccess))</td>
                         <td id="features-cell-@user.Id">@Html.Raw(DisplayHelper.FormatFlags(user.GrantedFeatures))</td>
                         <td>@(user.LastLogin?.ToVietNamTimeString("g") ?? "Chưa đăng nhập")</td>
                         <td class="text-center">
+                            <!-- === BẮT ĐẦU SỬA ĐỔI: Thêm data- attributes === -->
                             <button class="btn btn-sm btn-warning manage-permissions-btn" data-bs-toggle="modal" data-bs-target="#permissionsModal"
                                     data-user-id="@user.Id" data-user-name="@user.Username" data-user-tier="@user.Tier"
                                     data-granted-features="@user.GrantedFeatures" data-allowed-apis="@user.AllowedApiAccess"
                                     data-daily-video-limit="@user.DailyVideoLimit" data-daily-request-limit="@user.DailyRequestLimitOverride"
-                                    data-daily-srt-limit="@user.DailySrtLineLimit" data-daily-local-srt-limit="@user.DailyLocalSrtLimit">
+                                    data-daily-srt-limit="@user.DailySrtLineLimit" data-daily-local-srt-limit="@user.DailyLocalSrtLimit"
+                                    data-aio-char-limit="@user.AioCharacterLimit" data-aio-rpm="@user.AioRpm">
                                 <i class="bi bi-key-fill"></i> Sửa quyền
                             </button>
+                            <!-- === KẾT THÚC SỬA ĐỔI === -->
                         </td>
                     </tr>
                 }
@@ -84,8 +89,10 @@
                         <div class="col-6"><strong>Đăng nhập cuối:</strong> @(user.LastLogin?.ToVietNamTimeString("g") ?? "Chưa có")</div>
                         <div class="col-6"><strong>Video:</strong> @user.VideosProcessedToday / @(user.DailyVideoLimit == -1 ? "∞" : user.DailyVideoLimit)</div>
                         <div class="col-6"><strong>Dịch Truyện:</strong> @user.DailyRequestCount / @(user.DailyRequestLimitOverride == -1 ? "∞" : user.DailyRequestLimitOverride)</div>
+                        <!-- === BẮT ĐẦU THÊM MỚI === -->
+                        <div class="col-12"><strong>AIO:</strong> @user.AioCharactersUsedToday.ToString("N0") / @user.AioCharacterLimit.ToString("N0")</div>
+                        <!-- === KẾT THÚC THÊM MỚI === -->
                         <div class="col-12"><strong>Dịch SRT:</strong> @user.SrtLinesUsedToday / @user.DailySrtLineLimit</div>
-                        <div class="col-12"><strong>Dịch SRT Local/Ngày:</strong> @user.DailyLocalSrtLimit</div>
                     </div>
                     <hr class="my-2">
                     <div class="small mb-2">
@@ -98,13 +105,16 @@
                     </div>
                 </div>
                 <div class="card-footer bg-transparent border-0 pt-0">
+                    <!-- === BẮT ĐẦU SỬA ĐỔI: Thêm data- attributes === -->
                     <button class="btn btn-sm btn-warning w-100 manage-permissions-btn" data-bs-toggle="modal" data-bs-target="#permissionsModal"
                             data-user-id="@user.Id" data-user-name="@user.Username" data-user-tier="@user.Tier"
                             data-granted-features="@user.GrantedFeatures" data-allowed-apis="@user.AllowedApiAccess"
                             data-daily-video-limit="@user.DailyVideoLimit" data-daily-request-limit="@user.DailyRequestLimitOverride"
-                            data-daily-srt-limit="@user.DailySrtLineLimit" data-daily-local-srt-limit="@user.DailyLocalSrtLimit">
+                            data-daily-srt-limit="@user.DailySrtLineLimit" data-daily-local-srt-limit="@user.DailyLocalSrtLimit"
+                            data-aio-char-limit="@user.AioCharacterLimit" data-aio-rpm="@user.AioRpm">
                         <i class="bi bi-key-fill"></i> Sửa quyền
                     </button>
+                    <!-- === KẾT THÚC SỬA ĐỔI === -->
                 </div>
             </div>
         }

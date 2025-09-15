@@ -86,15 +86,17 @@ public class AuthController : ControllerBase
     public record RegisterRequest(string Username, string Password, string Email, string Hwid);
     public record LoginRequest(string Username, string Password, string Hwid);
     public record UserDto(
-        int Id, string Username, string Uid, string Email, string SubscriptionTier, DateTime SubscriptionExpiry,
-        string Token, GrantedFeatures GrantedFeatures,
-        AllowedApis AllowedApiAccess,
-        int RemainingRequests, int VideosProcessedToday,
-        int DailyVideoLimit, List<DeviceDto> Devices,
-         int SrtLinesUsedToday,
-    int DailySrtLineLimit, long TtsCharactersUsed,
-    long TtsCharacterLimit
-    );
+    int Id, string Username, string Uid, string Email, string SubscriptionTier, DateTime SubscriptionExpiry,
+    string Token, GrantedFeatures GrantedFeatures,
+    AllowedApis AllowedApiAccess,
+    int RemainingRequests, int VideosProcessedToday,
+    int DailyVideoLimit, List<DeviceDto> Devices,
+     int SrtLinesUsedToday,
+int DailySrtLineLimit, long TtsCharactersUsed,
+long TtsCharacterLimit,
+    long AioCharactersUsedToday,
+    long AioCharacterLimit
+);
     public record SrtTranslateCheckRequest(int LineCount);
 
     [HttpPost("pre-srt-translate-check")]
@@ -319,28 +321,31 @@ public class AuthController : ControllerBase
             };
         }
         int remainingRequests = dailyTranslationLimit - user.DailyRequestCount;
+        var tierSettings = await _context.TierDefaultSettings.FindAsync(user.Tier);
+        long aioCharacterLimit = tierSettings?.AioCharacterLimit ?? 0;
         var userDto = new UserDto(
-        user.Id,
-        user.Username,
-        user.Uid,
-        user.Email,
-        user.Tier.ToString(),
-        user.SubscriptionExpiry ?? DateTime.MinValue,
-        token,
-        user.GrantedFeatures,
-        user.AllowedApiAccess,
-        Math.Max(0, remainingRequests),
-        user.VideosProcessedToday,
-        user.DailyVideoLimit,
-        user.Devices.OrderByDescending(d => d.LastLogin)
-                     .Select(d => new DeviceDto(d.Hwid, d.LastLoginIp, d.LastLogin)).ToList(),
-        user.SrtLinesUsedToday,
-        user.DailySrtLineLimit,
-        user.TtsCharactersUsed,     // <<< THÊM MỚI
-        user.TtsCharacterLimit      // <<< THÊM MỚI
-    );
+            user.Id,
+            user.Username,
+            user.Uid,
+            user.Email,
+            user.Tier.ToString(),
+            user.SubscriptionExpiry ?? DateTime.MinValue,
+            token,
+            user.GrantedFeatures,
+            user.AllowedApiAccess,
+            Math.Max(0, remainingRequests),
+            user.VideosProcessedToday,
+            user.DailyVideoLimit,
+            user.Devices.OrderByDescending(d => d.LastLogin)
+                         .Select(d => new DeviceDto(d.Hwid, d.LastLoginIp, d.LastLogin)).ToList(),
+            user.SrtLinesUsedToday,
+            user.DailySrtLineLimit,
+            user.TtsCharactersUsed,
+            user.TtsCharacterLimit,
+            user.AioCharactersUsedToday,
+            aioCharacterLimit
+        );
         return Ok(userDto);
-        // --- KẾT THÚC SỬA LOGIC ---
     }
 
     [HttpGet("refresh-profile")]
@@ -423,6 +428,14 @@ public class AuthController : ControllerBase
             hasChanges = true;
             Debug.WriteLine($"[AuthController.RefreshProfile] Resetting TtsCharactersUsed for FREE user '{user.Username}'.");
         }
+        var lastAioResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(user.LastAioResetUtc, vietnamTimeZone);
+        if (lastAioResetInVietnam.Date < vietnamNow.Date)
+        {
+            user.AioCharactersUsedToday = 0;
+            user.LastAioResetUtc = DateTime.UtcNow.Date;
+            hasChanges = true;
+            Debug.WriteLine($"[AuthController.RefreshProfile] Resetting AioCharactersUsedToday for user '{user.Username}'.");
+        }
         if (hasChanges)
         {
             await _context.SaveChangesAsync();
@@ -436,6 +449,11 @@ public class AuthController : ControllerBase
         if (user.DailyRequestLimitOverride != -1) { dailyTranslationLimit = user.DailyRequestLimitOverride; }
         else { dailyTranslationLimit = user.Tier switch { SubscriptionTier.Free => 30, _ => 9999 }; }
         int remainingRequests = dailyTranslationLimit - user.DailyRequestCount;
+
+        // <<< BẮT ĐẦU THAY ĐỔI: Lấy AioCharacterLimit từ TierDefaultSettings >>>
+        var tierSettings = await _context.TierDefaultSettings.FindAsync(user.Tier);
+        long aioCharacterLimit = tierSettings?.AioCharacterLimit ?? 0;
+        // <<< KẾT THÚC THAY ĐỔI >>>
 
         var userDto = new UserDto(
             user.Id,
@@ -455,7 +473,11 @@ public class AuthController : ControllerBase
             user.SrtLinesUsedToday,
             user.DailySrtLineLimit,
             user.TtsCharactersUsed,
-            user.TtsCharacterLimit 
+            user.TtsCharacterLimit,
+            // <<< BẮT ĐẦU THÊM MỚI >>>
+            user.AioCharactersUsedToday,
+            aioCharacterLimit
+        // <<< KẾT THÚC THÊM MỚI >>>
         );
         return Ok(userDto);
     }
@@ -486,15 +508,8 @@ public class AuthController : ControllerBase
             user.LastVideoResetUtc = DateTime.UtcNow.Date;
             await _context.SaveChangesAsync();
         }
-
-        // SỬA LỖI: Không đọc từ IOptionsMonitor nữa.
-        // Tất cả các giới hạn đã được lưu trực tiếp vào đối tượng User trong DB.
-        // Chúng ta chỉ cần sử dụng các thuộc tính đó.
-
         bool canProcess = true;
         string message = "Bạn có thể xử lý video mới.";
-
-        // Dùng giới hạn đã lưu trong DB cho user này
         if (user.DailyVideoLimit != -1 && user.VideosProcessedToday >= user.DailyVideoLimit)
         {
             canProcess = false;
@@ -508,7 +523,7 @@ public class AuthController : ControllerBase
         var status = new UsageStatusDto(
             CanProcessNewVideo: canProcess,
             RemainingVideosToday: Math.Max(0, remaining),
-            MaxVideoDurationMinutes: user.VideoDurationLimitMinutes, // Đọc trực tiếp từ user
+            MaxVideoDurationMinutes: user.VideoDurationLimitMinutes, 
             LimitResetTimeUtc: nextResetUtc,
             Message: message
         );
@@ -540,18 +555,14 @@ public class AuthController : ControllerBase
         {
             user.VideosProcessedToday = 0; // Reset bộ đếm nếu đã sang ngày mới
             user.LastVideoResetUtc = DateTime.UtcNow.Date;
-            // Không cần save changes ở đây, sẽ save ở cuối
         }
         if (user.DailyVideoLimit != -1 && user.VideosProcessedToday >= user.DailyVideoLimit)
         {
-            // Nếu đã hết lượt, trả về lỗi "Too Many Requests"
             _logger.LogWarning("User '{Username}' (ID: {UserId}) was denied video processing. Limit reached: {Processed}/{Limit}",
                                 user.Username, user.Id, user.VideosProcessedToday, user.DailyVideoLimit);
 
             return StatusCode(429, $"Bạn đã đạt giới hạn {user.DailyVideoLimit} cho hôm nay. Nâng cấp gói để mở khoá giới hạn.");
         }
-
-        // --- BƯỚC 3: Nếu được phép, trừ đi một lượt và lưu lại NGAY LẬP TỨC ---
         user.VideosProcessedToday++;
         await _context.SaveChangesAsync();
 

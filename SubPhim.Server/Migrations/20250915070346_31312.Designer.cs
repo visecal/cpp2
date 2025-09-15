@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SubPhim.Server.Data;
 
@@ -10,9 +11,11 @@ using SubPhim.Server.Data;
 namespace SubPhim.Server.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250915070346_31312")]
+    partial class _31312
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.7");
@@ -615,7 +618,7 @@ namespace SubPhim.Server.Migrations
                         {
                             Id = 1,
                             DownloadUrl = "https://example.com/download/latest",
-                            LastUpdated = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            LastUpdated = new DateTime(2025, 9, 15, 7, 3, 45, 540, DateTimeKind.Utc).AddTicks(7149),
                             LatestVersion = "1.0.0",
                             ReleaseNotes = "Phiên bản đầu tiên."
                         });

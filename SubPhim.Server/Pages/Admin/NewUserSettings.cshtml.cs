@@ -34,7 +34,6 @@ namespace SubPhim.Server.Pages.Admin
             [Display(Name = "Giới hạn Dịch SRT (API bên thứ 3) / Ngày")]
             public int DailySrtLineLimit { get; set; }
 
-            // === ĐÃ THÊM MỚI ===
             [Display(Name = "Giới hạn Dịch SRT (Local API Server) / Ngày")]
             public int DailyLocalSrtLimit { get; set; }
 
@@ -46,6 +45,14 @@ namespace SubPhim.Server.Pages.Admin
 
             [Display(Name = "Giới hạn Ký tự TTS / Ngày")]
             public long TtsCharacterLimit { get; set; }
+
+            // === BẮT ĐẦU THÊM MỚI ===
+            [Display(Name = "Giới hạn Ký tự AIO / Ngày")]
+            public long AioCharacterLimit { get; set; }
+
+            [Display(Name = "Giới hạn Request AIO / Phút")]
+            public int AioRequestsPerMinute { get; set; }
+            // === KẾT THÚC THÊM MỚI ===
         }
 
         public async Task<IActionResult> OnGetAsync()
@@ -54,8 +61,13 @@ namespace SubPhim.Server.Pages.Admin
 
             if (freeSettings == null)
             {
-                ErrorMessage = "Không tìm thấy cấu hình mặc định cho gói 'Free'. Vui lòng kiểm tra lại database.";
-                return Page();
+                // Khởi tạo giá trị mặc định nếu chưa có trong DB
+                freeSettings = new TierDefaultSetting
+                {
+                    Tier = SubscriptionTier.Free,
+                    AioCharacterLimit = 5000,
+                    AioRequestsPerMinute = 3
+                };
             }
 
             FreeTierSettings = new TierSettingsViewModel
@@ -66,7 +78,11 @@ namespace SubPhim.Server.Pages.Admin
                 DailyLocalSrtLimit = freeSettings.DailyLocalSrtLimit,
                 AllowedApiAccess = freeSettings.AllowedApiAccess,
                 GrantedFeatures = freeSettings.GrantedFeatures,
-                TtsCharacterLimit = freeSettings.TtsCharacterLimit
+                TtsCharacterLimit = freeSettings.TtsCharacterLimit,
+                // === BẮT ĐẦU THÊM MỚI ===
+                AioCharacterLimit = freeSettings.AioCharacterLimit,
+                AioRequestsPerMinute = freeSettings.AioRequestsPerMinute
+                // === KẾT THÚC THÊM MỚI ===
             };
 
             return Page();
@@ -95,6 +111,10 @@ namespace SubPhim.Server.Pages.Admin
                 freeSettingsInDb.AllowedApiAccess = FreeTierSettings.AllowedApiAccess;
                 freeSettingsInDb.GrantedFeatures = FreeTierSettings.GrantedFeatures;
                 freeSettingsInDb.TtsCharacterLimit = FreeTierSettings.TtsCharacterLimit;
+                // === BẮT ĐẦU THÊM MỚI ===
+                freeSettingsInDb.AioCharacterLimit = FreeTierSettings.AioCharacterLimit;
+                freeSettingsInDb.AioRequestsPerMinute = FreeTierSettings.AioRequestsPerMinute;
+                // === KẾT THÚC THÊM MỚI ===
 
                 await _context.SaveChangesAsync();
                 SuccessMessage = "Đã cập nhật thành công cài đặt mặc định cho người dùng đăng ký mới!";

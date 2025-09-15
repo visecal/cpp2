@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using SubPhim.Server.Data;
 using SubPhim.Server.Services;
 using PagedList.Core;
-using SubPhim.Server.Utils; // Thêm using này để dùng DisplayHelper
+using SubPhim.Server.Utils;
 
 namespace SubPhim.Server.Pages.Admin.Users
 {
@@ -59,6 +60,10 @@ namespace SubPhim.Server.Pages.Admin.Users
                 settings.DailyTranslationRequests,
                 settings.DailySrtLineLimit,
                 settings.DailyLocalSrtLimit,
+                // === BẮT ĐẦU THÊM MỚI ===
+                settings.AioCharacterLimit,
+                settings.AioRequestsPerMinute,
+                // === KẾT THÚC THÊM MỚI ===
                 AllowedApis = apis,
                 GrantedFeatures = features
             });
@@ -112,27 +117,50 @@ namespace SubPhim.Server.Pages.Admin.Users
                 .Take(PageSize)
                 .ToListAsync();
 
-            var userViewModels = usersForCurrentPage.Select(u => new UserViewModel
+            // Lấy tất cả cài đặt tier một lần để tối ưu
+            var tierSettings = await _context.TierDefaultSettings.ToDictionaryAsync(ts => ts.Tier);
+
+            var userViewModels = usersForCurrentPage.Select(u =>
             {
-                Id = u.Id,
-                Uid = u.Uid,
-                Username = u.Username,
-                Email = u.Email,
-                Tier = u.Tier.ToString(),
-                SubscriptionExpiry = u.SubscriptionExpiry,
-                IsBlocked = u.IsBlocked,
-                VideosProcessedToday = u.VideosProcessedToday,
-                DailyVideoLimit = u.DailyVideoLimit,
-                DailyRequestCount = u.DailyRequestCount,
-                DailyRequestLimitOverride = u.DailyRequestLimitOverride,
-                AllowedApiAccess = u.AllowedApiAccess,
-                GrantedFeatures = u.GrantedFeatures,
-                LastLogin = u.Devices.Any() ? u.Devices.Max(d => d.LastLogin) : (DateTime?)null,
-                SrtLinesUsedToday = u.SrtLinesUsedToday,
-                DailySrtLineLimit = u.DailySrtLineLimit,
-                DailyLocalSrtLimit = u.DailyLocalSrtLimit,
-                TtsCharactersUsed = u.TtsCharactersUsed,
-                TtsCharacterLimit = u.TtsCharacterLimit
+                var currentTierSettings = tierSettings.GetValueOrDefault(u.Tier);
+
+                // Xác định giới hạn ký tự AIO: ưu tiên override, sau đó đến tier default
+                long aioCharLimit = u.AioCharacterLimitOverride != -1
+                    ? u.AioCharacterLimitOverride
+                    : (currentTierSettings?.AioCharacterLimit ?? 0);
+
+                // Xác định giới hạn RPM AIO: ưu tiên override, sau đó đến tier default
+                int aioRpm = u.AioRpmOverride != -1
+                    ? u.AioRpmOverride
+                    : (currentTierSettings?.AioRequestsPerMinute ?? 0);
+
+                return new UserViewModel
+                {
+                    Id = u.Id,
+                    Uid = u.Uid,
+                    Username = u.Username,
+                    Email = u.Email,
+                    Tier = u.Tier.ToString(),
+                    SubscriptionExpiry = u.SubscriptionExpiry,
+                    IsBlocked = u.IsBlocked,
+                    VideosProcessedToday = u.VideosProcessedToday,
+                    DailyVideoLimit = u.DailyVideoLimit,
+                    DailyRequestCount = u.DailyRequestCount,
+                    DailyRequestLimitOverride = u.DailyRequestLimitOverride,
+                    AllowedApiAccess = u.AllowedApiAccess,
+                    GrantedFeatures = u.GrantedFeatures,
+                    LastLogin = u.Devices.Any() ? u.Devices.Max(d => d.LastLogin) : (DateTime?)null,
+                    SrtLinesUsedToday = u.SrtLinesUsedToday,
+                    DailySrtLineLimit = u.DailySrtLineLimit,
+                    DailyLocalSrtLimit = u.DailyLocalSrtLimit,
+                    TtsCharactersUsed = u.TtsCharactersUsed,
+                    TtsCharacterLimit = u.TtsCharacterLimit,
+                    // === BẮT ĐẦU THÊM MỚI ===
+                    AioCharactersUsedToday = u.AioCharactersUsedToday,
+                    AioCharacterLimit = aioCharLimit,
+                    AioRpm = aioRpm
+                    // === KẾT THÚC THÊM MỚI ===
+                };
             }).ToList();
 
             DisplayUsers = new StaticPagedList<UserViewModel>(userViewModels, PageNumber, PageSize, totalItemCount);
@@ -266,6 +294,11 @@ namespace SubPhim.Server.Pages.Admin.Users
             userInDb.DailySrtLineLimit = request.DailySrtLineLimit;
             userInDb.DailyLocalSrtLimit = request.DailyLocalSrtLimit;
 
+            // === BẮT ĐẦU THÊM MỚI ===
+            userInDb.AioCharacterLimitOverride = request.AioCharacterLimitOverride;
+            userInDb.AioRpmOverride = request.AioRpmOverride;
+            // === KẾT THÚC THÊM MỚI ===
+
             await _context.SaveChangesAsync();
             return new JsonResult(new { message = "Cập nhật thành công!" });
         }
@@ -280,6 +313,11 @@ namespace SubPhim.Server.Pages.Admin.Users
         public int DailyRequestLimitOverride { get; set; }
         public int DailyLocalSrtLimit { get; set; }
         public int DailySrtLineLimit { get; set; }
+
+        // === BẮT ĐẦU THÊM MỚI ===
+        public long AioCharacterLimitOverride { get; set; }
+        public int AioRpmOverride { get; set; }
+        // === KẾT THÚC THÊM MỚI ===
     }
 
     public class UserViewModel
@@ -303,6 +341,11 @@ namespace SubPhim.Server.Pages.Admin.Users
         public int DailySrtLineLimit { get; set; }
         public long TtsCharactersUsed { get; set; }
         public long TtsCharacterLimit { get; set; }
-    }
 
+        // === BẮT ĐẦU THÊM MỚI ===
+        public long AioCharactersUsedToday { get; set; }
+        public long AioCharacterLimit { get; set; }
+        public int AioRpm { get; set; }
+        // === KẾT THÚC THÊM MỚI ===
+    }
 }

@@ -71,12 +71,25 @@
                                 <label class="form-label">Số dòng dịch SRT (API bên thứ 3) / ngày</label>
                                 <input type="number" name="Configs[@tier].DailySrtLineLimit" value="@config.DailySrtLineLimit" class="form-control" />
                             </div>
-                            <!-- === THÊM MỚI === -->
                             <div class="col-md-6">
                                 <label class="form-label">Số dòng dịch SRT (Local API) / ngày</label>
                                 <input type="number" name="Configs[@tier].DailyLocalSrtLimit" value="@config.DailyLocalSrtLimit" class="form-control" />
                             </div>
                         </div>
+
+                        <!-- === BẮT ĐẦU THÊM MỚI === -->
+                        <h5 class="mt-4"><i class="bi bi-robot me-2"></i>Giới hạn Dịch Văn Bản (AIO)</h5>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Số ký tự AIO / ngày</label>
+                                <input type="number" name="Configs[@tier].AioCharacterLimit" value="@config.AioCharacterLimit" class="form-control" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Số request AIO / phút (RPM)</label>
+                                <input type="number" name="Configs[@tier].AioRequestsPerMinute" value="@config.AioRequestsPerMinute" class="form-control" />
+                            </div>
+                        </div>
+                        <!-- === KẾT THÚC THÊM MỚI === -->
 
                         <h5 class="mt-4"><i class="bi bi-key me-2"></i>Quyền truy cập API</h5>
                         <div class="row mb-3">

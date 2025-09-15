@@ -24,10 +24,16 @@ builder.Services.Configure<UsageLimitsSettings>(
 builder.Services.AddScoped<ITtsOrchestratorService, TtsOrchestratorService>();
 builder.Services.AddScoped<ITtsSettingsService, TtsSettingsService>();
 builder.Services.AddHostedService<TtsKeyResetService>();
+builder.Services.AddHostedService<AioKeyResetService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<CleanupService>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddScoped<ITierSettingsService, TierSettingsService>();
+builder.Services.AddScoped<IAioLauncherService, AioLauncherService>();
+builder.Services.AddHttpClient("AioLauncherClient", client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5); 
+});
 builder.Services.AddControllers();
 builder.Services.AddSingleton<TranslationOrchestratorService>();
 builder.Services.AddMemoryCache();

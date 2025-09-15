@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SubPhim.Server.Data;
 
@@ -10,9 +11,11 @@ using SubPhim.Server.Data;
 namespace SubPhim.Server.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250915021724_AddAioTranslationFeature")]
+    partial class AddAioTranslationFeature
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.7");
@@ -128,9 +131,6 @@ namespace SubPhim.Server.Migrations
                     b.Property<int>("RetryApiDelayMs")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("RpdPerKey")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("RpmPerKey")
                         .HasColumnType("INTEGER");
 
@@ -149,7 +149,7 @@ namespace SubPhim.Server.Migrations
                         {
                             Id = 1,
                             ChunkSize = 3500,
-                            DefaultModelName = "gemini-2.5-pro",
+                            DefaultModelName = "gemini-1.5-flash-latest",
                             DelayBetweenChunksMs = 5000,
                             DelayBetweenFilesMs = 5000,
                             DirectSendThreshold = 8000,
@@ -157,7 +157,6 @@ namespace SubPhim.Server.Migrations
                             MaxApiRetries = 3,
                             MaxOutputTokens = 8192,
                             RetryApiDelayMs = 10000,
-                            RpdPerKey = 100,
                             RpmPerKey = 10,
                             Temperature = 0.7m,
                             ThinkingBudget = 8192
@@ -586,54 +585,13 @@ namespace SubPhim.Server.Migrations
                     b.ToTable("TtsModelSettings");
                 });
 
-            modelBuilder.Entity("SubPhim.Server.Data.UpdateInfo", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("DownloadUrl")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LatestVersion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ReleaseNotes")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("UpdateInfos");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            DownloadUrl = "https://example.com/download/latest",
-                            LastUpdated = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            LatestVersion = "1.0.0",
-                            ReleaseNotes = "Phiên bản đầu tiên."
-                        });
-                });
-
             modelBuilder.Entity("SubPhim.Server.Data.User", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<long>("AioCharacterLimitOverride")
-                        .HasColumnType("INTEGER");
-
                     b.Property<long>("AioCharactersUsedToday")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("AioRpmOverride")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("AllowedApiAccess")

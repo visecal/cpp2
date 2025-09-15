@@ -1,4 +1,6 @@
-﻿
+﻿// VỊ TRÍ: Pages/Admin/TierManagement.cshtml.cs
+// THAY THẾ TOÀN BỘ FILE
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -33,9 +35,12 @@ namespace SubPhim.Server.Pages.Admin
             public GrantedFeatures GrantedFeatures { get; set; }
             public int DailySrtLineLimit { get; set; }
             public long TtsCharacterLimit { get; set; }
-
-            // === THÊM MỚI ===
             public int DailyLocalSrtLimit { get; set; }
+
+            // === BẮT ĐẦU THÊM MỚI ===
+            public long AioCharacterLimit { get; set; }
+            public int AioRequestsPerMinute { get; set; }
+            // === KẾT THÚC THÊM MỚI ===
         }
 
         public async Task OnGetAsync()
@@ -55,8 +60,11 @@ namespace SubPhim.Server.Pages.Admin
                         GrantedFeatures = setting.GrantedFeatures,
                         DailySrtLineLimit = setting.DailySrtLineLimit,
                         TtsCharacterLimit = setting.TtsCharacterLimit,
-                        // === THÊM MỚI ===
-                        DailyLocalSrtLimit = setting.DailyLocalSrtLimit
+                        DailyLocalSrtLimit = setting.DailyLocalSrtLimit,
+                        // === BẮT ĐẦU THÊM MỚI ===
+                        AioCharacterLimit = setting.AioCharacterLimit,
+                        AioRequestsPerMinute = setting.AioRequestsPerMinute
+                        // === KẾT THÚC THÊM MỚI ===
                     });
                 }
             }
@@ -81,8 +89,11 @@ namespace SubPhim.Server.Pages.Admin
                         settingInDb.GrantedFeatures = formConfig.GrantedFeatures;
                         settingInDb.DailySrtLineLimit = formConfig.DailySrtLineLimit;
                         settingInDb.TtsCharacterLimit = formConfig.TtsCharacterLimit;
-                        // === THÊM MỚI ===
                         settingInDb.DailyLocalSrtLimit = formConfig.DailyLocalSrtLimit;
+                        // === BẮT ĐẦU THÊM MỚI ===
+                        settingInDb.AioCharacterLimit = formConfig.AioCharacterLimit;
+                        settingInDb.AioRequestsPerMinute = formConfig.AioRequestsPerMinute;
+                        // === KẾT THÚC THÊM MỚI ===
                     }
                 }
                 await _context.SaveChangesAsync();
@@ -125,8 +136,10 @@ namespace SubPhim.Server.Pages.Admin
                     user.GrantedFeatures = configToApply.GrantedFeatures;
                     user.DailySrtLineLimit = configToApply.DailySrtLineLimit;
                     user.TtsCharacterLimit = configToApply.TtsCharacterLimit;
-                    // === THÊM MỚI ===
                     user.DailyLocalSrtLimit = configToApply.DailyLocalSrtLimit;
+
+                    user.AioCharacterLimitOverride = -1;
+                    user.AioRpmOverride = -1;
                 }
 
                 var count = await _context.SaveChangesAsync();

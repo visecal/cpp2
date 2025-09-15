@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SubPhim.Server.Data;
 
@@ -10,9 +11,11 @@ using SubPhim.Server.Data;
 namespace SubPhim.Server.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250915063416_EnhanceAioKeyManagement3131323333")]
+    partial class EnhanceAioKeyManagement3131323333
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.7");
@@ -584,41 +587,6 @@ namespace SubPhim.Server.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("TtsModelSettings");
-                });
-
-            modelBuilder.Entity("SubPhim.Server.Data.UpdateInfo", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("DownloadUrl")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LatestVersion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ReleaseNotes")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("UpdateInfos");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            DownloadUrl = "https://example.com/download/latest",
-                            LastUpdated = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            LatestVersion = "1.0.0",
-                            ReleaseNotes = "Phiên bản đầu tiên."
-                        });
                 });
 
             modelBuilder.Entity("SubPhim.Server.Data.User", b =>

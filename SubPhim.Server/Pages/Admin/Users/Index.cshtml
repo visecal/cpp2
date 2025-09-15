@@ -79,7 +79,7 @@
     </div>
 </div>
 
-<!-- Modal Chỉnh sửa quyền (GIỮ NGUYÊN) -->
+<!-- === BẮT ĐẦU SỬA ĐỔI: Cập nhật Modal Chỉnh sửa quyền === -->
 <div class="modal fade" id="permissionsModal" tabindex="-1" aria-labelledby="permissionsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -117,7 +117,7 @@
 
                 <div class="row align-items-end">
                     <div class="col-md-6">
-                        <h5 class="mt-4"><i class="bi bi-sliders"></i> Giới hạn Sử dụng</h5>
+                        <h5 class="mt-4"><i class="bi bi-sliders"></i> Giới hạn Sử dụng (Nhập -1 để dùng mặc định theo gói)</h5>
                     </div>
                     <div class="col-md-6 mb-2">
                         <label for="modalTier" class="form-label fw-bold">Thay đổi Gói</label>
@@ -130,21 +130,29 @@
                     </div>
                 </div>
                 <div class="row p-2 rounded bg-light mb-3">
-                    <div class="col-md-3 mb-2">
+                    <div class="col-md-4 mb-2">
                         <label for="modalDailyVideoLimit" class="form-label">Video / Ngày</label>
                         <input type="number" class="form-control" id="modalDailyVideoLimit">
                     </div>
-                    <div class="col-md-3 mb-2">
+                    <div class="col-md-4 mb-2">
                         <label for="modalDailyRequestLimit" class="form-label">Dịch Truyện / Ngày</label>
                         <input type="number" class="form-control" id="modalDailyRequestLimit">
                     </div>
-                    <div class="col-md-3 mb-2">
+                    <div class="col-md-4 mb-2">
                         <label for="modalDailySrtLimit" class="form-label">Dịch SRT / Ngày</label>
                         <input type="number" class="form-control" id="modalDailySrtLimit">
                     </div>
-                    <div class="col-md-3 mb-2">
+                    <div class="col-md-4 mb-2">
                         <label for="modalDailyLocalSrtLimit" class="form-label">Dịch SRT Local / Ngày</label>
                         <input type="number" class="form-control" id="modalDailyLocalSrtLimit">
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label for="modalAioCharLimit" class="form-label">Ký tự AIO / Ngày</label>
+                        <input type="number" class="form-control" id="modalAioCharLimit">
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label for="modalAioRpm" class="form-label">AIO RPM</label>
+                        <input type="number" class="form-control" id="modalAioRpm">
                     </div>
                 </div>
 
@@ -180,6 +188,7 @@
         </div>
     </div>
 </div>
+<!-- === KẾT THÚC SỬA ĐỔI === -->
 
 @section Scripts {
     <script>
@@ -201,6 +210,10 @@
                     document.getElementById('modalDailyRequestLimit').value = data.dailyTranslationRequests;
                     document.getElementById('modalDailySrtLimit').value = data.dailySrtLineLimit;
                     document.getElementById('modalDailyLocalSrtLimit').value = data.dailyLocalSrtLimit;
+                    // === BẮT ĐẦU THÊM MỚI ===
+                    document.getElementById('modalAioCharLimit').value = data.aioCharacterLimit;
+                    document.getElementById('modalAioRpm').value = data.aioRequestsPerMinute;
+                    // === KẾT THÚC THÊM MỚI ===
                     document.querySelectorAll('#permissionsModal input[id^="api-check-"]').forEach(checkbox => {
                         checkbox.checked = data.allowedApis.includes(checkbox.value);
                     });
@@ -234,6 +247,10 @@
                 const dailyRequestLimit = button.getAttribute('data-daily-request-limit');
                 const dailySrtLimit = button.getAttribute('data-daily-srt-limit');
                 const dailyLocalSrtLimit = button.getAttribute('data-daily-local-srt-limit');
+                // === BẮT ĐẦU THÊM MỚI ===
+                const aioCharLimit = button.getAttribute('data-aio-char-limit');
+                const aioRpm = button.getAttribute('data-aio-rpm');
+                // === KẾT THÚC THÊM MỚI ===
 
                 document.getElementById('modalUserId').value = userId;
                 document.getElementById('modalUserName').innerText = userName;
@@ -244,6 +261,10 @@
                 document.getElementById('modalDailyRequestLimit').value = dailyRequestLimit;
                 document.getElementById('modalDailySrtLimit').value = dailySrtLimit;
                 document.getElementById('modalDailyLocalSrtLimit').value = dailyLocalSrtLimit;
+                // === BẮT ĐẦU THÊM MỚI ===
+                document.getElementById('modalAioCharLimit').value = aioCharLimit;
+                document.getElementById('modalAioRpm').value = aioRpm;
+                // === KẾT THÚC THÊM MỚI ===
 
                 document.querySelectorAll('#permissionsModal input[id^="api-check-"]').forEach(checkbox => {
                     checkbox.checked = allowedApis.includes(checkbox.value);
@@ -266,6 +287,10 @@
                 formData.append('dailyRequestLimitOverride', document.getElementById('modalDailyRequestLimit').value);
                 formData.append('dailySrtLineLimit', document.getElementById('modalDailySrtLimit').value);
                 formData.append('dailyLocalSrtLimit', document.getElementById('modalDailyLocalSrtLimit').value);
+                // === BẮT ĐẦU THÊM MỚI ===
+                formData.append('aioCharacterLimitOverride', document.getElementById('modalAioCharLimit').value);
+                formData.append('aioRpmOverride', document.getElementById('modalAioRpm').value);
+                // === KẾT THÚC THÊM MỚI ===
 
                 const selectedApis = Array.from(document.querySelectorAll('#permissionsModal input[id^="api-check-"]:checked')).map(cb => cb.value);
                 selectedApis.forEach(api => formData.append('apis', api));

@@ -45,7 +45,6 @@
                             <label asp-for="FreeTierSettings.DailySrtLineLimit" class="form-label"></label>
                             <input type="number" asp-for="FreeTierSettings.DailySrtLineLimit" class="form-control" />
                         </div>
-                        <!-- === ĐÃ THÊM MỚI === -->
                         <div class="col-md-6 mb-3">
                             <label asp-for="FreeTierSettings.DailyLocalSrtLimit" class="form-label"></label>
                             <input type="number" asp-for="FreeTierSettings.DailyLocalSrtLimit" class="form-control" />
@@ -56,6 +55,20 @@
                             <div class="form-text">Giới hạn này sẽ được reset hàng ngày cho user Free.</div>
                         </div>
                     </div>
+                    <!-- === BẮT ĐẦU THÊM MỚI === -->
+                    <hr />
+                    <h6 class="text-muted">Giới hạn Dịch Văn Bản (AIO)</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="FreeTierSettings.AioCharacterLimit" class="form-label"></label>
+                            <input type="number" asp-for="FreeTierSettings.AioCharacterLimit" class="form-control" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="FreeTierSettings.AioRequestsPerMinute" class="form-label"></label>
+                            <input type="number" asp-for="FreeTierSettings.AioRequestsPerMinute" class="form-control" />
+                        </div>
+                    </div>
+                    <!-- === KẾT THÚC THÊM MỚI === -->
                 </div>
             </div>
 

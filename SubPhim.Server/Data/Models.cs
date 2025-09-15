@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 
@@ -85,7 +86,7 @@ namespace SubPhim.Server.Data
         [Display(Name = "Giới hạn số video/ngày")]
         public int DailyVideoLimit { get; set; } = 2;
         [Display(Name = "Giới hạn dịch SRT Local/Ngày")]
-        public int DailyLocalSrtLimit { get; set; } = 500; 
+        public int DailyLocalSrtLimit { get; set; } = 500;
 
         [Display(Name = "Số dòng SRT Local đã dùng/Ngày")]
         public int LocalSrtLinesUsedToday { get; set; } = 0;
@@ -109,6 +110,20 @@ namespace SubPhim.Server.Data
 
         [Display(Name = "Lần cuối reset bộ đếm TTS (UTC)")]
         public DateTime LastTtsResetUtc { get; set; } = DateTime.UtcNow;
+
+        [Display(Name = "Ký tự AIO đã dùng/Ngày")]
+        public long AioCharactersUsedToday { get; set; } = 0;
+
+        [Display(Name = "Lần cuối reset bộ đếm AIO (UTC)")]
+        public DateTime LastAioResetUtc { get; set; } = DateTime.UtcNow;
+
+        // === BẮT ĐẦU THÊM MỚI ===
+        [Display(Name = "Ghi đè Giới hạn Ký tự AIO/Ngày")]
+        public long AioCharacterLimitOverride { get; set; } = -1;
+
+        [Display(Name = "Ghi đè Giới hạn Request AIO/Phút")]
+        public int AioRpmOverride { get; set; } = -1;
+        // === KẾT THÚC THÊM MỚI ===
     }
     public class TtsApiKey
     {
@@ -166,7 +181,7 @@ namespace SubPhim.Server.Data
         public int MaxRequestsPerMinute { get; set; }
 
         [Display(Name = "Nhà cung cấp")]
-        public TtsProvider Provider { get; set; } 
+        public TtsProvider Provider { get; set; }
 
     }
     public class Device
@@ -262,7 +277,7 @@ namespace SubPhim.Server.Data
     }
     public class TierDefaultSetting
     {
-        [Key] 
+        [Key]
         public SubscriptionTier Tier { get; set; }
 
         public int VideoDurationMinutes { get; set; }
@@ -275,6 +290,123 @@ namespace SubPhim.Server.Data
         public int DailyLocalSrtLimit { get; set; }
         [Display(Name = "Giới hạn ký tự TTS")]
         public long TtsCharacterLimit { get; set; }
+
+        // === BẮT ĐẦU THAY ĐỔI ===
+        [Display(Name = "Giới hạn ký tự AIO/Ngày")]
+        public long AioCharacterLimit { get; set; }
+
+        [Display(Name = "Giới hạn Request AIO/Phút")]
+        public int AioRequestsPerMinute { get; set; }
+        // === KẾT THÚC THAY ĐỔI ===
+    }
+    public class AioTranslationSetting
+    {
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
+        public int Id { get; set; } = 1;
+        [StringLength(100)]
+        [Display(Name = "Model API mặc định")]
+        public string DefaultModelName { get; set; } = "gemini-2.5-pro";
+
+        [Display(Name = "Temperature (0-2)")]
+        [Column(TypeName = "decimal(3, 2)")]
+        public decimal Temperature { get; set; } = 0.7m;
+
+        [Display(Name = "Max Output Tokens")]
+        public int MaxOutputTokens { get; set; } = 8192;
+
+        [Display(Name = "Bật Thinking Budget")]
+        public bool EnableThinkingBudget { get; set; } = true;
+
+        [Display(Name = "Thinking Budget")]
+        public int ThinkingBudget { get; set; } = 8192;
+
+        [Display(Name = "Request/Phút/Key")]
+        public int RpmPerKey { get; set; } = 10;
+        [Display(Name = "Request/Ngày/Key (RPD)")]
+        public int RpdPerKey { get; set; } = 100;
+        [Display(Name = "Số lần thử lại API nếu lỗi")]
+        public int MaxApiRetries { get; set; } = 3;
+
+        [Display(Name = "Delay giữa các lần thử lại API (ms)")]
+        public int RetryApiDelayMs { get; set; } = 10000;
+
+        [Display(Name = "Delay giữa các file (ms)")]
+        public int DelayBetweenFilesMs { get; set; } = 5000;
+
+        [Display(Name = "Delay giữa các chunk (ms)")]
+        public int DelayBetweenChunksMs { get; set; } = 5000;
+
+        [Display(Name = "Ngưỡng gửi trực tiếp (ký tự)")]
+        public int DirectSendThreshold { get; set; } = 8000;
+
+        [Display(Name = "Kích thước Chunk (ký tự)")]
+        public int ChunkSize { get; set; } = 3500;
+    }
+    public class AioApiKey
+    {
+        public int Id { get; set; }
+
+        [Required]
+        public string EncryptedApiKey { get; set; }
+
+        [Required]
+        public string Iv { get; set; }
+
+        [Display(Name = "Đang hoạt động")]
+        public bool IsEnabled { get; set; } = true;
+
+        [Display(Name = "Số Request Hôm Nay")]
+        public int RequestsToday { get; set; } = 0;
+
+        [Display(Name = "Lần cuối reset (UTC)")]
+        public DateTime LastResetUtc { get; set; } = DateTime.UtcNow;
+
+        [Display(Name = "Lý do bị vô hiệu hóa")]
+        [StringLength(200)]
+        public string? DisabledReason { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+    public class TranslationGenre
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        [Display(Name = "Tên Thể loại")]
+        public string GenreName { get; set; } // Ví dụ: "Huyền Huyễn Tiên Hiệp", "Ngôn Tình"
+
+        [Required]
+        [Display(Name = "Prompt Hệ thống (System Instruction)")]
+        public string SystemInstruction { get; set; } // Nội dung prompt tương ứng
+
+        [Display(Name = "Đang hoạt động")]
+        public bool IsActive { get; set; } = true;
+    }
+    public enum AioJobStatus { Pending, Processing, Completed, Failed }
+
+    public class AioTranslationJob
+    {
+        [Key]
+        public string SessionId { get; set; }
+
+        public int UserId { get; set; }
+        [ForeignKey("UserId")]
+        public User User { get; set; }
+
+        public AioJobStatus Status { get; set; } = AioJobStatus.Pending;
+
+        [Column(TypeName = "TEXT")] // Dùng TEXT để lưu trữ nội dung lớn
+        public string OriginalContent { get; set; }
+
+        [Column(TypeName = "TEXT")]
+        public string? TranslatedContent { get; set; }
+
+        public string Genre { get; set; }
+        public string TargetLanguage { get; set; }
+        public string? ErrorMessage { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? CompletedAt { get; set; }
     }
     public class AvailableApiModel
     {
@@ -351,6 +483,28 @@ namespace SubPhim.Server.Data
         [StringLength(50)]
         public string Provider { get; set; }
         public int TokensUsed { get; set; } = 0;
+    }
+    public class UpdateInfo
+    {
+        // Sử dụng Id cố định là 1 để đảm bảo chỉ có một dòng dữ liệu duy nhất
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
+        public int Id { get; set; } = 1;
+
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "Phiên bản mới nhất")]
+        public string LatestVersion { get; set; }
+
+        [Required]
+        [Url]
+        [Display(Name = "Đường dẫn tải file")]
+        public string DownloadUrl { get; set; }
+
+        [Display(Name = "Ghi chú phiên bản (Release Notes)")]
+        public string? ReleaseNotes { get; set; } // Cho phép null nếu không có ghi chú
+
+        [Display(Name = "Lần cuối cập nhật")]
+        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
     }
 
 }

@@ -1,50 +1,39 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿// VỊ TRÍ: Pages/Admin/BackupRestore.cshtml.cs
+// THAY THẾ TOÀN BỘ FILE
+
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using SubPhim.Server.Data;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace SubPhim.Server.Pages.Admin
 {
-    public class UserBackupModel
+    /// <summary>
+    /// Model chứa TOÀN BỘ dữ liệu quan trọng của server để backup.
+    /// </summary>
+    public class ComprehensiveBackupModel
     {
-        // Thông tin cơ bản
-        public string Uid { get; set; }
-        public int Id { get; set; }
-        public string Username { get; set; }
-        public string? Email { get; set; }
-        public string PasswordHash { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public bool IsBlocked { get; set; }
-        public bool IsAdmin { get; set; }
+        // Dữ liệu người dùng và thiết bị
+        public List<User> Users { get; set; }
+        public List<Device> Devices { get; set; }
+        public List<BannedDevice> BannedDevices { get; set; }
 
-        // Thông tin gói và quyền
-        public SubscriptionTier Tier { get; set; }
-        public DateTime? SubscriptionExpiry { get; set; }
-        public AllowedApis AllowedApiAccess { get; set; }
-        public GrantedFeatures GrantedFeatures { get; set; }
-        public int MaxDevices { get; set; }
+        // Toàn bộ các loại API Keys
+        public List<ManagedApiKey> ManagedApiKeys { get; set; } // Local API
+        public List<TtsApiKey> TtsApiKeys { get; set; }
+        public List<AioApiKey> AioApiKeys { get; set; }
+        public List<AioTtsServiceAccount> AioTtsServiceAccounts { get; set; }
 
-        // Giới hạn và bộ đếm Dịch Truyện
-        public int DailyRequestLimitOverride { get; set; }
-        public int DailyRequestCount { get; set; }
-        public DateTime LastRequestResetUtc { get; set; }
-
-        // Giới hạn và bộ đếm Video
-        public int VideosProcessedToday { get; set; }
-        public DateTime LastVideoResetUtc { get; set; }
-        public int VideoDurationLimitMinutes { get; set; }
-        public int DailyVideoLimit { get; set; }
-
-        // Giới hạn và bộ đếm Dịch SRT (API)
-        public int DailySrtLineLimit { get; set; }
-        public int SrtLinesUsedToday { get; set; }
-        public DateTime LastSrtLineResetUtc { get; set; }
-
-        // Giới hạn và bộ đếm Dịch SRT (Local)
-        public int DailyLocalSrtLimit { get; set; }
-        public int LocalSrtLinesUsedToday { get; set; }
-        public DateTime LastLocalSrtResetUtc { get; set; }
+        // Toàn bộ các bảng Cấu hình
+        public List<TierDefaultSetting> TierDefaultSettings { get; set; }
+        public List<LocalApiSetting> LocalApiSettings { get; set; }
+        public List<AvailableApiModel> AvailableApiModels { get; set; }
+        public List<AioTranslationSetting> AioTranslationSettings { get; set; }
+        public List<TranslationGenre> TranslationGenres { get; set; }
+        public List<TtsModelSetting> TtsModelSettings { get; set; }
+        public List<UpdateInfo> UpdateInfos { get; set; }
     }
 
     public class BackupRestoreModel : PageModel
@@ -63,72 +52,54 @@ namespace SubPhim.Server.Pages.Admin
         [TempData]
         public string ErrorMessage { get; set; }
 
-        public void OnGet()
-        {
-            // Chỉ hiển thị trang, không cần logic gì
-        }
+        public void OnGet() { }
 
         public async Task<IActionResult> OnGetDownloadBackupAsync()
         {
             try
             {
-                var usersToBackup = await _context.Users
-                    .AsNoTracking()
-                    .Select(u => new UserBackupModel
-                    {
-                        // Thông tin cơ bản
-                        Uid = u.Uid,
-                        Id = u.Id,
-                        Username = u.Username,
-                        Email = u.Email,
-                        PasswordHash = u.PasswordHash,
-                        CreatedAt = u.CreatedAt,
-                        IsBlocked = u.IsBlocked,
-                        IsAdmin = u.IsAdmin,
+                _logger.LogInformation("Bắt đầu quá trình tạo backup toàn diện...");
 
-                        // Thông tin gói và quyền
-                        Tier = u.Tier,
-                        SubscriptionExpiry = u.SubscriptionExpiry,
-                        AllowedApiAccess = u.AllowedApiAccess,
-                        GrantedFeatures = u.GrantedFeatures,
-                        MaxDevices = u.MaxDevices,
+                var backupData = new ComprehensiveBackupModel
+                {
+                    // Lấy dữ liệu từ tất cả các bảng cần thiết
+                    Users = await _context.Users.AsNoTracking().ToListAsync(),
+                    Devices = await _context.Devices.AsNoTracking().ToListAsync(),
+                    BannedDevices = await _context.BannedDevices.AsNoTracking().ToListAsync(),
+                    ManagedApiKeys = await _context.ManagedApiKeys.AsNoTracking().ToListAsync(),
+                    TtsApiKeys = await _context.TtsApiKeys.AsNoTracking().ToListAsync(),
+                    AioApiKeys = await _context.AioApiKeys.AsNoTracking().ToListAsync(),
+                    AioTtsServiceAccounts = await _context.AioTtsServiceAccounts.AsNoTracking().ToListAsync(),
+                    TierDefaultSettings = await _context.TierDefaultSettings.AsNoTracking().ToListAsync(),
+                    LocalApiSettings = await _context.LocalApiSettings.AsNoTracking().ToListAsync(),
+                    AvailableApiModels = await _context.AvailableApiModels.AsNoTracking().ToListAsync(),
+                    AioTranslationSettings = await _context.AioTranslationSettings.AsNoTracking().ToListAsync(),
+                    TranslationGenres = await _context.TranslationGenres.AsNoTracking().ToListAsync(),
+                    TtsModelSettings = await _context.TtsModelSettings.AsNoTracking().ToListAsync(),
+                    UpdateInfos = await _context.UpdateInfos.AsNoTracking().ToListAsync()
+                };
 
-                        // Giới hạn và bộ đếm Dịch Truyện
-                        DailyRequestLimitOverride = u.DailyRequestLimitOverride,
-                        DailyRequestCount = u.DailyRequestCount,
-                        LastRequestResetUtc = u.LastRequestResetUtc,
+                // Cấu hình serializer để xử lý các mối quan hệ (ví dụ: User -> Devices)
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    ReferenceHandler = ReferenceHandler.Preserve // Rất quan trọng để tránh lỗi lặp vô hạn
+                };
 
-                        // Giới hạn và bộ đếm Video
-                        VideosProcessedToday = u.VideosProcessedToday,
-                        LastVideoResetUtc = u.LastVideoResetUtc,
-                        VideoDurationLimitMinutes = u.VideoDurationLimitMinutes,
-                        DailyVideoLimit = u.DailyVideoLimit,
+                var jsonString = JsonSerializer.Serialize(backupData, jsonOptions);
+                var fileName = $"subphim_full_backup_{DateTime.Now:yyyyMMdd_HHmm}.json";
 
-                        // Giới hạn và bộ đếm Dịch SRT (API)
-                        DailySrtLineLimit = u.DailySrtLineLimit,
-                        SrtLinesUsedToday = u.SrtLinesUsedToday,
-                        LastSrtLineResetUtc = u.LastSrtLineResetUtc,
-
-                        // Giới hạn và bộ đếm Dịch SRT (Local)
-                        DailyLocalSrtLimit = u.DailyLocalSrtLimit,
-                        LocalSrtLinesUsedToday = u.LocalSrtLinesUsedToday,
-                        LastLocalSrtResetUtc = u.LastLocalSrtResetUtc
-                    })
-                    .ToListAsync();
-
-                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
-                var jsonString = JsonSerializer.Serialize(usersToBackup, jsonOptions);
-                var fileName = $"subphim_users_backup_{DateTime.Now:yyyyMMdd_HHmm}.json";
-
+                _logger.LogInformation("Tạo file backup '{FileName}' thành công.", fileName);
                 return File(System.Text.Encoding.UTF8.GetBytes(jsonString), "application/json", fileName);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi khi tạo file backup người dùng.");
+                _logger.LogError(ex, "Lỗi khi tạo file backup toàn diện.");
                 ErrorMessage = "Đã có lỗi xảy ra trong quá trình tạo file backup. Vui lòng kiểm tra log.";
                 return RedirectToPage();
             }
         }
+
         public async Task<IActionResult> OnPostImportAsync(IFormFile backupFile)
         {
             if (backupFile == null || backupFile.Length == 0)
@@ -143,108 +114,82 @@ namespace SubPhim.Server.Pages.Admin
                 return Page();
             }
 
-            List<UserBackupModel> usersFromBackup;
+            ComprehensiveBackupModel backupData;
             try
             {
                 using var streamReader = new StreamReader(backupFile.OpenReadStream());
                 var jsonString = await streamReader.ReadToEndAsync();
-                usersFromBackup = JsonSerializer.Deserialize<List<UserBackupModel>>(jsonString);
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "Lỗi khi đọc file JSON backup.");
-                ErrorMessage = "File backup không thể đọc được. Cấu trúc JSON không hợp lệ.";
-                return Page();
-            }
-
-            if (usersFromBackup == null || !usersFromBackup.Any())
-            {
-                SuccessMessage = "File backup không chứa dữ liệu người dùng nào.";
-                return RedirectToPage();
-            }
-
-            await using var transaction = await _context.Database.BeginTransactionAsync();
-            try
-            {
-                int importedCount = 0;
-                int updatedCount = 0;
-                var existingUsers = await _context.Users.ToDictionaryAsync(u => u.Username, u => u);
-
-                foreach (var userFromFile in usersFromBackup)
-                {
-                    if (existingUsers.TryGetValue(userFromFile.Username, out var userInDb))
-                    {
-                        // === CẬP NHẬT USER ĐÃ CÓ ===
-                        userInDb.Email = userFromFile.Email;
-                        userInDb.PasswordHash = userFromFile.PasswordHash;
-                        userInDb.IsBlocked = userFromFile.IsBlocked;
-                        userInDb.IsAdmin = userFromFile.IsAdmin;
-                        userInDb.Tier = userFromFile.Tier;
-                        userInDb.SubscriptionExpiry = userFromFile.SubscriptionExpiry;
-                        userInDb.AllowedApiAccess = userFromFile.AllowedApiAccess;
-                        userInDb.GrantedFeatures = userFromFile.GrantedFeatures;
-                        userInDb.MaxDevices = userFromFile.MaxDevices;
-                        userInDb.DailyRequestLimitOverride = userFromFile.DailyRequestLimitOverride;
-                        userInDb.DailyRequestCount = userFromFile.DailyRequestCount;
-                        userInDb.LastRequestResetUtc = userFromFile.LastRequestResetUtc;
-                        userInDb.VideosProcessedToday = userFromFile.VideosProcessedToday;
-                        userInDb.LastVideoResetUtc = userFromFile.LastVideoResetUtc;
-                        userInDb.VideoDurationLimitMinutes = userFromFile.VideoDurationLimitMinutes;
-                        userInDb.DailyVideoLimit = userFromFile.DailyVideoLimit;
-                        userInDb.DailySrtLineLimit = userFromFile.DailySrtLineLimit;
-                        userInDb.SrtLinesUsedToday = userFromFile.SrtLinesUsedToday;
-                        userInDb.LastSrtLineResetUtc = userFromFile.LastSrtLineResetUtc;
-                        userInDb.DailyLocalSrtLimit = userFromFile.DailyLocalSrtLimit;
-                        userInDb.LocalSrtLinesUsedToday = userFromFile.LocalSrtLinesUsedToday;
-                        userInDb.LastLocalSrtResetUtc = userFromFile.LastLocalSrtResetUtc;
-
-                        updatedCount++;
-                    }
-                    else
-                    {
-                        // === THÊM USER MỚI ===
-                        var newUser = new User
-                        {
-                            Uid = userFromFile.Uid,
-                            Username = userFromFile.Username,
-                            Email = userFromFile.Email,
-                            PasswordHash = userFromFile.PasswordHash,
-                            CreatedAt = userFromFile.CreatedAt,
-                            IsBlocked = userFromFile.IsBlocked,
-                            IsAdmin = userFromFile.IsAdmin,
-                            Tier = userFromFile.Tier,
-                            SubscriptionExpiry = userFromFile.SubscriptionExpiry,
-                            AllowedApiAccess = userFromFile.AllowedApiAccess,
-                            GrantedFeatures = userFromFile.GrantedFeatures,
-                            MaxDevices = userFromFile.MaxDevices,
-                            DailyRequestLimitOverride = userFromFile.DailyRequestLimitOverride,
-                            DailyRequestCount = userFromFile.DailyRequestCount,
-                            LastRequestResetUtc = userFromFile.LastRequestResetUtc,
-                            VideosProcessedToday = userFromFile.VideosProcessedToday,
-                            LastVideoResetUtc = userFromFile.LastVideoResetUtc,
-                            VideoDurationLimitMinutes = userFromFile.VideoDurationLimitMinutes,
-                            DailyVideoLimit = userFromFile.DailyVideoLimit,
-                            DailySrtLineLimit = userFromFile.DailySrtLineLimit,
-                            SrtLinesUsedToday = userFromFile.SrtLinesUsedToday,
-                            LastSrtLineResetUtc = userFromFile.LastSrtLineResetUtc,
-                            DailyLocalSrtLimit = userFromFile.DailyLocalSrtLimit,
-                            LocalSrtLinesUsedToday = userFromFile.LocalSrtLinesUsedToday,
-                            LastLocalSrtResetUtc = userFromFile.LastLocalSrtResetUtc
-                        };
-                        _context.Users.Add(newUser);
-                        importedCount++;
-                    }
-                }
-
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                SuccessMessage = $"Khôi phục thành công! Đã thêm mới {importedCount} user và cập nhật {updatedCount} user.";
+                var jsonOptions = new JsonSerializerOptions { ReferenceHandler = ReferenceHandler.Preserve };
+                backupData = JsonSerializer.Deserialize<ComprehensiveBackupModel>(jsonString, jsonOptions);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Lỗi khi đọc hoặc deserialize file JSON backup.");
+                ErrorMessage = "File backup không thể đọc được hoặc cấu trúc JSON không hợp lệ. Lỗi: " + ex.Message;
+                return Page();
+            }
+
+            if (backupData == null)
+            {
+                ErrorMessage = "Dữ liệu backup không hợp lệ.";
+                return Page();
+            }
+
+            // Bắt đầu một transaction để đảm bảo an toàn dữ liệu
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                _logger.LogWarning("Bắt đầu quá trình KHÔI PHỤC DỮ LIỆU. Dữ liệu hiện tại sẽ bị XÓA và THAY THẾ.");
+
+                // XÓA DỮ LIỆU CŨ theo thứ tự để không vi phạm khóa ngoại
+                // Bảng con -> bảng cha
+                await _context.Devices.ExecuteDeleteAsync();
+                await _context.Users.ExecuteDeleteAsync();
+                await _context.BannedDevices.ExecuteDeleteAsync();
+                await _context.ManagedApiKeys.ExecuteDeleteAsync();
+                await _context.TtsApiKeys.ExecuteDeleteAsync();
+                await _context.AioApiKeys.ExecuteDeleteAsync();
+                await _context.AioTtsServiceAccounts.ExecuteDeleteAsync();
+                await _context.TierDefaultSettings.ExecuteDeleteAsync();
+                await _context.LocalApiSettings.ExecuteDeleteAsync();
+                await _context.AvailableApiModels.ExecuteDeleteAsync();
+                await _context.AioTranslationSettings.ExecuteDeleteAsync();
+                await _context.TranslationGenres.ExecuteDeleteAsync();
+                await _context.TtsModelSettings.ExecuteDeleteAsync();
+                await _context.UpdateInfos.ExecuteDeleteAsync();
+                _logger.LogInformation("Đã xóa dữ liệu cũ từ các bảng.");
+
+                // THÊM DỮ LIỆU MỚI TỪ FILE BACKUP
+                // Dùng AddRange để EF Core xử lý việc chèn hàng loạt hiệu quả
+                if (backupData.Users?.Any() ?? false) _context.Users.AddRange(backupData.Users);
+                if (backupData.Devices?.Any() ?? false) _context.Devices.AddRange(backupData.Devices);
+                if (backupData.BannedDevices?.Any() ?? false) _context.BannedDevices.AddRange(backupData.BannedDevices);
+                if (backupData.ManagedApiKeys?.Any() ?? false) _context.ManagedApiKeys.AddRange(backupData.ManagedApiKeys);
+                if (backupData.TtsApiKeys?.Any() ?? false) _context.TtsApiKeys.AddRange(backupData.TtsApiKeys);
+                if (backupData.AioApiKeys?.Any() ?? false) _context.AioApiKeys.AddRange(backupData.AioApiKeys);
+                if (backupData.AioTtsServiceAccounts?.Any() ?? false) _context.AioTtsServiceAccounts.AddRange(backupData.AioTtsServiceAccounts);
+                if (backupData.TierDefaultSettings?.Any() ?? false) _context.TierDefaultSettings.AddRange(backupData.TierDefaultSettings);
+                if (backupData.LocalApiSettings?.Any() ?? false) _context.LocalApiSettings.AddRange(backupData.LocalApiSettings);
+                if (backupData.AvailableApiModels?.Any() ?? false) _context.AvailableApiModels.AddRange(backupData.AvailableApiModels);
+                if (backupData.AioTranslationSettings?.Any() ?? false) _context.AioTranslationSettings.AddRange(backupData.AioTranslationSettings);
+                if (backupData.TranslationGenres?.Any() ?? false) _context.TranslationGenres.AddRange(backupData.TranslationGenres);
+                if (backupData.TtsModelSettings?.Any() ?? false) _context.TtsModelSettings.AddRange(backupData.TtsModelSettings);
+                if (backupData.UpdateInfos?.Any() ?? false) _context.UpdateInfos.AddRange(backupData.UpdateInfos);
+
+                // Lưu tất cả các thay đổi vào DB
+                await _context.SaveChangesAsync();
+
+                // Hoàn tất transaction
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Khôi phục dữ liệu toàn diện thành công.");
+                SuccessMessage = $"Khôi phục thành công! Đã import dữ liệu cho {backupData.Users?.Count ?? 0} người dùng và các cấu hình liên quan.";
+            }
+            catch (Exception ex)
+            {
+                // Nếu có lỗi, hoàn tác tất cả thay đổi
                 await transaction.RollbackAsync();
-                _logger.LogError(ex, "Lỗi nghiêm trọng khi import dữ liệu người dùng.");
+                _logger.LogError(ex, "Lỗi nghiêm trọng khi import dữ liệu, đã rollback transaction.");
                 ErrorMessage = "Đã có lỗi xảy ra trong quá trình import, mọi thay đổi đã được hoàn tác. Chi tiết: " + ex.Message;
             }
 

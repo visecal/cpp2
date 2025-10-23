@@ -64,6 +64,38 @@ namespace SubPhim.Server.Services
                     {
                         _logger.LogInformation("No old AIO jobs found to delete.");
                     }
+                    _logger.LogInformation("Checking for old AIO TTS Batch jobs to delete...");
+                    var aioTtsThreshold = DateTime.UtcNow.AddHours(-1); // Xóa các job đã hoàn thành/lỗi sau 1 giờ
+
+                    var aioTtsJobsToDelete = await context.AioTtsBatchJobs
+                        .Where(j => (j.Status == AioTtsJobStatus.Completed || j.Status == AioTtsJobStatus.Failed)
+                                    && j.CreatedAt < aioTtsThreshold)
+                        .ToListAsync(stoppingToken);
+
+                    if (aioTtsJobsToDelete.Any())
+                    {
+                        // Xóa các file vật lý còn sót lại (nếu có)
+                        foreach (var job in aioTtsJobsToDelete)
+                        {
+                            if (!string.IsNullOrEmpty(job.ResultZipFilePath) && File.Exists(job.ResultZipFilePath))
+                            {
+                                try { File.Delete(job.ResultZipFilePath); } catch { }
+                            }
+                            if (!string.IsNullOrEmpty(job.OriginalSrtFilePath) && File.Exists(job.OriginalSrtFilePath))
+                            {
+                                try { File.Delete(job.OriginalSrtFilePath); } catch { }
+                            }
+                        }
+
+                        // Xóa bản ghi trong DB
+                        context.AioTtsBatchJobs.RemoveRange(aioTtsJobsToDelete);
+                        var deletedCount = await context.SaveChangesAsync(stoppingToken);
+                        _logger.LogInformation("Cleanup Service successfully deleted {Count} old AIO TTS Batch job(s).", deletedCount);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("No old AIO TTS Batch jobs found to delete.");
+                    }
 
                     _logger.LogInformation("Performing database WAL checkpoint...");
                     var connection = context.Database.GetDbConnection() as SqliteConnection;

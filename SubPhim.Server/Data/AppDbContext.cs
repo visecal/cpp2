@@ -6,6 +6,8 @@ namespace SubPhim.Server.Data
 {
     public class AppDbContext : DbContext
     {
+        public DbSet<AioTtsServiceAccount> AioTtsServiceAccounts { get; set; }
+        public DbSet<AioTtsBatchJob> AioTtsBatchJobs { get; set; }
         public DbSet<TierDefaultSetting> TierDefaultSettings { get; set; }
         public DbSet<LocalApiSetting> LocalApiSettings { get; set; }
         public DbSet<User> Users { get; set; }
@@ -23,7 +25,8 @@ namespace SubPhim.Server.Data
         public DbSet<TranslationGenre> TranslationGenres { get; set; }
         public DbSet<AioTranslationJob> AioTranslationJobs { get; set; }
         public DbSet<TtsModelSetting> TtsModelSettings { get; set; }
-        public DbSet<UpdateInfo> UpdateInfos { get; set; } // <-- THÊM DÒNG NÀY
+        public DbSet<UpdateInfo> UpdateInfos { get; set; }
+        public DbSet<SaOcrServiceAccount> SaOcrServiceAccounts { get; set; }
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -47,6 +50,14 @@ namespace SubPhim.Server.Data
                 .OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<AioTranslationSetting>()
                 .HasData(new AioTranslationSetting { Id = 1 });
+            modelBuilder.Entity<AioTtsServiceAccount>()
+               .HasIndex(sa => sa.ClientEmail)
+               .IsUnique();
+            modelBuilder.Entity<AioTtsBatchJob>()
+       .HasOne(j => j.User)
+       .WithMany() // Nếu User không cần danh sách các job thì để trống
+       .HasForeignKey(j => j.UserId)
+       .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<UpdateInfo>()
     .HasData(new UpdateInfo
@@ -57,6 +68,9 @@ namespace SubPhim.Server.Data
         ReleaseNotes = "Phiên bản đầu tiên.",
         LastUpdated = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
     });
+            modelBuilder.Entity<SaOcrServiceAccount>()
+               .HasIndex(sa => sa.ClientEmail)
+               .IsUnique();
         }
     }
 }

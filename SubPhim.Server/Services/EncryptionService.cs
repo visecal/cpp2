@@ -39,8 +39,6 @@ namespace SubPhim.Server.Services
                 }
             }
         }
-
-        // === BẮT ĐẦU SỬA LỖI: VIẾT CODE HOÀN CHỈNH CHO HÀM DECRYPT ===
         public string Decrypt(string encryptedText, string iv)
         {
             if (string.IsNullOrEmpty(encryptedText) || string.IsNullOrEmpty(iv))
@@ -71,20 +69,16 @@ namespace SubPhim.Server.Services
             }
             catch (FormatException)
             {
-                // Lỗi khi chuỗi Base64 không hợp lệ
                 return "!!! LỖI ĐỊNH DẠNG KEY !!!";
             }
             catch (CryptographicException)
             {
-                // Lỗi khi giải mã (ví dụ: key sai, padding sai)
                 return "!!! LỖI GIẢI MÃ (CRYPTO) !!!";
             }
             catch (Exception)
             {
-                // Bắt các lỗi khác
                 return "!!! LỖI KHÔNG XÁC ĐỊNH !!!";
             }
         }
-        // === KẾT THÚC SỬA LỖI ===
     }
 }

@@ -1,4 +1,8 @@
 is_global = true
+build_property.EnableAotAnalyzer = 
+build_property.EnableSingleFileAnalyzer = 
+build_property.EnableTrimAnalyzer = 
+build_property.IncludeAllContentForSelfExtract = 
 build_property.TargetFramework = net8.0
 build_property.TargetFramework = net8.0
 build_property.TargetPlatformMinVersion = 
@@ -32,6 +36,10 @@ build_property.EnableCodeStyleSeverity =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5cQWlvTGF1bmNoZXJTZXR0aW5ncy5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/subphimv1/SubPhim.Server/SubPhim.Server/Pages/Admin/AioLauncherTts.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5cQWlvTGF1bmNoZXJUdHMuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/subphimv1/SubPhim.Server/SubPhim.Server/Pages/Admin/BackupRestore.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5cQmFja3VwUmVzdG9yZS5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
@@ -50,6 +58,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/subphimv1/SubPhim.Server/SubPhim.Server/Pages/Admin/NewUserSettings.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5cTmV3VXNlclNldHRpbmdzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/subphimv1/SubPhim.Server/SubPhim.Server/Pages/Admin/SaOcr.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5cU2FPY3IuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/subphimv1/SubPhim.Server/SubPhim.Server/Pages/Admin/ServerControl.cshtml]

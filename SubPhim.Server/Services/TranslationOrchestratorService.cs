@@ -22,7 +22,7 @@ namespace SubPhim.Server.Services
             _httpClientFactory = httpClientFactory;
         }
 
-        public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, bool acceptPartial)
+        public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial)
         {
             _logger.LogInformation("GATEKEEPER: Job creation request for User ID {UserId}. AcceptPartial={AcceptPartial}", userId, acceptPartial);
 
@@ -32,7 +32,6 @@ namespace SubPhim.Server.Services
             var user = await context.Users.FindAsync(userId);
             if (user == null) throw new InvalidOperationException("User not found.");
 
-            // Logic reset hàng ngày (đảm bảo dữ liệu là mới nhất)
             var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
             var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
             var lastResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(user.LastLocalSrtResetUtc, vietnamTimeZone);
@@ -40,37 +39,30 @@ namespace SubPhim.Server.Services
             {
                 user.LocalSrtLinesUsedToday = 0;
                 user.LastLocalSrtResetUtc = DateTime.UtcNow.Date;
-                // Lưu ngay thay đổi này để đảm bảo các request đồng thời khác cũng thấy
                 await context.SaveChangesAsync();
             }
 
             int remainingLines = user.DailyLocalSrtLimit - user.LocalSrtLinesUsedToday;
             int requestedLines = allLines.Count;
 
-            // --- BẮT ĐẦU LOGIC PHÂN LUỒNG MỚI ---
-
-            // TRƯỜNG HỢP 1: User đủ lượt
             if (requestedLines <= remainingLines)
             {
                 user.LocalSrtLinesUsedToday += requestedLines;
-                var sessionId = await CreateJobInDb(user, genre, targetLanguage, allLines, context);
+                var sessionId = await CreateJobInDb(user, genre, targetLanguage, systemInstruction, allLines, context);
                 _ = ProcessJob(sessionId, user.Tier);
                 return new CreateJobResult("Accepted", "OK", sessionId);
             }
 
-            // TRƯỜNG HỢP 2: User không đủ lượt, nhưng vẫn còn một ít
             if (remainingLines > 0)
             {
-                // 2a: User đã đồng ý dịch số lượng còn lại
                 if (acceptPartial)
                 {
                     var partialLines = allLines.Take(remainingLines).ToList();
-                    user.LocalSrtLinesUsedToday += partialLines.Count; // Trừ đúng số lượng dịch
-                    var sessionId = await CreateJobInDb(user, genre, targetLanguage, partialLines, context);
+                    user.LocalSrtLinesUsedToday += partialLines.Count;
+                    var sessionId = await CreateJobInDb(user, genre, targetLanguage, systemInstruction, partialLines, context);
                     _ = ProcessJob(sessionId, user.Tier);
                     return new CreateJobResult("Accepted", "OK", sessionId);
                 }
-                // 2b: Đây là lần hỏi đầu tiên, đưa ra gợi ý
                 else
                 {
                     string message = $"Bạn không đủ lượt dịch Local API. Yêu cầu: {requestedLines} dòng, còn lại: {remainingLines} dòng.\n\nBạn có muốn dịch {remainingLines} dòng đầu tiên không?";
@@ -78,13 +70,11 @@ namespace SubPhim.Server.Services
                 }
             }
 
-            // TRƯỜNG HỢP 3: User đã hết sạch lượt
             string errorMessage = $"Bạn đã hết {user.DailyLocalSrtLimit} lượt dịch Local API trong ngày.";
             return new CreateJobResult("Error", errorMessage);
         }
 
-        // Tách logic tạo Job ra một hàm riêng để tái sử dụng
-        private async Task<string> CreateJobInDb(User user, string genre, string targetLanguage, List<SrtLine> linesToProcess, AppDbContext context)
+        private async Task<string> CreateJobInDb(User user, string genre, string targetLanguage, string systemInstruction, List<SrtLine> linesToProcess, AppDbContext context)
         {
             var sessionId = Guid.NewGuid().ToString();
             var newJob = new TranslationJobDb
@@ -93,6 +83,7 @@ namespace SubPhim.Server.Services
                 UserId = user.Id,
                 Genre = genre,
                 TargetLanguage = targetLanguage,
+                SystemInstruction = systemInstruction, // Lưu instruction vào DB
                 Status = JobStatus.Pending,
                 OriginalLines = linesToProcess.Select(l => new OriginalSrtLineDb { LineIndex = l.Index, OriginalText = l.OriginalText }).ToList()
             };
@@ -101,7 +92,7 @@ namespace SubPhim.Server.Services
             _logger.LogInformation("[DB] Created Job {SessionId} with {LineCount} lines for user {Username}", sessionId, linesToProcess.Count, user.Username);
             return sessionId;
         }
-        #region Unchanged Methods
+
         public async Task<List<TranslatedSrtLine>> GetJobResultsAsync(string sessionId)
         {
             using var scope = _serviceProvider.CreateScope();
@@ -126,7 +117,6 @@ namespace SubPhim.Server.Services
             bool isFinished = job.Status == JobStatus.Completed || job.Status == JobStatus.Failed;
             return (isFinished, job.ErrorMessage);
         }
-        #endregion
 
         private async Task ProcessJob(string sessionId, SubscriptionTier userTier)
         {
@@ -191,7 +181,7 @@ namespace SubPhim.Server.Services
                         {
                             var apiKeyRecord = enabledKeys[Random.Shared.Next(enabledKeys.Count)];
                             var apiKey = encryptionService.Decrypt(apiKeyRecord.EncryptedApiKey, apiKeyRecord.Iv);
-                            var (translatedBatch, tokensUsed) = await TranslateBatchAsync(batch, job, settings, activeModel.ModelName, apiKey, cts.Token);
+                            var (translatedBatch, tokensUsed) = await TranslateBatchAsync(batch, job, settings, activeModel.ModelName, apiKey, job.SystemInstruction, cts.Token);
                             await SaveResultsToDb(sessionId, translatedBatch);
                             await UpdateUsageInDb(apiKeyRecord.Id, tokensUsed);
                         }
@@ -221,9 +211,10 @@ namespace SubPhim.Server.Services
                 await UpdateJobStatus(sessionId, JobStatus.Failed, ex.Message);
             }
         }
+
         private async Task<(List<TranslatedSrtLineDb> results, int tokensUsed)> TranslateBatchAsync(
             List<OriginalSrtLineDb> batch, TranslationJobDb job, LocalApiSetting settings,
-            string modelName, string apiKey, CancellationToken token)
+            string modelName, string apiKey, string systemInstruction, CancellationToken token)
         {
             var payloadBuilder = new StringBuilder();
             foreach (var line in batch)
@@ -232,15 +223,13 @@ namespace SubPhim.Server.Services
             }
             string payload = payloadBuilder.ToString().TrimEnd();
 
-            // 1. XÂY DỰNG PAYLOAD VỚI CÁC THAM SỐ ĐÃ ĐƯỢC CHỨNG MINH LÀ ỔN ĐỊNH
             var generationConfig = new JObject
             {
-                ["temperature"] = 1, // GIÁ TRỊ TỪ MÃ THAM KHẢO
-                ["topP"] = 0.95,     // GIÁ TRỊ TỪ MÃ THAM KHẢO, LUÔN CÓ
-                ["maxOutputTokens"] = 15000 // GIÁ TRỊ TỪ MÃ THAM KHẢO
+                ["temperature"] = 1,
+                ["topP"] = 0.95,
+                ["maxOutputTokens"] = 15000
             };
 
-            // Vẫn giữ lại logic thinking_budget nếu được bật
             if (settings.EnableThinkingBudget && settings.ThinkingBudget > 0)
             {
                 generationConfig["thinking_config"] = new JObject { ["thinking_budget"] = settings.ThinkingBudget };
@@ -249,14 +238,14 @@ namespace SubPhim.Server.Services
             var requestPayloadObject = new
             {
                 contents = new[] { new { role = "user", parts = new[] { new { text = $"Dịch các câu thoại sau sang {job.TargetLanguage}:\n\n{payload}" } } } },
-                system_instruction = new { parts = new[] { new { text = GetSystemInstructionForGeminiSrtTranslation(job.Genre, job.TargetLanguage) } } },
+                // Sử dụng systemInstruction được truyền vào
+                system_instruction = new { parts = new[] { new { text = systemInstruction } } },
                 generationConfig
             };
 
             string jsonPayload = JsonConvert.SerializeObject(requestPayloadObject, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
             string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={apiKey}";
 
-            // 2. GỌI PHƯƠNG THỨC GỌI API CHUYÊN DỤNG VỚI LOGIC RETRY MẠNH MẼ
             var (responseText, tokensUsed) = await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, token);
 
             var results = new List<TranslatedSrtLineDb>();
@@ -280,7 +269,6 @@ namespace SubPhim.Server.Services
             }
             else
             {
-                // Nếu có lỗi, ghi lỗi cho tất cả các dòng trong batch
                 foreach (var line in batch)
                 {
                     results.Add(new TranslatedSrtLineDb { SessionId = job.SessionId, LineIndex = line.LineIndex, TranslatedText = $"[LỖI: {responseText}]", Success = false });
@@ -289,9 +277,6 @@ namespace SubPhim.Server.Services
             return (results, tokensUsed);
         }
 
-        /// <summary>
-        /// Phương thức chuyên dụng để gọi API, tích hợp logic Exponential Backoff từ mã nguồn tham khảo.
-        /// </summary>
         private async Task<(string responseText, int tokensUsed)> CallApiWithRetryAsync(string url, string jsonPayload, LocalApiSetting settings, CancellationToken token)
         {
             for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
@@ -300,8 +285,6 @@ namespace SubPhim.Server.Services
 
                 try
                 {
-                    // Dùng HttpClientFactory để tối ưu, nếu đã đăng ký trong Program.cs
-                    // Hoặc tạo mới như mã tham khảo
                     using var httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(5) };
                     using var request = new HttpRequestMessage(HttpMethod.Post, url)
                     {
@@ -317,9 +300,8 @@ namespace SubPhim.Server.Services
                         _logger.LogWarning("HTTP Error {StatusCode} from {Url}. Retrying in {Delay}ms...", response.StatusCode, url, settings.RetryDelayMs * attempt);
                         if (attempt < settings.MaxRetries)
                         {
-                            // 3. ÁP DỤNG EXPONENTIAL BACKOFF
                             await Task.Delay(settings.RetryDelayMs * attempt, token);
-                            continue; // Chuyển sang lần thử tiếp theo
+                            continue;
                         }
                         return ($"Lỗi API: {response.StatusCode}", 0);
                     }
@@ -333,7 +315,6 @@ namespace SubPhim.Server.Services
 
                     if (responseText == null)
                     {
-                        // Xử lý trường hợp Gemini trả về 200 OK nhưng không có nội dung
                         _logger.LogWarning("API returned OK but content is empty. Retrying...");
                         if (attempt < settings.MaxRetries)
                         {
@@ -355,7 +336,6 @@ namespace SubPhim.Server.Services
             return ("Lỗi API: Hết số lần thử lại.", 0);
         }
 
-        // === CÁC PHƯƠNG THỨC HỖ TRỢ KHÁC ===
         private async Task UpdateJobStatus(string sessionId, JobStatus status, string errorMessage = null)
         {
             using var scope = _serviceProvider.CreateScope();
@@ -383,92 +363,32 @@ namespace SubPhim.Server.Services
             {
                 using var scope = _serviceProvider.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-                // Tìm key API tương ứng trong database
                 var apiKey = await context.ManagedApiKeys.FindAsync(apiKeyId);
                 if (apiKey == null)
                 {
                     _logger.LogWarning("Không thể cập nhật sử dụng: Không tìm thấy API Key ID {ApiKeyId}", apiKeyId);
                     return;
                 }
-
-                // === LOGIC RESET HÀNG NGÀY THEO GIỜ VIỆT NAM ===
                 var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
                 var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
                 var lastResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(apiKey.LastRequestCountResetUtc, vietnamTimeZone);
-
-                // Nếu ngày reset cuối cùng nhỏ hơn ngày hiện tại (theo giờ VN), reset bộ đếm
                 if (lastResetInVietnam.Date < vietnamNow.Date)
                 {
                     _logger.LogInformation("Resetting daily request count for API Key ID {ApiKeyId}", apiKeyId);
                     apiKey.RequestsToday = 0;
-                    // Ghi lại thời điểm reset là đầu ngày UTC hôm nay
                     apiKey.LastRequestCountResetUtc = DateTime.UtcNow.Date;
                 }
-
-                // === CẬP NHẬT CÁC BỘ ĐẾM ===
-                apiKey.RequestsToday++; // Mỗi lần gọi là một request
-
+                apiKey.RequestsToday++;
                 if (tokensUsed > 0)
                 {
                     apiKey.TotalTokensUsed += tokensUsed;
                 }
-
-                // Lưu các thay đổi vào database
                 await context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Lỗi khi cập nhật sử dụng cho API Key ID {ApiKeyId}", apiKeyId);
             }
-        }
-        private string GetSystemInstructionForGeminiSrtTranslation(string selectedGenre, string targetLanguage)
-        {
-            // (Giữ nguyên phương thức này từ mã nguồn cũ của bạn vì nó đã chi tiết và tốt)
-            string baseFormattingAndCoreRules = $@"QUY TẮC CHUNG:
-1. Dịch toàn bộ sang {targetLanguage}, KHÔNG bỏ dòng nào.
-2. Kết quả là văn bản thuần túy, KHÔNG thêm lời dẫn, chú thích, markdown, in đậm/in nghiêng.
-3. Tên riêng (nhân vật, địa danh, pháp bảo...) giữ nguyên Hán-Việt, KHÔNG dịch nghĩa từng chữ. Đảm bảo nhất quán.
-4. Mỗi dòng phải giữ nguyên số thứ tự. Ví dụ: 123: Nội dung dịch. Nếu không có gì để dịch, trả về: 123:
-5. KHÔNG tự ý thêm dấu chấm, dấu phẩy ở đầu/cuối câu.";
-
-            string genreSpecificConstraints = "";
-
-            if (selectedGenre == "H.Huyễn Tiên Hiệp")
-            {
-                genreSpecificConstraints = $@"QUY TẮC CHO PHIM THỂ LOẠI TU TIÊN / HUYỀN HUYỄN:
-- Văn phong vẫn dễ hiểu, phù hợp với đối thoại trong phim tu tiên - tiên hiệp.
-- Lời thoại phải mượt mà, ngắn gọn, không rườm rà.
-- Dùng đúng các đại từ cổ phù hợp hoàn cảnh như ví dụ: ngươi (汝), ta (我吾), hắn (他), nàng (她), y (他她伊), sư tỷ (师姐), sư tôn (师尊), sư đệ (师弟), sư muội (师妹), chàng (郎君他), muội muội (妹妹), tỷ tỷ (姐姐), huynh đệ (兄弟), đại ca (大哥), sư tổ (师祖), tiên tử (仙子), thánh nữ (圣女), ma nữ (魔女), tiểu yêu (小妖), đệ (弟), đệ tử (弟子) huynh (兄), tỷ (姐), thúc thúc (叔叔), tẩu tẩu (嫂嫂嫂子), bá bá (伯伯), lão gia (老爷), nha đầu (丫头), tiểu nha đầu (小丫头), đệ đệ (弟弟), thiếp (妾), tiểu thư (小姐), công tử (公子), các vị (各位), bản tọa (本座), lão phu (老夫), tại hạ (在下), đạo hữu (道友), tiền bối (前辈), vãn bối (晚辈), tiểu bối (小辈), tiểu tử (小子), tiểu nha đầu (小丫头), cô nương (姑娘), nô tỳ (奴婢), không tự tiện sửa thành đại từ khác nếu như không rõ ràng trong ngữ cảnh.
-- TRÁNH TUYỆT ĐỐI các đại từ hiện đại như: tôi, mày, tao, bạn, ông, bà, cha mẹ...
-- Ưu tiên dịch sát nghĩa, không được cường điệu hay “văn vẻ hóa” lời thoại.
-";
-            }
-            else if (selectedGenre == "Ngôn Tình")
-            {
-                genreSpecificConstraints = @"QUY TẮC CHO PHIM NGÔN TÌNH:
-- Giữ nguyên tên riêng Hán-Việt, không dịch nghĩa từng chữ.
-- Văn phong hiện đại, lời thoại tự nhiên, biểu cảm phù hợp ngữ cảnh.
-- Sử dụng đại từ hiện đại như: tôi, anh, em, cậu, bạn… tùy mối quan hệ.";
-            }
-            else if (selectedGenre == "Khoa học lịch sử")
-            {
-                genreSpecificConstraints = @"QUY TẮC CHO PHIM KHOA HỌC / LỊCH SỬ:
-- Dịch chính xác và nhất quán các thuật ngữ khoa học, kỹ thuật, tên riêng và các sự kiện lịch sử.
-- Văn phong trang trọng, rõ ràng, phù hợp với bối cảnh học thuật hoặc lịch sử.
-- Tránh sử dụng ngôn ngữ quá đời thường hoặc tiếng lóng.";
-            }
-            else // Đô Thị Hiện Đại
-            {
-                genreSpecificConstraints = @"QUY TẮC CHO PHIM ĐÔ THỊ / HIỆN ĐẠI:
-- Tên riêng giữ nguyên Hán-Việt. KHÔNG dịch nghĩa từng chữ.
-- Sử dụng đại từ hiện đại tự nhiên như: tôi, anh, em, chị, bạn, v.v.
-- Lời thoại mạch lạc, gần gũi, dễ hiểu.";
-            }
-
-            return !string.IsNullOrWhiteSpace(genreSpecificConstraints)
-                ? $"{baseFormattingAndCoreRules}\n\n{genreSpecificConstraints}"
-                : baseFormattingAndCoreRules;
         }
     }
 }

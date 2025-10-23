@@ -59,22 +59,22 @@ public class AuthController : ControllerBase
     private readonly IMemoryCache _cache;
     private readonly IConfiguration _configuration;
     private readonly ITierSettingsService _tierSettingsService;
-
+    private readonly IEmailService _emailService;
     public AuthController(
-         AppDbContext context,
-         ILogger<AuthController> logger,
-         IMemoryCache cache,
-         IConfiguration configuration,
-         ITierSettingsService tierSettingsService) 
+     AppDbContext context,
+     ILogger<AuthController> logger,
+     IMemoryCache cache,
+     IConfiguration configuration,
+     ITierSettingsService tierSettingsService,
+     IEmailService emailService) 
     {
         _context = context;
         _logger = logger;
         _cache = cache;
         _configuration = configuration;
         _tierSettingsService = tierSettingsService;
+        _emailService = emailService; 
     }
-
-
     public record UsageStatusDto(
        bool CanProcessNewVideo,
        int RemainingVideosToday,
@@ -97,8 +97,136 @@ long TtsCharacterLimit,
     long AioCharactersUsedToday,
     long AioCharacterLimit
 );
-    public record SrtTranslateCheckRequest(int LineCount);
+    public record ForgotPasswordRequest(string Email);
 
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        if (string.IsNullOrEmpty(request.Email))
+        {
+            return BadRequest("Email là bắt buộc.");
+        }
+        const int MaxForgotPasswordRequestsPerDay = 2;
+        var cacheKey = $"forgot_password_limit_{request.Email.ToLower()}";
+        if (_cache.TryGetValue(cacheKey, out int requestCount) && requestCount >= MaxForgotPasswordRequestsPerDay)
+        {
+            _logger.LogWarning("Forgot password limit ({Limit}) reached for email: {Email}", MaxForgotPasswordRequestsPerDay, request.Email);
+            return Ok(new { Message = "Nếu email của bạn chính xác là email đã đăng ký tài khoản, hãy kiểm tra hộp thư để lấy mật khẩu mới." });
+        }
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == request.Email.ToLower());
+        if (user == null)
+        {
+            _logger.LogInformation("Forgot password request for non-existent email: {Email}", request.Email);
+            return Ok(new { Message = "Nếu email của bạn chính xác là email đã đăng ký tài khoản, hãy kiểm tra hộp thư để lấy mật khẩu mới." });
+        }
+        //  Nếu người dùng tồn tại và chưa quá giới hạn, tăng bộ đếm và lưu vào cache với thời hạn 24 giờ
+        var newCount = requestCount + 1;
+        var cacheEntryOptions = new MemoryCacheEntryOptions()
+            .SetAbsoluteExpiration(TimeSpan.FromDays(1)); // Key sẽ hết hạn sau 24 giờ
+        _cache.Set(cacheKey, newCount, cacheEntryOptions);
+
+        _logger.LogInformation("Forgot password request #{Count} for email: {Email}", newCount, request.Email);
+        var newPassword = GenerateRandomPassword();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Password has been reset for user {Username} (Email: {Email})", user.Username, request.Email);
+        try
+        {
+            var subject = "Yêu cầu cấp lại mật khẩu cho tài khoản SubPhim";
+            var body = $@"
+                <h3>Xin chào {user.Username},</h3>
+                <p>Bạn đã yêu cầu cấp lại mật khẩu cho tài khoản SubPhim của mình.</p>
+                <p>Đây là mật khẩu mới của bạn:</p>
+                <h2 style='color: #0d6efd; letter-spacing: 2px; border: 1px solid #ddd; padding: 10px; background-color: #f8f9fa;'>{newPassword}</h2>
+                <p>Vui lòng đăng nhập bằng mật khẩu này và đổi lại mật khẩu trong ứng dụng để đảm bảo an toàn.</p>
+                <p>Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email này.</p>
+                <p>Trân trọng,<br>Đội ngũ SubPhim</p>";
+
+            await _emailService.SendEmailAsync(request.Email, subject, body);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CRITICAL: Password for user {Username} was reset, but failed to send notification email to {Email}", user.Username, request.Email);
+        }
+
+        return Ok(new { Message = "Nếu email của bạn chính xác là email đã đăng ký tài khoản, hãy kiểm tra hộp thư để lấy mật khẩu mới." });
+    }
+
+    private static string GenerateRandomPassword(int length = 4)
+    {
+        const string validChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+        var random = new Random();
+        var chars = new char[length];
+        for (int i = 0; i < length; i++)
+        {
+            chars[i] = validChars[random.Next(validChars.Length)];
+        }
+        return new string(chars);
+    }
+    public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+    [HttpPost("reset-devices")]
+    [Authorize]
+    public async Task<IActionResult> ResetDevices()
+    {
+        var userIdString = User.FindFirstValue("id");
+        if (!int.TryParse(userIdString, out int userId))
+        {
+            return Unauthorized();
+        }
+
+        var user = await _context.Users.Include(u => u.Devices).FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+        {
+            return NotFound("Không tìm thấy người dùng.");
+        }
+        if (user.LastDeviceResetUtc.HasValue && user.LastDeviceResetUtc.Value.AddDays(1) > DateTime.UtcNow)
+        {
+            var timeRemaining = user.LastDeviceResetUtc.Value.AddDays(1) - DateTime.UtcNow;
+            return StatusCode(429, $"Bạn chỉ có thể reset thiết bị mỗi 24 giờ. Vui lòng thử lại sau {timeRemaining.Hours} giờ {timeRemaining.Minutes} phút.");
+        }
+
+        if (user.Devices.Any())
+        {
+            _context.Devices.RemoveRange(user.Devices);
+            _logger.LogInformation("User '{Username}' (ID: {UserId}) has reset all their devices.", user.Username, user.Id);
+        }
+        user.LastDeviceResetUtc = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return Ok(new { Message = "Đã xóa toàn bộ thiết bị của bạn thành công!" });
+    }
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var userIdString = User.FindFirstValue("id");
+        if (!int.TryParse(userIdString, out int userId))
+        {
+            return Unauthorized();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 6)
+        {
+            return BadRequest("Mật khẩu mới không hợp lệ. Yêu cầu ít nhất 6 ký tự.");
+        }
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+        {
+            return NotFound("Không tìm thấy người dùng.");
+        }
+        if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+        {
+            return BadRequest("Mật khẩu hiện tại không đúng.");
+        }
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("User '{Username}' (ID: {UserId}) has changed their password successfully.", user.Username, user.Id);
+
+        return Ok(new { Message = "Đổi mật khẩu thành công!" });
+    }
+    public record SrtTranslateCheckRequest(int LineCount);
     [HttpPost("pre-srt-translate-check")]
     [Authorize]
     public async Task<IActionResult> PreSrtTranslateCheck([FromBody] SrtTranslateCheckRequest request)
@@ -114,14 +242,10 @@ long TtsCharacterLimit,
         {
             return NotFound("Không tìm thấy người dùng.");
         }
-
-        // Chỉ user Free mới bị kiểm tra giới hạn này. Các gói trả phí không giới hạn.
         if (user.Tier != SubscriptionTier.Free)
         {
             return Ok(new { CanTranslate = true, RemainingLines = 99999, Message = "OK" });
         }
-
-        // Logic reset bộ đếm theo múi giờ Việt Nam
         var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
         var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
         var lastResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(user.LastSrtLineResetUtc, vietnamTimeZone);
@@ -294,7 +418,16 @@ long TtsCharacterLimit,
         {
             if (user.Devices.Count >= user.MaxDevices)
             {
-                return StatusCode(403, $"Tài khoản của bạn đã đạt giới hạn {user.MaxDevices} thiết bị.");
+                // Thay vì báo lỗi, tìm và xóa thiết bị đăng nhập cũ nhất
+                var oldestDevice = user.Devices.OrderBy(d => d.LastLogin).FirstOrDefault();
+                if (oldestDevice != null)
+                {
+                    _context.Devices.Remove(oldestDevice);
+                    _logger.LogInformation(
+                        "User '{Username}' reached device limit ({Limit}). Removing oldest device (HWID: {OldHwid}, LastLogin: {LastLogin}) to add new device (HWID: {NewHwid}).",
+                        user.Username, user.MaxDevices, oldestDevice.Hwid, oldestDevice.LastLogin, request.Hwid
+                    );
+                }
             }
             user.Devices.Add(new Device { Hwid = request.Hwid, LastLogin = DateTime.UtcNow, LastLoginIp = clientIp });
         }
@@ -474,10 +607,8 @@ long TtsCharacterLimit,
             user.DailySrtLineLimit,
             user.TtsCharactersUsed,
             user.TtsCharacterLimit,
-            // <<< BẮT ĐẦU THÊM MỚI >>>
             user.AioCharactersUsedToday,
             aioCharacterLimit
-        // <<< KẾT THÚC THÊM MỚI >>>
         );
         return Ok(userDto);
     }
@@ -568,10 +699,9 @@ long TtsCharacterLimit,
 
         _logger.LogInformation("User '{Username}' (ID: {UserId}) granted video processing. New count: {Count}/{Limit}",
                                 user.Username, user.Id, user.VideosProcessedToday, user.DailyVideoLimit);
-
-        // Trả về "OK" để báo cho client biết họ có thể bắt đầu xử lý
         return Ok(new { Message = "Bắt đầu..." });
     }
+
 
     [HttpPost("pre-translate-check")]
     [Authorize]
@@ -582,8 +712,6 @@ long TtsCharacterLimit,
             {
                 return Unauthorized();
             }
-
-            // Luôn tải đối tượng user đầy đủ từ DB
             var userInDb = await _context.Users.FindAsync(userId);
             if (userInDb == null)
             {
@@ -596,7 +724,6 @@ long TtsCharacterLimit,
             }
 
             bool isAllowed = false;
-            // SỬA LỖI: Luôn dùng đối tượng 'userInDb' từ DB để kiểm tra
             var allowedApisForUser = userInDb.AllowedApiAccess;
 
             if (allowedApisForUser != AllowedApis.None)
@@ -611,7 +738,6 @@ long TtsCharacterLimit,
             }
             else
             {
-                // SỬA LỖI: Luôn dùng đối tượng 'userInDb' từ DB để kiểm tra
                 if (userInDb.Tier == SubscriptionTier.Lifetime) { isAllowed = true; }
                 else if (userInDb.Tier == SubscriptionTier.Free) { isAllowed = (requestedProvider == ApiProviderType.OpenRouter); }
                 else { isAllowed = true; }
@@ -670,42 +796,42 @@ long TtsCharacterLimit,
         Gemini,
         OpenRouter
     }
-    private void ApplyTierSettings(User user, SubscriptionTier tier)
+    [HttpPost("check-api-access")]
+    [Authorize] // Chỉ người dùng đã đăng nhập mới được gọi
+    public async Task<IActionResult> CheckApiAccess([FromBody] ApiAccessRequest request)
     {
-        // Lấy cấu hình MỚI NHẤT từ IOptionsMonitor
-        var currentLimits = _usageLimitsMonitor.CurrentValue;
-        TierConfig tierConfig = tier switch
+        var userIdString = User.FindFirstValue("id");
+        if (!int.TryParse(userIdString, out int userId))
         {
-            SubscriptionTier.Free => currentLimits.Free,
-            SubscriptionTier.Daily => currentLimits.Daily,
-            SubscriptionTier.Monthly => currentLimits.Monthly,
-            SubscriptionTier.Yearly => currentLimits.Yearly,
-            SubscriptionTier.Lifetime => currentLimits.Lifetime,
-            _ => currentLimits.Free // Mặc định an toàn
-        };
+            return Unauthorized();
+        }
 
-        user.Tier = tier;
-
-        // Parse và áp dụng các giá trị từ đối tượng cấu hình
-        if (Enum.TryParse<GrantedFeatures>(tierConfig.GrantedFeatures, true, out var features))
-            user.GrantedFeatures = features;
-
-        if (Enum.TryParse<AllowedApis>(tierConfig.AllowedApis, true, out var apis))
-            user.AllowedApiAccess = apis;
-
-        user.VideoDurationLimitMinutes = tierConfig.VideoDurationMinutes;
-        user.DailyVideoLimit = tierConfig.DailyVideoCount;
-        user.DailyRequestLimitOverride = tierConfig.DailyTranslationRequests;
-        user.DailySrtLineLimit = tierConfig.DailySrtLineLimit;
-
-        user.MaxDevices = (tier == SubscriptionTier.Free) ? 1 : 1;
-
-        if (tier == SubscriptionTier.Free)
+        // Luôn lấy thông tin mới nhất từ DB để đảm bảo quyền là chính xác
+        var userInDb = await _context.Users.FindAsync(userId);
+        if (userInDb == null)
         {
-            user.SubscriptionExpiry = null;
+            return NotFound("Tài khoản không tồn tại.");
+        }
+
+        // Chuyển đổi tên API từ chuỗi sang enum
+        if (!Enum.TryParse<AllowedApis>(request.ApiName, true, out var apiToCheck))
+        {
+            return BadRequest($"Tên API không hợp lệ: {request.ApiName}");
+        }
+
+        // Kiểm tra quyền
+        bool hasAccess = userInDb.AllowedApiAccess.HasFlag(apiToCheck);
+
+        if (hasAccess)
+        {
+            return Ok(new { HasAccess = true, Message = "OK" });
+        }
+        else
+        {
+            return Ok(new { HasAccess = false, Message = $"Bạn không có quyền truy cập API '{request.ApiName}'. Vui lòng liên hệ admin." });
         }
     }
-
+    public record ApiAccessRequest(string ApiName);
     private string GenerateJwtToken(User user)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
@@ -718,7 +844,6 @@ long TtsCharacterLimit,
         new Claim(ClaimTypes.Name, user.Username),
         new Claim(ClaimTypes.Role, user.Tier.ToString()),
         new Claim("features", ((int)user.GrantedFeatures).ToString()),
-        // === THÊM DÒNG NÀY VÀO ĐÂY ===
         new Claim("allowedApis", ((int)user.AllowedApiAccess).ToString())
     };
 
@@ -731,4 +856,5 @@ long TtsCharacterLimit,
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
     }
+
 }

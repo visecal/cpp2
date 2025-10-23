@@ -15,6 +15,10 @@ using SubPhim.Server.Middleware;
 
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.Configure<SmtpSettings>(
+    builder.Configuration.GetSection("SmtpSettings")
+);
+builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.Configure<LocalApiSettings>(
     builder.Configuration.GetSection(LocalApiSettings.SectionName)
 );
@@ -25,11 +29,14 @@ builder.Services.AddScoped<ITtsOrchestratorService, TtsOrchestratorService>();
 builder.Services.AddScoped<ITtsSettingsService, TtsSettingsService>();
 builder.Services.AddHostedService<TtsKeyResetService>();
 builder.Services.AddHostedService<AioKeyResetService>();
+builder.Services.AddHostedService<AioTtsBatchProcessorService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<CleanupService>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddScoped<ITierSettingsService, TierSettingsService>();
 builder.Services.AddScoped<IAioLauncherService, AioLauncherService>();
+builder.Services.AddSingleton<AioTtsSaStore>();
+builder.Services.AddSingleton<AioTtsDispatcherService>();
 builder.Services.AddHttpClient("AioLauncherClient", client =>
 {
     client.Timeout = TimeSpan.FromMinutes(5); 
@@ -238,15 +245,11 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-
-
-// --- 6. Chạy ứng dụng ---
-// Cấu hình cổng lắng nghe linh hoạt
 if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FLY_APP_NAME")))
 {
     app.Run("http://*:8080");
 }
 else
 {
-    app.Run();
+    app.Run("http://*:5000");
 }

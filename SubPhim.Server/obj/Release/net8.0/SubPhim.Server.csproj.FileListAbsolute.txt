@@ -8,7 +8,22 @@ D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\SubPhim.Server.run
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\SubPhim.Server.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\SubPhim.Server.pdb
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\BCrypt.Net-Next.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\BouncyCastle.Cryptography.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Google.Api.CommonProtos.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Google.Api.Gax.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Google.Api.Gax.Grpc.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Google.Apis.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Google.Apis.Auth.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Google.Apis.Core.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Google.Cloud.TextToSpeech.V1.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Google.LongRunning.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Google.Protobuf.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Grpc.Auth.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Grpc.Core.Api.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Grpc.Net.Client.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Grpc.Net.Common.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Humanizer.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\MailKit.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Microsoft.Bcl.AsyncInterfaces.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Microsoft.Build.Locator.dll
@@ -40,6 +55,7 @@ D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Microsoft.Identity
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Microsoft.IdentityModel.Protocols.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Microsoft.IdentityModel.Tokens.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\MimeKit.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Mono.TextTemplating.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\Newtonsoft.Json.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\PagedList.Core.dll
@@ -47,6 +63,7 @@ D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\PagedList.Core.Mvc
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\SQLitePCLRaw.batteries_v2.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\SQLitePCLRaw.core.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\SQLitePCLRaw.provider.e_sqlite3.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\SubtitlesParser.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.CodeDom.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.Composition.AttributedModel.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.Composition.Convention.dll
@@ -56,6 +73,8 @@ D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.Composition
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.Diagnostics.DiagnosticSource.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.IdentityModel.Tokens.Jwt.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.IO.Pipelines.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.Management.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.Security.Cryptography.Pkcs.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.Text.Encodings.Web.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\System.Text.Json.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\X.PagedList.dll
@@ -146,6 +165,8 @@ D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\runtimes\win-arm\n
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\runtimes\win-arm64\native\e_sqlite3.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\runtimes\win-x64\native\e_sqlite3.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\runtimes\win-x86\native\e_sqlite3.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\runtimes\win\lib\net7.0\System.Management.dll
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\runtimes\win\lib\net8.0\System.Security.Cryptography.Pkcs.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\runtimes\browser\lib\net8.0\System.Text.Encodings.Web.dll
 D:\subphimv1\SubPhim.Server\SubPhim.Server\obj\Release\net8.0\SubPhim.Server.csproj.AssemblyReference.cache
 D:\subphimv1\SubPhim.Server\SubPhim.Server\obj\Release\net8.0\SubPhim.Server.GeneratedMSBuildEditorConfig.editorconfig

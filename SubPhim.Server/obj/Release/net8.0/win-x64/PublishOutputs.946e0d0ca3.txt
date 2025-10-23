@@ -1,0 +1,4 @@
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\win-x64\publish\appsettings.Development.json
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\win-x64\publish\appsettings.json
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\win-x64\publish\SubPhim.Server.pdb
+D:\subphimv1\SubPhim.Server\SubPhim.Server\bin\Release\net8.0\win-x64\publish\SubPhim.Server.exe

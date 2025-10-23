@@ -164,6 +164,107 @@ namespace SubPhim.Server.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SubPhim.Server.Data.AioTtsBatchJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AudioFormat")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OriginalSrtFilePath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProcessedLines")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("Rate")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("ResultZipFilePath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TotalLines")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("VoiceId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AioTtsBatchJobs");
+                });
+
+            modelBuilder.Entity("SubPhim.Server.Data.AioTtsServiceAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CharactersUsed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClientEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EncryptedJsonKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Iv")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UsageMonth")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientEmail")
+                        .IsUnique();
+
+                    b.ToTable("AioTtsServiceAccounts");
+                });
+
             modelBuilder.Entity("SubPhim.Server.Data.AvailableApiModel", b =>
                 {
                     b.Property<int>("Id")
@@ -344,6 +445,49 @@ namespace SubPhim.Server.Migrations
                     b.ToTable("OriginalSrtLines");
                 });
 
+            modelBuilder.Entity("SubPhim.Server.Data.SaOcrServiceAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClientEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DriveFolderId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EncryptedJsonKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Iv")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientEmail")
+                        .IsUnique();
+
+                    b.ToTable("SaOcrServiceAccounts");
+                });
+
             modelBuilder.Entity("SubPhim.Server.Data.TierDefaultSetting", b =>
                 {
                     b.Property<int>("Tier")
@@ -454,6 +598,10 @@ namespace SubPhim.Server.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("SystemInstruction")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TargetLanguage")
                         .IsRequired()
@@ -673,6 +821,9 @@ namespace SubPhim.Server.Migrations
                     b.Property<DateTime>("LastAioResetUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("LastDeviceResetUtc")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("LastLocalSrtResetUtc")
                         .HasColumnType("TEXT");
 
@@ -735,6 +886,17 @@ namespace SubPhim.Server.Migrations
                 });
 
             modelBuilder.Entity("SubPhim.Server.Data.AioTranslationJob", b =>
+                {
+                    b.HasOne("SubPhim.Server.Data.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SubPhim.Server.Data.AioTtsBatchJob", b =>
                 {
                     b.HasOne("SubPhim.Server.Data.User", "User")
                         .WithMany()

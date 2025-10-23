@@ -264,14 +264,11 @@ namespace SubPhim.Server.Services
         private static string Capitalize(string voice)
         {
             if (string.IsNullOrEmpty(voice)) return voice;
-            // Sử dụng CultureInfo.InvariantCulture để đảm bảo hoạt động nhất quán trên mọi hệ thống
             return char.ToUpper(voice[0], CultureInfo.InvariantCulture) + voice.Substring(1).ToLowerInvariant();
         }
         private async Task<(bool isSuccess, byte[] audioData, string mimeType, string error)> CallGeminiTtsAsync(HttpClient client, string apiKey, string modelName, string text, string voiceName, string? systemInstruction)
         {
             var requestUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:streamGenerateContent?key={apiKey}";
-
-            // <<< BẮT ĐẦU SỬA ĐỔI: Xây dựng payload động với system_instruction >>>
             var payloadObject = new
             {
                 contents = new[] { new { role = "user", parts = new[] { new { text } } } },

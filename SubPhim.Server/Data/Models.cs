@@ -35,7 +35,8 @@ namespace SubPhim.Server.Data
         None = 0,
         ChutesAI = 1,
         Gemini = 2,
-        OpenRouter = 4
+        OpenRouter = 4,
+        SmartCut = 8
     }
     [Flags]
     public enum ApiPoolType
@@ -117,13 +118,13 @@ namespace SubPhim.Server.Data
         [Display(Name = "Lần cuối reset bộ đếm AIO (UTC)")]
         public DateTime LastAioResetUtc { get; set; } = DateTime.UtcNow;
 
-        // === BẮT ĐẦU THÊM MỚI ===
         [Display(Name = "Ghi đè Giới hạn Ký tự AIO/Ngày")]
         public long AioCharacterLimitOverride { get; set; } = -1;
 
         [Display(Name = "Ghi đè Giới hạn Request AIO/Phút")]
         public int AioRpmOverride { get; set; } = -1;
-        // === KẾT THÚC THÊM MỚI ===
+        [Display(Name = "Lần cuối reset thiết bị (UTC)")]
+        public DateTime? LastDeviceResetUtc { get; set; }
     }
     public class TtsApiKey
     {
@@ -240,21 +241,49 @@ namespace SubPhim.Server.Data
         Completed,
         Failed
     }
+    public class SaOcrServiceAccount
+    {
+        public int Id { get; set; }
 
+        [Required]
+        [StringLength(200)]
+        public string ClientEmail { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public string ProjectId { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        [Display(Name = "ID Thư mục Google Drive")]
+        public string DriveFolderId { get; set; }
+
+        [Required]
+        public string EncryptedJsonKey { get; set; } // Sẽ lưu toàn bộ file JSON đã được mã hóa
+
+        [Required]
+        public string Iv { get; set; }
+
+        public bool IsEnabled { get; set; } = true;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
     public class TranslationJobDb
     {
         [Key]
-        public string SessionId { get; set; } // Dùng SessionId làm khóa chính
+        public string SessionId { get; set; } 
         public int UserId { get; set; }
         public string Genre { get; set; }
         public string TargetLanguage { get; set; }
+
+        public string SystemInstruction { get; set; } 
+                                                    
         public JobStatus Status { get; set; } = JobStatus.Pending;
         public string? ErrorMessage { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public ICollection<OriginalSrtLineDb> OriginalLines { get; set; }
         public ICollection<TranslatedSrtLineDb> TranslatedLines { get; set; }
     }
-
     public class OriginalSrtLineDb
     {
         public long Id { get; set; }
@@ -461,7 +490,73 @@ namespace SubPhim.Server.Data
 
         // --- KẾT THÚC THÊM CÁC TRƯỜNG MỚI ---
     }
+    public class AioTtsServiceAccount
+    {
+        public int Id { get; set; }
 
+        [Required]
+        [StringLength(200)]
+        public string ClientEmail { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public string ProjectId { get; set; }
+
+        [Required]
+        public string EncryptedJsonKey { get; set; } // Sẽ lưu toàn bộ file JSON đã được mã hóa
+
+        [Required]
+        public string Iv { get; set; }
+
+        public bool IsEnabled { get; set; } = true;
+
+        // Dùng để theo dõi quota 1M/tháng
+        public long CharactersUsed { get; set; } = 0;
+
+        // Lưu tháng sử dụng dưới dạng "YYYY-MM" để tự động reset
+        public string UsageMonth { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+    public enum AioTtsJobStatus
+    {
+        Pending,
+        Processing,
+        Completed,
+        Failed
+    }
+
+    public class AioTtsBatchJob
+    {
+        [Key]
+        public Guid Id { get; set; } // Dùng Guid để đảm bảo ID là duy nhất
+
+        public int UserId { get; set; }
+        [ForeignKey("UserId")]
+        public User User { get; set; }
+
+        public AioTtsJobStatus Status { get; set; } = AioTtsJobStatus.Pending;
+
+        // --- Thông số yêu cầu ---
+        [Required]
+        public string Language { get; set; }
+        [Required]
+        public string VoiceId { get; set; }
+        public double Rate { get; set; }
+        [Required]
+        public string AudioFormat { get; set; } // "MP3", "WAV", "OGG_OPUS"
+
+        // --- Thông tin xử lý ---
+        [Required]
+        public string OriginalSrtFilePath { get; set; } // Đường dẫn tới file SRT đã upload
+        public string? ResultZipFilePath { get; set; } // Đường dẫn tới file ZIP kết quả
+        public string? ErrorMessage { get; set; }
+        public int TotalLines { get; set; }
+        public int ProcessedLines { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? CompletedAt { get; set; }
+    }
     public class TranslationLog
     {
         public long Id { get; set; }

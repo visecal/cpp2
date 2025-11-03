@@ -286,7 +286,7 @@ namespace SubPhim.Server.Data
 
         [Display(Name = "Chi tiết lỗi (JSON)")]
         [Column(TypeName = "TEXT")]
-        public string ErrorDetails { get; set; } // Lưu dưới dạng JSON để track từng lỗi cụ thể
+        public string? ErrorDetails { get; set; } // Lưu dưới dạng JSON để track từng lỗi cụ thể
 
         [Display(Name = "Đã hoàn trả lượt dịch")]
         public bool HasRefunded { get; set; } = false;

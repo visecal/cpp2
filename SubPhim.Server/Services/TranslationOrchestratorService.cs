@@ -14,7 +14,9 @@ namespace SubPhim.Server.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<TranslationOrchestratorService> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
+
         public record CreateJobResult(string Status, string Message, string SessionId = null, int RemainingLines = 0);
+
         public TranslationOrchestratorService(IServiceProvider serviceProvider, ILogger<TranslationOrchestratorService> logger, IHttpClientFactory httpClientFactory)
         {
             _serviceProvider = serviceProvider;
@@ -83,7 +85,7 @@ namespace SubPhim.Server.Services
                 UserId = user.Id,
                 Genre = genre,
                 TargetLanguage = targetLanguage,
-                SystemInstruction = systemInstruction, // Lưu instruction vào DB
+                SystemInstruction = systemInstruction,
                 Status = JobStatus.Pending,
                 OriginalLines = linesToProcess.Select(l => new OriginalSrtLineDb { LineIndex = l.Index, OriginalText = l.OriginalText }).ToList()
             };
@@ -189,14 +191,27 @@ namespace SubPhim.Server.Services
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "Lỗi xử lý batch cho job {SessionId}", sessionId);
-                            var errorResults = batch.Select(l => new TranslatedSrtLineDb { SessionId = sessionId, LineIndex = l.LineIndex, TranslatedText = "[LỖI EXCEPTION]", Success = false }).ToList();
+                            var errorResults = batch.Select(l => new TranslatedSrtLineDb
+                            {
+                                SessionId = sessionId,
+                                LineIndex = l.LineIndex,
+                                TranslatedText = "[LỖI EXCEPTION]",
+                                Success = false,
+                                ErrorType = "EXCEPTION",
+                                ErrorDetail = ex.Message
+                            }).ToList();
                             await SaveResultsToDb(sessionId, errorResults);
                         }
                     }, cts.Token));
                 }
 
                 await Task.WhenAll(processingTasks);
-                _logger.LogInformation("All batches for job {SessionId} completed. Setting status to 'Completed'.", sessionId);
+                _logger.LogInformation("All batches for job {SessionId} completed. Checking for errors and refunding if needed...", sessionId);
+
+                // ===== THÊM MỚI: Kiểm tra lỗi và hoàn trả lượt dịch =====
+                await CheckAndRefundFailedLinesAsync(sessionId);
+                // ===== KẾT THÚC THÊM MỚI =====
+
                 await UpdateJobStatus(sessionId, JobStatus.Completed);
 
             }
@@ -211,6 +226,74 @@ namespace SubPhim.Server.Services
                 await UpdateJobStatus(sessionId, JobStatus.Failed, ex.Message);
             }
         }
+
+        // ===== THÊM MỚI: Phương thức kiểm tra và hoàn trả lượt dịch =====
+        private async Task CheckAndRefundFailedLinesAsync(string sessionId)
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                var job = await context.TranslationJobs
+                    .Include(j => j.TranslatedLines)
+                    .FirstOrDefaultAsync(j => j.SessionId == sessionId);
+
+                if (job == null || job.HasRefunded)
+                {
+                    _logger.LogWarning("Job {SessionId} not found or already refunded", sessionId);
+                    return;
+                }
+
+                // Đếm số dòng bị lỗi (Success = false)
+                var failedLines = job.TranslatedLines.Where(l => !l.Success).ToList();
+                int failedCount = failedLines.Count;
+
+                if (failedCount > 0)
+                {
+                    _logger.LogWarning("Job {SessionId} has {FailedCount} failed lines. Refunding...", sessionId, failedCount);
+
+                    // Lấy thông tin user
+                    var user = await context.Users.FindAsync(job.UserId);
+                    if (user != null)
+                    {
+                        // Hoàn trả số dòng bị lỗi
+                        user.LocalSrtLinesUsedToday = Math.Max(0, user.LocalSrtLinesUsedToday - failedCount);
+
+                        _logger.LogInformation("Refunded {FailedCount} lines to User ID {UserId}. New usage: {NewUsage}/{Limit}",
+                            failedCount, user.Id, user.LocalSrtLinesUsedToday, user.DailyLocalSrtLimit);
+                    }
+
+                    // Cập nhật job với thông tin lỗi
+                    job.FailedLinesCount = failedCount;
+                    job.HasRefunded = true;
+
+                    // Tạo error details dưới dạng JSON
+                    var errorSummary = failedLines
+                        .GroupBy(l => l.ErrorType ?? "UNKNOWN")
+                        .Select(g => new { ErrorType = g.Key, Count = g.Count() })
+                        .ToList();
+
+                    job.ErrorDetails = JsonConvert.SerializeObject(errorSummary);
+
+                    await context.SaveChangesAsync();
+
+                    _logger.LogInformation("Refund completed for Job {SessionId}. Error summary: {ErrorSummary}",
+                        sessionId, job.ErrorDetails);
+                }
+                else
+                {
+                    _logger.LogInformation("Job {SessionId} completed successfully with no failed lines", sessionId);
+                    job.HasRefunded = true; // Đánh dấu đã kiểm tra
+                    await context.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during refund process for Job {SessionId}", sessionId);
+            }
+        }
+        // ===== KẾT THÚC THÊM MỚI =====
 
         private async Task<(List<TranslatedSrtLineDb> results, int tokensUsed)> TranslateBatchAsync(
             List<OriginalSrtLineDb> batch, TranslationJobDb job, LocalApiSetting settings,
@@ -238,7 +321,6 @@ namespace SubPhim.Server.Services
             var requestPayloadObject = new
             {
                 contents = new[] { new { role = "user", parts = new[] { new { text = $"Dịch các câu thoại sau sang {job.TargetLanguage}:\n\n{payload}" } } } },
-                // Sử dụng systemInstruction được truyền vào
                 system_instruction = new { parts = new[] { new { text = systemInstruction } } },
                 generationConfig
             };
@@ -246,7 +328,9 @@ namespace SubPhim.Server.Services
             string jsonPayload = JsonConvert.SerializeObject(requestPayloadObject, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
             string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={apiKey}";
 
-            var (responseText, tokensUsed) = await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, token);
+            // ===== SỬA ĐỔI: Nhận thêm thông tin lỗi từ CallApiWithRetryAsync =====
+            var (responseText, tokensUsed, errorType, errorDetail, httpStatusCode) = await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, token);
+            // ===== KẾT THÚC SỬA ĐỔI =====
 
             var results = new List<TranslatedSrtLineDb>();
             if (responseText != null && !responseText.StartsWith("Lỗi", StringComparison.OrdinalIgnoreCase))
@@ -262,26 +346,53 @@ namespace SubPhim.Server.Services
                 foreach (var line in batch)
                 {
                     if (translatedLinesDict.TryGetValue(line.LineIndex, out string translated))
-                        results.Add(new TranslatedSrtLineDb { SessionId = job.SessionId, LineIndex = line.LineIndex, TranslatedText = string.IsNullOrWhiteSpace(translated) ? "[API DỊCH RỖNG]" : translated, Success = true });
+                        results.Add(new TranslatedSrtLineDb
+                        {
+                            SessionId = job.SessionId,
+                            LineIndex = line.LineIndex,
+                            TranslatedText = string.IsNullOrWhiteSpace(translated) ? "[API DỊCH RỖNG]" : translated,
+                            Success = true
+                        });
                     else
-                        results.Add(new TranslatedSrtLineDb { SessionId = job.SessionId, LineIndex = line.LineIndex, TranslatedText = "[API KHÔNG TRẢ VỀ DÒNG NÀY]", Success = false });
+                        results.Add(new TranslatedSrtLineDb
+                        {
+                            SessionId = job.SessionId,
+                            LineIndex = line.LineIndex,
+                            TranslatedText = "[API KHÔNG TRẢ VỀ DÒNG NÀY]",
+                            Success = false,
+                            ErrorType = "MISSING_LINE",
+                            ErrorDetail = "API không trả về dòng này trong response"
+                        });
                 }
             }
             else
             {
+                // ===== SỬA ĐỔI: Lưu thông tin lỗi chi tiết =====
                 foreach (var line in batch)
                 {
-                    results.Add(new TranslatedSrtLineDb { SessionId = job.SessionId, LineIndex = line.LineIndex, TranslatedText = $"[LỖI: {responseText}]", Success = false });
+                    results.Add(new TranslatedSrtLineDb
+                    {
+                        SessionId = job.SessionId,
+                        LineIndex = line.LineIndex,
+                        TranslatedText = $"[LỖI: {responseText}]",
+                        Success = false,
+                        ErrorType = errorType,
+                        ErrorDetail = errorDetail
+                    });
                 }
+                // ===== KẾT THÚC SỬA ĐỔI =====
             }
             return (results, tokensUsed);
         }
 
-        private async Task<(string responseText, int tokensUsed)> CallApiWithRetryAsync(string url, string jsonPayload, LocalApiSetting settings, CancellationToken token)
+        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết =====
+        private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
+            string url, string jsonPayload, LocalApiSetting settings, CancellationToken token)
         {
             for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
             {
-                if (token.IsCancellationRequested) return ("Lỗi: Tác vụ đã bị hủy.", 0);
+                if (token.IsCancellationRequested)
+                    return ("Lỗi: Tác vụ đã bị hủy.", 0, "CANCELLED", "Task was cancelled", 0);
 
                 try
                 {
@@ -297,44 +408,108 @@ namespace SubPhim.Server.Services
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        _logger.LogWarning("HTTP Error {StatusCode} from {Url}. Retrying in {Delay}ms...", response.StatusCode, url, settings.RetryDelayMs * attempt);
+                        int statusCode = (int)response.StatusCode;
+                        string errorType = $"HTTP_{statusCode}";
+                        string errorMsg = $"HTTP Error {statusCode}";
+
+                        _logger.LogWarning("HTTP Error {StatusCode} from {Url}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
+                            statusCode, url, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
+
                         if (attempt < settings.MaxRetries)
                         {
                             await Task.Delay(settings.RetryDelayMs * attempt, token);
                             continue;
                         }
-                        return ($"Lỗi API: {response.StatusCode}", 0);
+
+                        // Hết số lần retry, trả về lỗi
+                        return ($"Lỗi API: {response.StatusCode}", 0, errorType, errorMsg, statusCode);
                     }
 
                     JObject parsedBody = JObject.Parse(responseBody);
-                    if (parsedBody?["error"] != null) return ($"Lỗi API: {parsedBody["error"]?["message"]}", 0);
-                    if (parsedBody?["promptFeedback"]?["blockReason"] != null) return ($"Lỗi: Nội dung bị chặn. Lý do: {parsedBody["promptFeedback"]["blockReason"]}", 0);
+
+                    // Kiểm tra lỗi trong response body
+                    if (parsedBody?["error"] != null)
+                    {
+                        string errorMsg = parsedBody["error"]?["message"]?.ToString() ?? "Unknown error";
+                        _logger.LogWarning("API returned error: {ErrorMsg}. Retrying... (Attempt {Attempt}/{MaxRetries})",
+                            errorMsg, attempt, settings.MaxRetries);
+
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+
+                        return ($"Lỗi API: {errorMsg}", 0, "API_ERROR", errorMsg, 200);
+                    }
+
+                    // ===== THÊM MỚI: Kiểm tra blockReason (vi phạm chính sách an toàn) =====
+                    if (parsedBody?["promptFeedback"]?["blockReason"] != null)
+                    {
+                        string blockReason = parsedBody["promptFeedback"]["blockReason"].ToString();
+                        string errorMsg = $"Nội dung bị chặn. Lý do: {blockReason}";
+
+                        _logger.LogWarning("Content blocked by safety filters: {BlockReason}. This will NOT be retried.", blockReason);
+
+                        // Vi phạm chính sách không retry
+                        return ($"Lỗi: {errorMsg}", 0, "BLOCKED_CONTENT", errorMsg, 200);
+                    }
+                    // ===== KẾT THÚC THÊM MỚI =====
+
+                    // ===== THÊM MỚI: Kiểm tra finishReason =====
+                    var finishReason = parsedBody?["candidates"]?[0]?["finishReason"]?.ToString();
+                    if (!string.IsNullOrEmpty(finishReason) && finishReason != "STOP")
+                    {
+                        string errorMsg = $"FinishReason không hợp lệ: {finishReason}";
+
+                        _logger.LogWarning("Invalid finishReason: {FinishReason}. Possible safety violation. Retrying... (Attempt {Attempt}/{MaxRetries})",
+                            finishReason, attempt, settings.MaxRetries);
+
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+
+                        return ($"Lỗi: {errorMsg}", 0, "FINISH_REASON", errorMsg, 200);
+                    }
+                    // ===== KẾT THÚC THÊM MỚI =====
 
                     int tokens = parsedBody?["usageMetadata"]?["totalTokenCount"]?.Value<int>() ?? 0;
                     string responseText = parsedBody?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
 
                     if (responseText == null)
                     {
-                        _logger.LogWarning("API returned OK but content is empty. Retrying...");
+                        _logger.LogWarning("API returned OK but content is empty. Retrying... (Attempt {Attempt}/{MaxRetries})",
+                            attempt, settings.MaxRetries);
+
                         if (attempt < settings.MaxRetries)
                         {
                             await Task.Delay(settings.RetryDelayMs * attempt, token);
                             continue;
                         }
-                        return ("Lỗi: API trả về phản hồi rỗng.", 0);
+
+                        return ("Lỗi: API trả về phản hồi rỗng.", 0, "EMPTY_RESPONSE", "API returned empty response", 200);
                     }
 
-                    return (responseText, tokens);
+                    // Thành công
+                    return (responseText, tokens, null, null, 200);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Exception during API call. Retrying in {Delay}ms...", settings.RetryDelayMs * attempt);
-                    if (attempt >= settings.MaxRetries) return ($"Lỗi Exception: {ex.Message}", 0);
+                    _logger.LogError(ex, "Exception during API call. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
+                        settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
+
+                    if (attempt >= settings.MaxRetries)
+                        return ($"Lỗi Exception: {ex.Message}", 0, "EXCEPTION", ex.Message, 0);
+
                     await Task.Delay(settings.RetryDelayMs * attempt, token);
                 }
             }
-            return ("Lỗi API: Hết số lần thử lại.", 0);
+
+            return ("Lỗi API: Hết số lần thử lại.", 0, "MAX_RETRIES", "Exceeded maximum retry attempts", 0);
         }
+        // ===== KẾT THÚC SỬA ĐỔI =====
 
         private async Task UpdateJobStatus(string sessionId, JobStatus status, string errorMessage = null)
         {

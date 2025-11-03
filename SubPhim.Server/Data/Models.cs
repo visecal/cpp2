@@ -281,6 +281,15 @@ namespace SubPhim.Server.Data
         public JobStatus Status { get; set; } = JobStatus.Pending;
         public string? ErrorMessage { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        [Display(Name = "Số dòng bị lỗi")]
+        public int FailedLinesCount { get; set; } = 0;
+
+        [Display(Name = "Chi tiết lỗi (JSON)")]
+        [Column(TypeName = "TEXT")]
+        public string ErrorDetails { get; set; } // Lưu dưới dạng JSON để track từng lỗi cụ thể
+
+        [Display(Name = "Đã hoàn trả lượt dịch")]
+        public bool HasRefunded { get; set; } = false;
         public ICollection<OriginalSrtLineDb> OriginalLines { get; set; }
         public ICollection<TranslatedSrtLineDb> TranslatedLines { get; set; }
     }
@@ -300,9 +309,22 @@ namespace SubPhim.Server.Data
         public int LineIndex { get; set; }
         public string TranslatedText { get; set; }
         public bool Success { get; set; }
+        [StringLength(50)]
+        public string ErrorType { get; set; } // "HTTP_429", "HTTP_500", "FINISH_REASON", "TIMEOUT", etc.
+
+        [StringLength(500)]
+        public string ErrorDetail { get; set; }
         public string SessionId { get; set; } // Khóa ngoại
         [ForeignKey("SessionId")]
         public TranslationJobDb Job { get; set; }
+    }
+    public class ErrorTrackingInfo
+    {
+        public int LineIndex { get; set; }
+        public string ErrorType { get; set; }
+        public string ErrorDetail { get; set; }
+        public int HttpStatusCode { get; set; }
+        public DateTime OccurredAt { get; set; }
     }
     public class TierDefaultSetting
     {

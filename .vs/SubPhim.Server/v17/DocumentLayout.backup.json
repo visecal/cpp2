@@ -3,12 +3,16 @@
   "WorkspaceRootPath": "D:\\subphimv1\\SubPhim.Server\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\translationorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\translationorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20251103203032_46635412.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:SubPhim.Server\\Migrations\\20251103203032_46635412.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20251103143314_AddSrtLi42572.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:SubPhim.Server\\Migrations\\20251103143314_AddSrtLi42572.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\migrations\\20251103143314_addsrtli42572.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\migrations\\20251103143314_addsrtli42572.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\services\\translationorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|solutionrelative:subphim.server\\services\\translationorchestratorservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{0047BF59-63F6-4363-9E90-9B18E41BE78B}|SubPhim.Server\\SubPhim.Server.csproj|d:\\subphimv1\\subphim.server\\subphim.server\\data\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -186,11 +190,24 @@
       "DocumentGroups": [
         {
           "DockedWidth": 635,
-          "SelectedChildIndex": 11,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "20251103203032_46635412.cs",
+              "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20251103203032_46635412.cs",
+              "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20251103203032_46635412.cs",
+              "ToolTip": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20251103203032_46635412.cs",
+              "RelativeToolTip": "SubPhim.Server\\Migrations\\20251103203032_46635412.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-03T20:30:32.42Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -207,7 +224,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "Index.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml.cs",
@@ -219,7 +236,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "Index.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\LocalApi\\Index.cshtml",
@@ -231,7 +248,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "BackupRestore.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml",
@@ -243,7 +260,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 11,
               "Title": "Index.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml.cs",
@@ -255,7 +272,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 14,
               "Title": "SaOcrController.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\SaOcrController.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\SaOcrController.cs",
@@ -267,7 +284,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 19,
+              "DocumentIndex": 20,
               "Title": "LauncherAioController.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\LauncherAioController.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\LauncherAioController.cs",
@@ -279,7 +296,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 22,
+              "DocumentIndex": 23,
               "Title": "AioLauncherService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\AioLauncherService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\AioLauncherService.cs",
@@ -291,7 +308,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 16,
+              "DocumentIndex": 17,
               "Title": "AioLauncherController.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\AioLauncherController.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\AioLauncherController.cs",
@@ -303,7 +320,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "Program.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Program.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Program.cs",
@@ -315,7 +332,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "TranslationOrchestratorService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\TranslationOrchestratorService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\TranslationOrchestratorService.cs",
@@ -328,7 +345,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "AioLauncherSettings.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\AioLauncherSettings.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\AioLauncherSettings.cshtml.cs",
@@ -340,7 +357,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "AioLauncherSettings.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\AioLauncherSettings.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\AioLauncherSettings.cshtml",
@@ -348,12 +365,11 @@
               "RelativeToolTip": "SubPhim.Server\\Pages\\Admin\\AioLauncherSettings.cshtml",
               "ViewState": "AgIAAL8AAAAAAAAAAAAAwOoAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-09-28T03:38:27.973Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-28T03:38:27.973Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "Models.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\Models.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Data\\Models.cs",
@@ -361,12 +377,11 @@
               "RelativeToolTip": "SubPhim.Server\\Data\\Models.cs",
               "ViewState": "AgIAACkBAAAAAAAAAAA8wEcBAAAFAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-09-20T03:04:58.047Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-20T03:04:58.047Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 12,
               "Title": "Index.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Index.cshtml",
@@ -378,7 +393,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 10,
               "Title": "BackupRestore.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\BackupRestore.cshtml.cs",
@@ -390,7 +405,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 15,
               "Title": "SaOcr.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\SaOcr.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\SaOcr.cshtml",
@@ -402,7 +417,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 29,
+              "DocumentIndex": 30,
               "Title": "DesignTimeDbContextFactory.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\DesignTimeDbContextFactory.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Data\\DesignTimeDbContextFactory.cs",
@@ -414,7 +429,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 28,
+              "DocumentIndex": 29,
               "Title": "CleanupService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\CleanupService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\CleanupService.cs",
@@ -426,7 +441,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 20,
+              "DocumentIndex": 21,
               "Title": "EmailService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\EmailService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\EmailService.cs",
@@ -438,7 +453,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 15,
+              "DocumentIndex": 16,
               "Title": "SaOcr.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\SaOcr.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\SaOcr.cshtml.cs",
@@ -450,7 +465,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 13,
               "Title": "AuthController.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\AuthController.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\AuthController.cs",
@@ -462,7 +477,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 43,
+              "DocumentIndex": 44,
               "Title": "20251010090912_AddSaOcrServiceAccounts.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20251010090912_AddSaOcrServiceAccounts.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20251010090912_AddSaOcrServiceAccounts.cs",
@@ -474,7 +489,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 42,
+              "DocumentIndex": 43,
               "Title": "20251010093547_AddDriveFolderIdToSaOcr.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20251010093547_AddDriveFolderIdToSaOcr.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20251010093547_AddDriveFolderIdToSaOcr.cs",
@@ -486,7 +501,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 41,
+              "DocumentIndex": 42,
               "Title": "20251009143941_AddCustomPromptToTranslationJob.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20251009143941_AddCustomPromptToTranslationJob.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20251009143941_AddCustomPromptToTranslationJob.cs",
@@ -498,7 +513,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 17,
+              "DocumentIndex": 18,
               "Title": "_AdminLayout.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml",
@@ -510,7 +525,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 18,
+              "DocumentIndex": 19,
               "Title": "AppDbContext.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\AppDbContext.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Data\\AppDbContext.cs",
@@ -522,7 +537,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 21,
+              "DocumentIndex": 22,
               "Title": "EncryptionService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\EncryptionService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\EncryptionService.cs",
@@ -534,7 +549,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 40,
+              "DocumentIndex": 41,
               "Title": "20251009150038_AddCustomPromptToTranslationJob1.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20251009150038_AddCustomPromptToTranslationJob1.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20251009150038_AddCustomPromptToTranslationJob1.cs",
@@ -546,7 +561,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 23,
+              "DocumentIndex": 24,
               "Title": "AioTtsBatchProcessorService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\AioTtsBatchProcessorService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\AioTtsBatchProcessorService.cs",
@@ -558,7 +573,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 24,
+              "DocumentIndex": 25,
               "Title": "AioLauncherTtsController.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Controllers\\AioLauncherTtsController.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Controllers\\AioLauncherTtsController.cs",
@@ -570,7 +585,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 27,
+              "DocumentIndex": 28,
               "Title": "AioTtsSaStore.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\AioTtsSaStore.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\AioTtsSaStore.cs",
@@ -582,7 +597,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 26,
+              "DocumentIndex": 27,
               "Title": "AioTtsDispatcherService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\AioTtsDispatcherService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\AioTtsDispatcherService.cs",
@@ -594,7 +609,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 25,
+              "DocumentIndex": 26,
               "Title": "AioLauncherTts.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\AioLauncherTts.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\AioLauncherTts.cshtml",
@@ -606,7 +621,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 38,
+              "DocumentIndex": 39,
               "Title": "20250923152730_jontts.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250923152730_jontts.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250923152730_jontts.cs",
@@ -618,7 +633,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 30,
+              "DocumentIndex": 31,
               "Title": "_AdminLayout.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Shared\\_AdminLayout.cshtml.cs",
@@ -630,7 +645,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 31,
+              "DocumentIndex": 32,
               "Title": "AioLauncherTts.cshtml.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\AioLauncherTts.cshtml.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\AioLauncherTts.cshtml.cs",
@@ -642,7 +657,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 39,
+              "DocumentIndex": 40,
               "Title": "20250923144146_AddSrtLimitFields1398787.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250923144146_AddSrtLimitFields1398787.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250923144146_AddSrtLimitFields1398787.cs",
@@ -654,7 +669,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 32,
+              "DocumentIndex": 33,
               "Title": "IEmailService.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Services\\IEmailService.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Services\\IEmailService.cs",
@@ -666,7 +681,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 33,
+              "DocumentIndex": 34,
               "Title": "SmtpSettings.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Data\\SmtpSettings.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Data\\SmtpSettings.cs",
@@ -678,7 +693,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 34,
+              "DocumentIndex": 35,
               "Title": "appsettings.json",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\appsettings.json",
               "RelativeDocumentMoniker": "SubPhim.Server\\appsettings.json",
@@ -690,7 +705,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 37,
+              "DocumentIndex": 38,
               "Title": "20250920030951_AddUserDeviceResetTimestamp.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250920030951_AddUserDeviceResetTimestamp.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250920030951_AddUserDeviceResetTimestamp.cs",
@@ -702,7 +717,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 36,
+              "DocumentIndex": 37,
               "Title": "Create.cshtml",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml",
               "RelativeDocumentMoniker": "SubPhim.Server\\Pages\\Admin\\Users\\Create.cshtml",
@@ -714,7 +729,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 35,
+              "DocumentIndex": 36,
               "Title": "20250915033827_EnhanceAioKeyManagement3131323.cs",
               "DocumentMoniker": "D:\\subphimv1\\SubPhim.Server\\SubPhim.Server\\Migrations\\20250915033827_EnhanceAioKeyManagement3131323.cs",
               "RelativeDocumentMoniker": "SubPhim.Server\\Migrations\\20250915033827_EnhanceAioKeyManagement3131323.cs",

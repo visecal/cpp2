@@ -47,6 +47,56 @@ namespace SubPhim.Server.Pages.Admin
             public string ApiKeys { get; set; }
         }
 
+        public async Task<IActionResult> OnPostDeleteSelectedAsync([FromForm] int[] selectedKeyIds)
+        {
+            if (selectedKeyIds == null || !selectedKeyIds.Any())
+            {
+                ErrorMessage = "Vui lòng chọn ít nhất một API key để xóa.";
+                return RedirectToPage();
+            }
+
+            var keysToDelete = await _context.AioApiKeys
+                .Where(k => selectedKeyIds.Contains(k.Id))
+                .ToListAsync();
+
+            if (keysToDelete.Any())
+            {
+                _context.AioApiKeys.RemoveRange(keysToDelete);
+                await _context.SaveChangesAsync();
+                SuccessMessage = $"Đã xóa thành công {keysToDelete.Count} API key đã chọn.";
+            }
+
+            return RedirectToPage();
+        }
+
+        public async Task<IActionResult> OnPostToggleSelectedAsync([FromForm] int[] selectedKeyIds)
+        {
+            if (selectedKeyIds == null || !selectedKeyIds.Any())
+            {
+                ErrorMessage = "Vui lòng chọn ít nhất một API key để thay đổi trạng thái.";
+                return RedirectToPage();
+            }
+
+            var keysToToggle = await _context.AioApiKeys
+                .Where(k => selectedKeyIds.Contains(k.Id))
+                .ToListAsync();
+
+            if (keysToToggle.Any())
+            {
+                foreach (var key in keysToToggle)
+                {
+                    key.IsEnabled = !key.IsEnabled;
+                    if (key.IsEnabled)
+                    {
+                        key.DisabledReason = null; // Xóa lý do khi bật lại
+                    }
+                }
+                await _context.SaveChangesAsync();
+                SuccessMessage = $"Đã thay đổi trạng thái của {keysToToggle.Count} API key đã chọn.";
+            }
+
+            return RedirectToPage();
+        }
 
         public async Task<IActionResult> OnGetAsync()
         {

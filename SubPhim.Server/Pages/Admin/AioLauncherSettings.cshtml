@@ -157,50 +157,79 @@
                 </form>
 
                 <h5>Danh sách API Keys</h5>
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped">
-                        <thead>
-                            <tr>
-                                <th>Key (ẩn)</th>
-                                <th class="text-center">Request/Ngày</th>
-                                <th>Trạng thái</th>
-                                <th>Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var key in Model.ApiKeys)
-                            {
+
+                <!-- >> BẮT ĐẦU FORM XỬ LÝ HÀNG LOẠT << -->
+                <form method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-2">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" asp-page-handler="DeleteSelected" onclick="return confirm('Bạn có chắc muốn XÓA các key đã chọn?');">
+                            <i class="bi bi-trash"></i> Xóa mục đã chọn
+                        </button>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" asp-page-handler="ToggleSelected" onclick="return confirm('Bạn có chắc muốn BẬT/TẮT các key đã chọn?');">
+                            <i class="bi bi-toggles"></i> Bật/Tắt mục đã chọn
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
                                 <tr>
-                                    <td><code>@key.MaskedKey</code></td>
-                                    <td class="text-center">@key.RequestsToday / @Model.Settings.RpdPerKey</td>
-                                    <td>
-                                        @if (key.IsEnabled)
-                                        {
-                                            <span class="badge bg-success">Đang Bật</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-secondary" title="@key.DisabledReason">Đã Tắt</span>
-                                        }
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <form method="post" asp-page-handler="ToggleApiKey" asp-route-id="@key.Id" class="d-inline">
-                                                <button type="submit" class="btn @(key.IsEnabled ? "btn-outline-secondary" : "btn-outline-success")">
+                                    <th style="width: 5%;"><input class="form-check-input" type="checkbox" id="selectAllKeys"></th>
+                                    <th>Key (ẩn)</th>
+                                    <th class="text-center">Request/Ngày</th>
+                                    <th>Trạng thái</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var key in Model.ApiKeys)
+                                {
+                                    <tr>
+                                        <td><input class="form-check-input apiKeyCheckbox" type="checkbox" name="selectedKeyIds" value="@key.Id"></td>
+                                        <td><code>@key.MaskedKey</code></td>
+                                        <td class="text-center">@key.RequestsToday / @Model.Settings.RpdPerKey</td>
+                                        <td>
+                                            @if (key.IsEnabled)
+                                            {
+                                                <span class="badge bg-success">Đang Bật</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary" title="@key.DisabledReason">Đã Tắt</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button type="submit" class="btn @(key.IsEnabled ? "btn-outline-secondary" : "btn-outline-success")" asp-page-handler="ToggleApiKey" asp-route-id="@key.Id">
                                                     @(key.IsEnabled ? "Tắt" : "Bật")
                                                 </button>
-                                            </form>
-                                            <form method="post" asp-page-handler="DeleteApiKey" asp-route-id="@key.Id" onsubmit="return confirm('Xóa API key này?');" class="d-inline">
-                                                <button type="submit" class="btn btn-outline-danger">Xóa</button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
+                                                <button type="submit" class="btn btn-outline-danger" asp-page-handler="DeleteApiKey" asp-route-id="@key.Id" onclick="return confirm('Xóa API key này?');">Xóa</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+                <!-- << KẾT THÚC FORM XỬ LÝ HÀNG LOẠT << -->
             </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const selectAllCheckbox = document.getElementById('selectAllKeys');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('click', function () {
+                    const checkboxes = document.querySelectorAll('.apiKeyCheckbox');
+                    checkboxes.forEach(checkbox => {
+                        checkbox.checked = selectAllCheckbox.checked;
+                    });
+                });
+            }
+        });
+    </script>
+}

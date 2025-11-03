@@ -86,7 +86,52 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 ThinkingBudget = settingsFromDb.ThinkingBudget
             };
         }
+        public async Task<IActionResult> OnPostDeleteSelectedKeysAsync([FromForm] int[] selectedKeyIds)
+        {
+            if (selectedKeyIds == null || !selectedKeyIds.Any())
+            {
+                ErrorMessage = "Vui lòng chọn ít nhất một API key để xóa.";
+                return RedirectToPage();
+            }
 
+            var keysToDelete = await _context.ManagedApiKeys
+                .Where(k => selectedKeyIds.Contains(k.Id))
+                .ToListAsync();
+
+            if (keysToDelete.Any())
+            {
+                _context.ManagedApiKeys.RemoveRange(keysToDelete);
+                await _context.SaveChangesAsync();
+                SuccessMessage = $"Đã xóa thành công {keysToDelete.Count} API key.";
+            }
+
+            return RedirectToPage();
+        }
+
+        public async Task<IActionResult> OnPostDisableSelectedKeysAsync([FromForm] int[] selectedKeyIds)
+        {
+            if (selectedKeyIds == null || !selectedKeyIds.Any())
+            {
+                ErrorMessage = "Vui lòng chọn ít nhất một API key để tắt.";
+                return RedirectToPage();
+            }
+
+            var keysToDisable = await _context.ManagedApiKeys
+                .Where(k => selectedKeyIds.Contains(k.Id))
+                .ToListAsync();
+
+            if (keysToDisable.Any())
+            {
+                foreach (var key in keysToDisable)
+                {
+                    key.IsEnabled = false;
+                }
+                await _context.SaveChangesAsync();
+                SuccessMessage = $"Đã vô hiệu hóa thành công {keysToDisable.Count} API key.";
+            }
+
+            return RedirectToPage();
+        }
         private async Task LoadDataAsync()
         {
             PaidApiKeys = await GetApiKeysByPool(ApiPoolType.Paid);

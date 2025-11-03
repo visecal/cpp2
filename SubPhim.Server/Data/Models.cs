@@ -310,10 +310,10 @@ namespace SubPhim.Server.Data
         public string TranslatedText { get; set; }
         public bool Success { get; set; }
         [StringLength(50)]
-        public string ErrorType { get; set; } // "HTTP_429", "HTTP_500", "FINISH_REASON", "TIMEOUT", etc.
+        public string? ErrorType { get; set; } // "HTTP_429", "HTTP_500", "FINISH_REASON", "TIMEOUT", etc.
 
         [StringLength(500)]
-        public string ErrorDetail { get; set; }
+        public string? ErrorDetail { get; set; }
         public string SessionId { get; set; } // Khóa ngoại
         [ForeignKey("SessionId")]
         public TranslationJobDb Job { get; set; }

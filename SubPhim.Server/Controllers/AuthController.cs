@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -95,8 +95,11 @@ public class AuthController : ControllerBase
 int DailySrtLineLimit, long TtsCharactersUsed,
 long TtsCharacterLimit,
     long AioCharactersUsedToday,
-    long AioCharacterLimit
+    long AioCharacterLimit,
+         int LocalSrtLinesUsedToday,
+    int DailyLocalSrtLineLimit
 );
+
     public record ForgotPasswordRequest(string Email);
 
     [HttpPost("forgot-password")]
@@ -476,8 +479,11 @@ long TtsCharacterLimit,
             user.TtsCharactersUsed,
             user.TtsCharacterLimit,
             user.AioCharactersUsedToday,
-            aioCharacterLimit
-        );
+            aioCharacterLimit,
+    user.LocalSrtLinesUsedToday,
+    user.DailyLocalSrtLimit
+);
+
         return Ok(userDto);
     }
 
@@ -608,7 +614,9 @@ long TtsCharacterLimit,
             user.TtsCharactersUsed,
             user.TtsCharacterLimit,
             user.AioCharactersUsedToday,
-            aioCharacterLimit
+             aioCharacterLimit,
+    user.LocalSrtLinesUsedToday,
+    user.DailyLocalSrtLimit
         );
         return Ok(userDto);
     }

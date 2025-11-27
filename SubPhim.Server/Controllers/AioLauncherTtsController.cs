@@ -157,6 +157,128 @@ namespace SubPhim.Server.Controllers
             });
         }
 
+        [HttpGet("list-voices")]
+        public async Task<IActionResult> ListVoices([FromQuery] string? languageCode = null, [FromQuery] GoogleTtsModelType? modelType = null)
+        {
+            try
+            {
+                // Lấy một SA bất kỳ để gọi API (không tốn quota khi list voices)
+                var allSas = await _context.AioTtsServiceAccounts
+                    .Where(sa => sa.IsEnabled)
+                    .ToListAsync();
+
+                if (!allSas.Any())
+                {
+                    return StatusCode(503, new { message = "Không có Service Account nào khả dụng." });
+                }
+
+                var sa = allSas.First();
+
+                // Giải mã key
+                var encryptionService = HttpContext.RequestServices.GetRequiredService<IEncryptionService>();
+                var decryptedKey = encryptionService.Decrypt(sa.EncryptedJsonKey, sa.Iv);
+
+                var client = new Google.Cloud.TextToSpeech.V1.TextToSpeechClientBuilder
+                {
+                    JsonCredentials = decryptedKey
+                }.Build();
+
+                // Gọi ListVoices API
+                var request = new Google.Cloud.TextToSpeech.V1.ListVoicesRequest();
+                if (!string.IsNullOrEmpty(languageCode))
+                {
+                    request.LanguageCode = languageCode;
+                }
+
+                var response = await client.ListVoicesAsync(request);
+
+                // Filter theo model type nếu được chỉ định
+                var voices = response.Voices.AsEnumerable();
+                if (modelType.HasValue)
+                {
+                    var modelIdentifier = GetModelIdentifierFromType(modelType.Value);
+                    voices = voices.Where(v => v.Name.Contains($"-{modelIdentifier}-", StringComparison.OrdinalIgnoreCase));
+                }
+
+                // Format response
+                var result = voices.Select(v => new
+                {
+                    name = v.Name,
+                    languageCodes = v.LanguageCodes.ToArray(),
+                    ssmlGender = v.SsmlGender.ToString(),
+                    naturalSampleRateHertz = v.NaturalSampleRateHertz,
+                    // Phân tích model type từ tên voice
+                    modelType = DetectModelTypeFromVoiceName(v.Name),
+                    // Trích xuất voice ID (ký tự cuối hoặc tên)
+                    voiceId = ExtractVoiceId(v.Name)
+                }).ToList();
+
+                return Ok(new
+                {
+                    voices = result,
+                    totalCount = result.Count,
+                    filteredBy = new
+                    {
+                        languageCode = languageCode ?? "all",
+                        modelType = modelType?.ToString() ?? "all"
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi list voices từ Google TTS API");
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách voices: " + ex.Message });
+            }
+        }
+
+        private string GetModelIdentifierFromType(GoogleTtsModelType modelType)
+        {
+            return modelType switch
+            {
+                GoogleTtsModelType.Standard => "Standard",
+                GoogleTtsModelType.WaveNet => "Wavenet",
+                GoogleTtsModelType.Neural2 => "Neural2",
+                GoogleTtsModelType.Chirp3HD => "Chirp3-HD",
+                GoogleTtsModelType.ChirpHD => "Chirp-HD",
+                GoogleTtsModelType.Studio => "Studio",
+                GoogleTtsModelType.Polyglot => "Polyglot",
+                GoogleTtsModelType.News => "News",
+                GoogleTtsModelType.Casual => "Casual",
+                _ => "Standard"
+            };
+        }
+
+        private string DetectModelTypeFromVoiceName(string voiceName)
+        {
+            if (voiceName.Contains("Chirp3-HD", StringComparison.OrdinalIgnoreCase))
+                return "Chirp3HD";
+            if (voiceName.Contains("Chirp-HD", StringComparison.OrdinalIgnoreCase))
+                return "ChirpHD";
+            if (voiceName.Contains("Neural2", StringComparison.OrdinalIgnoreCase))
+                return "Neural2";
+            if (voiceName.Contains("Wavenet", StringComparison.OrdinalIgnoreCase))
+                return "WaveNet";
+            if (voiceName.Contains("Studio", StringComparison.OrdinalIgnoreCase))
+                return "Studio";
+            if (voiceName.Contains("Polyglot", StringComparison.OrdinalIgnoreCase))
+                return "Polyglot";
+            if (voiceName.Contains("News", StringComparison.OrdinalIgnoreCase))
+                return "News";
+            if (voiceName.Contains("Casual", StringComparison.OrdinalIgnoreCase))
+                return "Casual";
+            if (voiceName.Contains("Standard", StringComparison.OrdinalIgnoreCase))
+                return "Standard";
+            return "Unknown";
+        }
+
+        private string ExtractVoiceId(string voiceName)
+        {
+            // Ví dụ: en-US-Standard-A -> A
+            // en-US-Chirp3-HD-Achernar -> Achernar
+            var parts = voiceName.Split('-');
+            return parts.Length > 0 ? parts[^1] : voiceName;
+        }
+
         [HttpGet("batch/download/{jobId}")]
         public async Task<IActionResult> DownloadBatchResult(Guid jobId)
         {

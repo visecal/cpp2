@@ -87,7 +87,89 @@ curl -X GET "https://your-domain.com/api/aiolauncher-tts/list-voices?languageCod
 
 ---
 
-### 2. Generate TTS
+### 2. Voice Map (Model ⇄ Language ⇄ Voice ID)
+
+Trả về bản đồ đầy đủ các model → ngôn ngữ → voice ID để client có thể hiển thị danh sách lựa chọn.
+
+**Endpoint:** `GET /api/aiolauncher-tts/voice-map`
+
+**Authentication:** Required (Bearer Token)
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description | Example |
+|-----------|------|----------|-------------|---------|
+| `languageCode` | string | ❌ | Giới hạn kết quả cho một mã ngôn ngữ (BCP-47) | `vi-VN`, `en-US` |
+
+**Response Shape (rút gọn):**
+
+```json
+{
+  "models": [
+    {
+      "modelType": "Chirp3HD",
+      "languages": [
+        {
+          "languageCode": "en-US",
+          "voices": [
+            {
+              "name": "en-US-Chirp3-HD-Achernar",
+              "voiceId": "Achernar",
+              "ssmlGender": "Male",
+              "naturalSampleRateHertz": 24000
+            },
+            {
+              "name": "en-US-Chirp3-HD-Adhara",
+              "voiceId": "Adhara",
+              "ssmlGender": "Female",
+              "naturalSampleRateHertz": 24000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "modelType": "WaveNet",
+      "languages": [
+        {
+          "languageCode": "en-US",
+          "voices": [
+            {
+              "name": "en-US-Wavenet-A",
+              "voiceId": "A",
+              "ssmlGender": "Male",
+              "naturalSampleRateHertz": 24000
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "totalModels": 2,
+  "totalVoices": 3,
+  "filter": {
+    "languageCode": "en-US"
+  }
+}
+```
+
+**cURL Example:**
+
+```bash
+# Lấy full map tất cả ngôn ngữ và model
+curl -X GET "https://your-domain.com/api/aiolauncher-tts/voice-map" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Lọc theo một ngôn ngữ cụ thể
+curl -X GET "https://your-domain.com/api/aiolauncher-tts/voice-map?languageCode=vi-VN" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Lưu ý:** `modelType` trong response được suy ra tự động từ tên voice bằng logic `DetectModelTypeFromVoiceName`, giúp client không cần tự phân tích.
+
+---
+
+### 3. Generate TTS
 
 Tạo audio từ văn bản sử dụng model và voice được chỉ định.
 
@@ -157,7 +239,7 @@ curl -X POST "https://your-domain.com/api/aiolauncher-tts/generate" \
 
 ---
 
-### 3. Batch Upload SRT
+### 4. Batch Upload SRT
 
 Upload file SRT và tạo audio cho từng dòng subtitle.
 
@@ -201,7 +283,7 @@ curl -X POST "https://your-domain.com/api/aiolauncher-tts/batch/upload" \
 
 ---
 
-### 4. Check Batch Status
+### 5. Check Batch Status
 
 Kiểm tra trạng thái của batch job.
 
@@ -229,7 +311,7 @@ Kiểm tra trạng thái của batch job.
 
 ---
 
-### 5. Download Batch Result
+### 6. Download Batch Result
 
 Tải về file ZIP chứa tất cả audio đã tạo.
 

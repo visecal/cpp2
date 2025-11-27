@@ -231,6 +231,94 @@ namespace SubPhim.Server.Controllers
             }
         }
 
+        [HttpGet("voice-map")]
+        public async Task<IActionResult> GetVoiceMap([FromQuery] string? languageCode = null)
+        {
+            try
+            {
+                var allSas = await _context.AioTtsServiceAccounts
+                    .Where(sa => sa.IsEnabled)
+                    .ToListAsync();
+
+                if (!allSas.Any())
+                {
+                    return StatusCode(503, new { message = "Không có Service Account nào khả dụng." });
+                }
+
+                var sa = allSas.First();
+
+                var encryptionService = HttpContext.RequestServices.GetRequiredService<IEncryptionService>();
+                var decryptedKey = encryptionService.Decrypt(sa.EncryptedJsonKey, sa.Iv);
+
+                var client = new Google.Cloud.TextToSpeech.V1.TextToSpeechClientBuilder
+                {
+                    JsonCredentials = decryptedKey
+                }.Build();
+
+                var request = new Google.Cloud.TextToSpeech.V1.ListVoicesRequest();
+                if (!string.IsNullOrEmpty(languageCode))
+                {
+                    request.LanguageCode = languageCode;
+                }
+
+                var response = await client.ListVoicesAsync(request);
+
+                var voiceDetails = response.Voices
+                    .Where(v => string.IsNullOrEmpty(languageCode) || v.LanguageCodes.Contains(languageCode))
+                    .Select(v => new
+                    {
+                        name = v.Name,
+                        languageCodes = v.LanguageCodes.ToArray(),
+                        ssmlGender = v.SsmlGender.ToString(),
+                        naturalSampleRateHertz = v.NaturalSampleRateHertz,
+                        modelType = DetectModelTypeFromVoiceName(v.Name),
+                        voiceId = ExtractVoiceId(v.Name)
+                    })
+                    .ToList();
+
+                var modelMap = voiceDetails
+                    .GroupBy(v => v.modelType)
+                    .OrderBy(g => g.Key)
+                    .Select(g => new
+                    {
+                        modelType = g.Key,
+                        languages = g
+                            .SelectMany(v => v.languageCodes.Select(lang => new { lang, v }))
+                            .GroupBy(x => x.lang)
+                            .OrderBy(lg => lg.Key)
+                            .Select(lg => new
+                            {
+                                languageCode = lg.Key,
+                                voices = lg
+                                    .Select(x => new
+                                    {
+                                        name = x.v.name,
+                                        voiceId = x.v.voiceId,
+                                        ssmlGender = x.v.ssmlGender,
+                                        naturalSampleRateHertz = x.v.naturalSampleRateHertz
+                                    })
+                                    .OrderBy(v => v.voiceId)
+                            })
+                    });
+
+                return Ok(new
+                {
+                    models = modelMap,
+                    totalModels = modelMap.Count(),
+                    totalVoices = voiceDetails.Count,
+                    filter = new
+                    {
+                        languageCode = languageCode ?? "all"
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tạo voice map từ Google TTS API");
+                return StatusCode(500, new { message = "Lỗi khi lấy voice map: " + ex.Message });
+            }
+        }
+
         private string GetModelIdentifierFromType(GoogleTtsModelType modelType)
         {
             return modelType switch

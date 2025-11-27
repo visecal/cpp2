@@ -52,7 +52,7 @@ namespace SubPhim.Server.Data
             modelBuilder.Entity<AioTranslationSetting>()
                 .HasData(new AioTranslationSetting { Id = 1 });
             modelBuilder.Entity<AioTtsServiceAccount>()
-               .HasIndex(sa => sa.ClientEmail)
+               .HasIndex(sa => new { sa.ClientEmail, sa.ModelType })
                .IsUnique();
             modelBuilder.Entity<AioTtsBatchJob>()
        .HasOne(j => j.User)

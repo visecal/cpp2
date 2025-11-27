@@ -86,9 +86,9 @@ namespace SubPhim.Server.Pages.Admin
                         continue;
                     }
 
-                    if (await _context.AioTtsServiceAccounts.AnyAsync(sa => sa.ClientEmail == email))
+                    if (await _context.AioTtsServiceAccounts.AnyAsync(sa => sa.ClientEmail == email && sa.ModelType == SelectedModelType))
                     {
-                        errors.Add($"Bỏ qua: Service Account '{email}' đã tồn tại.");
+                        errors.Add($"Bỏ qua: Service Account '{email}' đã tồn tại cho model {SelectedModelType}.");
                         continue;
                     }
 

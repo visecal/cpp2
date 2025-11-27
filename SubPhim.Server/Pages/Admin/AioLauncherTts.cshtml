@@ -26,6 +26,13 @@
             <div class="card-body">
                 <form method="post" asp-page-handler="AddKeys">
                     <div class="mb-3">
+                        <label asp-for="SelectedModelType" class="form-label">Loại Model TTS</label>
+                        <select asp-for="SelectedModelType" asp-items="Html.GetEnumSelectList<GoogleTtsModelType>()" class="form-select">
+                            <option value="">-- Chọn Model Type --</option>
+                        </select>
+                        <div class="form-text">Chọn loại model mà các Service Account này sẽ sử dụng.</div>
+                    </div>
+                    <div class="mb-3">
                         <label asp-for="JsonKeysInput" class="form-label"></label>
                         <textarea asp-for="JsonKeysInput" class="form-control" rows="10" placeholder="Dán nội dung của một hoặc nhiều file service-account.json vào đây."></textarea>
                         <div class="form-text">Mỗi file JSON sẽ được tự động nhận dạng và xử lý.</div>
@@ -49,7 +56,8 @@
                             <tr>
                                 <th>Project ID</th>
                                 <th>Client Email</th>
-                                <th class="text-center">Đã dùng / Tháng</th>
+                                <th>Model Type</th>
+                                <th class="text-center">Đã dùng / Giới hạn</th>
                                 <th class="text-center">Trạng thái</th>
                                 <th class="text-center">Thao tác</th>
                             </tr>
@@ -63,15 +71,17 @@
                             }
                             @foreach (var sa in Model.ServiceAccounts)
                             {
-                                var usagePercentage = (double)sa.CharactersUsed / 1_000_000 * 100;
+                                var modelLimit = Model.GetModelLimit(sa.ModelType);
+                                var usagePercentage = modelLimit > 0 ? (double)sa.CharactersUsed / modelLimit * 100 : 0;
                                 var progressBarClass = usagePercentage > 90 ? "bg-danger" : (usagePercentage > 70 ? "bg-warning" : "bg-success");
                                 <tr>
                                     <td><small><code>@sa.ProjectId</code></small></td>
                                     <td><small>@sa.ClientEmail</small></td>
-                                    <td style="min-width: 200px;">
-                                        <div class="progress" title="@sa.CharactersUsed.ToString("N0") / 1,000,000 ký tự">
+                                    <td><span class="badge bg-info">@sa.ModelType</span></td>
+                                    <td style="min-width: 250px;">
+                                        <div class="progress" title="@sa.CharactersUsed.ToString("N0") / @modelLimit.ToString("N0") ký tự">
                                             <div class="progress-bar @progressBarClass" role="progressbar" style="width: @usagePercentage%;" aria-valuenow="@usagePercentage" aria-valuemin="0" aria-valuemax="100">
-                                                @sa.CharactersUsed.ToString("N0")
+                                                @sa.CharactersUsed.ToString("N0") / @(modelLimit / 1_000_000)M
                                             </div>
                                         </div>
                                     </td>

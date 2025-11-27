@@ -8,6 +8,7 @@ namespace SubPhim.Server.Data
     {
         public DbSet<AioTtsServiceAccount> AioTtsServiceAccounts { get; set; }
         public DbSet<AioTtsBatchJob> AioTtsBatchJobs { get; set; }
+        public DbSet<GoogleTtsModelConfig> GoogleTtsModelConfigs { get; set; }
         public DbSet<TierDefaultSetting> TierDefaultSettings { get; set; }
         public DbSet<LocalApiSetting> LocalApiSettings { get; set; }
         public DbSet<User> Users { get; set; }
@@ -71,6 +72,141 @@ namespace SubPhim.Server.Data
             modelBuilder.Entity<SaOcrServiceAccount>()
                .HasIndex(sa => sa.ClientEmail)
                .IsUnique();
+
+            // Cấu hình GoogleTtsModelConfig với dữ liệu mặc định
+            modelBuilder.Entity<GoogleTtsModelConfig>()
+                .HasIndex(c => c.ModelType)
+                .IsUnique();
+
+            modelBuilder.Entity<GoogleTtsModelConfig>()
+                .HasData(
+                    new GoogleTtsModelConfig
+                    {
+                        Id = 1,
+                        ModelType = GoogleTtsModelType.Standard,
+                        ModelIdentifier = "Standard",
+                        MonthlyFreeLimit = 4_000_000,
+                        PricePerMillionChars = 4.00m,
+                        SupportsSsml = true,
+                        SupportsSpeakingRate = true,
+                        SupportsPitch = true,
+                        IsEnabled = true,
+                        Description = "Standard voices - Cost-efficient general purpose TTS",
+                        CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new GoogleTtsModelConfig
+                    {
+                        Id = 2,
+                        ModelType = GoogleTtsModelType.WaveNet,
+                        ModelIdentifier = "Wavenet",
+                        MonthlyFreeLimit = 1_000_000,
+                        PricePerMillionChars = 16.00m,
+                        SupportsSsml = true,
+                        SupportsSpeakingRate = true,
+                        SupportsPitch = true,
+                        IsEnabled = true,
+                        Description = "WaveNet voices - Premium synthetic speech with human-like quality",
+                        CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new GoogleTtsModelConfig
+                    {
+                        Id = 3,
+                        ModelType = GoogleTtsModelType.Neural2,
+                        ModelIdentifier = "Neural2",
+                        MonthlyFreeLimit = 1_000_000,
+                        PricePerMillionChars = 16.00m,
+                        SupportsSsml = true,
+                        SupportsSpeakingRate = true,
+                        SupportsPitch = true,
+                        IsEnabled = true,
+                        Description = "Neural2 voices - Premium with custom voice technology",
+                        CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new GoogleTtsModelConfig
+                    {
+                        Id = 4,
+                        ModelType = GoogleTtsModelType.Chirp3HD,
+                        ModelIdentifier = "Chirp3-HD",
+                        MonthlyFreeLimit = 1_000_000,
+                        PricePerMillionChars = 30.00m,
+                        SupportsSsml = false,
+                        SupportsSpeakingRate = false,
+                        SupportsPitch = false,
+                        IsEnabled = true,
+                        Description = "Chirp 3: HD voices - Conversational agents with 30 distinct styles",
+                        CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new GoogleTtsModelConfig
+                    {
+                        Id = 5,
+                        ModelType = GoogleTtsModelType.ChirpHD,
+                        ModelIdentifier = "Chirp-HD",
+                        MonthlyFreeLimit = 1_000_000,
+                        PricePerMillionChars = 30.00m,
+                        SupportsSsml = false,
+                        SupportsSpeakingRate = false,
+                        SupportsPitch = false,
+                        IsEnabled = false,
+                        Description = "Chirp HD voices (Legacy) - Earlier generation Chirp voices",
+                        CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new GoogleTtsModelConfig
+                    {
+                        Id = 6,
+                        ModelType = GoogleTtsModelType.Studio,
+                        ModelIdentifier = "Studio",
+                        MonthlyFreeLimit = 1_000_000,
+                        PricePerMillionChars = 16.00m,
+                        SupportsSsml = true,
+                        SupportsSpeakingRate = true,
+                        SupportsPitch = true,
+                        IsEnabled = true,
+                        Description = "Studio voices - News reading and broadcast content",
+                        CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new GoogleTtsModelConfig
+                    {
+                        Id = 7,
+                        ModelType = GoogleTtsModelType.Polyglot,
+                        ModelIdentifier = "Polyglot",
+                        MonthlyFreeLimit = 1_000_000,
+                        PricePerMillionChars = 16.00m,
+                        SupportsSsml = true,
+                        SupportsSpeakingRate = true,
+                        SupportsPitch = true,
+                        IsEnabled = true,
+                        Description = "Polyglot voices - Multilingual capability",
+                        CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new GoogleTtsModelConfig
+                    {
+                        Id = 8,
+                        ModelType = GoogleTtsModelType.News,
+                        ModelIdentifier = "News",
+                        MonthlyFreeLimit = 1_000_000,
+                        PricePerMillionChars = 16.00m,
+                        SupportsSsml = true,
+                        SupportsSpeakingRate = true,
+                        SupportsPitch = true,
+                        IsEnabled = true,
+                        Description = "News voices - Specialized for news reading",
+                        CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new GoogleTtsModelConfig
+                    {
+                        Id = 9,
+                        ModelType = GoogleTtsModelType.Casual,
+                        ModelIdentifier = "Casual",
+                        MonthlyFreeLimit = 1_000_000,
+                        PricePerMillionChars = 16.00m,
+                        SupportsSsml = true,
+                        SupportsSpeakingRate = true,
+                        SupportsPitch = true,
+                        IsEnabled = true,
+                        Description = "Casual voices - Relaxed conversational style",
+                        CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    }
+                );
         }
     }
 }

@@ -18,6 +18,19 @@ namespace SubPhim.Server.Data
         Pro = 2    // gemini-2.5-pro-preview-tts
     }
 
+    public enum GoogleTtsModelType
+    {
+        Standard = 1,      // Standard voices (4M chars free/month)
+        WaveNet = 2,       // WaveNet voices (1M chars free/month)
+        Neural2 = 3,       // Neural2 voices (1M chars free/month)
+        Chirp3HD = 4,      // Chirp 3: HD voices (1M chars free/month)
+        ChirpHD = 5,       // Chirp HD legacy (1M chars free/month)
+        Studio = 6,        // Studio voices (1M chars free/month)
+        Polyglot = 7,      // Polyglot voices (1M chars free/month)
+        News = 8,          // News voices (1M chars free/month)
+        Casual = 9         // Casual voices (1M chars free/month)
+    }
+
     [Flags]
     public enum GrantedFeatures
     {
@@ -530,9 +543,12 @@ namespace SubPhim.Server.Data
         [Required]
         public string Iv { get; set; }
 
+        [Display(Name = "Loại Model TTS")]
+        public GoogleTtsModelType ModelType { get; set; } = GoogleTtsModelType.Chirp3HD; // Mặc định Chirp3HD để tương thích ngược
+
         public bool IsEnabled { get; set; } = true;
 
-        // Dùng để theo dõi quota 1M/tháng
+        // Dùng để theo dõi quota theo tháng
         public long CharactersUsed { get; set; } = 0;
 
         // Lưu tháng sử dụng dưới dạng "YYYY-MM" để tự động reset
@@ -568,6 +584,9 @@ namespace SubPhim.Server.Data
         [Required]
         public string AudioFormat { get; set; } // "MP3", "WAV", "OGG_OPUS"
 
+        [Display(Name = "Loại Model TTS")]
+        public GoogleTtsModelType ModelType { get; set; } = GoogleTtsModelType.Chirp3HD;
+
         // --- Thông tin xử lý ---
         [Required]
         public string OriginalSrtFilePath { get; set; } // Đường dẫn tới file SRT đã upload
@@ -578,6 +597,45 @@ namespace SubPhim.Server.Data
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? CompletedAt { get; set; }
+    }
+
+    public class GoogleTtsModelConfig
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [Display(Name = "Loại Model")]
+        public GoogleTtsModelType ModelType { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        [Display(Name = "Tên Model trong API")]
+        public string ModelIdentifier { get; set; } // Ví dụ: "Standard", "Wavenet", "Neural2", "Chirp3-HD", "Studio"
+
+        [Display(Name = "Giới hạn miễn phí/tháng (ký tự)")]
+        public long MonthlyFreeLimit { get; set; }
+
+        [Display(Name = "Giá sau giới hạn ($/1M ký tự)")]
+        [Column(TypeName = "decimal(10, 2)")]
+        public decimal PricePerMillionChars { get; set; }
+
+        [Display(Name = "Hỗ trợ SSML")]
+        public bool SupportsSsml { get; set; } = true;
+
+        [Display(Name = "Hỗ trợ Speaking Rate")]
+        public bool SupportsSpeakingRate { get; set; } = true;
+
+        [Display(Name = "Hỗ trợ Pitch")]
+        public bool SupportsPitch { get; set; } = true;
+
+        [Display(Name = "Đang hoạt động")]
+        public bool IsEnabled { get; set; } = true;
+
+        [Display(Name = "Mô tả")]
+        [StringLength(500)]
+        public string? Description { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
     public class TranslationLog
     {

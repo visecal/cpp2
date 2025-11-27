@@ -29,7 +29,8 @@ namespace SubPhim.Server.Controllers
             string Language,
             string VoiceId,
             double Rate,
-            string Text
+            string Text,
+            GoogleTtsModelType ModelType = GoogleTtsModelType.Chirp3HD // Mặc định Chirp3HD để tương thích ngược
         );
 
         [HttpPost("generate")]
@@ -70,7 +71,7 @@ namespace SubPhim.Server.Controllers
             user.TtsCharactersUsed += characterCount;
             await _context.SaveChangesAsync();
 
-            var result = await _dispatcher.SynthesizeAsync(request.Language, request.VoiceId, request.Rate, request.Text);
+            var result = await _dispatcher.SynthesizeAsync(request.ModelType, request.Language, request.VoiceId, request.Rate, request.Text);
 
             if (result.IsSuccess)
             {
@@ -89,7 +90,7 @@ namespace SubPhim.Server.Controllers
         }
 
         [HttpPost("batch/upload"), DisableRequestSizeLimit] // Cho phép upload file lớn
-        public async Task<IActionResult> UploadSrtBatch([FromForm] IFormFile srtFile, [FromForm] string language, [FromForm] string voiceId, [FromForm] double rate, [FromForm] string audioFormat)
+        public async Task<IActionResult> UploadSrtBatch([FromForm] IFormFile srtFile, [FromForm] string language, [FromForm] string voiceId, [FromForm] double rate, [FromForm] string audioFormat, [FromForm] GoogleTtsModelType modelType = GoogleTtsModelType.Chirp3HD)
         {
             const long maxFileSize = 50 * 1024 * 1024;
 
@@ -122,6 +123,7 @@ namespace SubPhim.Server.Controllers
                 VoiceId = voiceId,
                 Rate = rate,
                 AudioFormat = audioFormat,
+                ModelType = modelType,
                 OriginalSrtFilePath = originalFilePath
             };
 

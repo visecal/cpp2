@@ -87,7 +87,7 @@ namespace SubPhim.Server.Services
                     var ext = GetExtensionFromFormat(job.AudioFormat);
                     var fileName = $"{item.Index:D4}_{SafeTimestamp(item.Start)}_{SafeTimestamp(item.End)}{ext}";
 
-                    return dispatcher.SynthesizeAsync(job.Language, job.VoiceId, job.Rate, item.Text)
+                    return dispatcher.SynthesizeAsync(job.ModelType, job.Language, job.VoiceId, job.Rate, item.Text)
                                      .ContinueWith(t => new { Result = t.Result, FileName = fileName, Index = item.Index }, stoppingToken);
                 }).ToList();
 

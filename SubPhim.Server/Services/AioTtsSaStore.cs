@@ -10,9 +10,9 @@ namespace SubPhim.Server.Services
         private readonly ILogger<AioTtsSaStore> _logger;
         private List<AioTtsServiceAccount> _accountsCache = new();
         private ConcurrentDictionary<string, long> _usageCache = new();
+        private ConcurrentDictionary<GoogleTtsModelType, long> _modelLimitsCache = new();
         private string _currentMonthKey = string.Empty;
         private readonly object _lock = new();
-        private const long MONTHLY_LIMIT_CHARS = 1_000_000;
 
         public AioTtsSaStore(IServiceProvider serviceProvider, ILogger<AioTtsSaStore> logger)
         {
@@ -40,6 +40,14 @@ namespace SubPhim.Server.Services
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+            // Tải giới hạn cho từng model type
+            var modelConfigs = await context.GoogleTtsModelConfigs.AsNoTracking().Where(c => c.IsEnabled).ToListAsync();
+            _modelLimitsCache.Clear();
+            foreach (var config in modelConfigs)
+            {
+                _modelLimitsCache.TryAdd(config.ModelType, config.MonthlyFreeLimit);
+            }
+
             var allAccounts = await context.AioTtsServiceAccounts.AsNoTracking().Where(sa => sa.IsEnabled).ToListAsync();
 
             lock (_lock)
@@ -57,7 +65,8 @@ namespace SubPhim.Server.Services
                     }
                 }
             }
-            _logger.LogInformation("AIOLauncher TTS: Đã nạp {Count} Service Accounts đang hoạt động.", _accountsCache.Count);
+            _logger.LogInformation("AIOLauncher TTS: Đã nạp {Count} Service Accounts đang hoạt động với {ModelCount} model types.",
+                _accountsCache.Count, _modelLimitsCache.Count);
         }
 
         public List<AioTtsServiceAccount> GetAvailableAccounts()
@@ -68,13 +77,33 @@ namespace SubPhim.Server.Services
             }
         }
 
-        // HÀM MỚI: Thử đặt chỗ quota một cách an toàn
-        public bool TryReserveQuota(string clientEmail, int neededChars)
+        public List<AioTtsServiceAccount> GetAvailableAccountsByModelType(GoogleTtsModelType modelType)
+        {
+            lock (_lock)
+            {
+                return _accountsCache.Where(acc => acc.ModelType == modelType).ToList();
+            }
+        }
+
+        public long GetModelLimit(GoogleTtsModelType modelType)
+        {
+            return _modelLimitsCache.GetValueOrDefault(modelType, 1_000_000);
+        }
+
+        // HÀM MỚI: Thử đặt chỗ quota một cách an toàn với model type
+        public bool TryReserveQuota(string clientEmail, GoogleTtsModelType modelType, int neededChars)
         {
             // Tự động reset nếu cần
             if (GetCurrentMonthKey() != _currentMonthKey)
             {
                 LoadAccountsAndUsage().GetAwaiter().GetResult();
+            }
+
+            // Lấy giới hạn cho model type này
+            if (!_modelLimitsCache.TryGetValue(modelType, out long monthlyLimit))
+            {
+                _logger.LogWarning("Không tìm thấy giới hạn cho model type {ModelType}. Sử dụng giới hạn mặc định 1M.", modelType);
+                monthlyLimit = 1_000_000;
             }
 
             // Vòng lặp để đảm bảo hoạt động trừ quota là an toàn (atomic)
@@ -83,8 +112,10 @@ namespace SubPhim.Server.Services
                 long currentUsage = _usageCache.GetValueOrDefault(clientEmail, 0);
                 long potentialUsage = currentUsage + neededChars;
 
-                if (potentialUsage > MONTHLY_LIMIT_CHARS)
+                if (potentialUsage > monthlyLimit)
                 {
+                    _logger.LogWarning("SA {Email} (Model: {ModelType}) đã đạt giới hạn {Limit} ký tự/tháng. Hiện tại: {Current}, yêu cầu thêm: {Needed}",
+                        clientEmail, modelType, monthlyLimit, currentUsage, neededChars);
                     return false; // Không đủ quota
                 }
 

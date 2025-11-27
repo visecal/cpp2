@@ -32,6 +32,10 @@ namespace SubPhim.Server.Pages.Admin
         [Display(Name = "Dán nội dung các file JSON vào đây")]
         public string JsonKeysInput { get; set; }
 
+        [BindProperty]
+        [Display(Name = "Loại Model TTS")]
+        public GoogleTtsModelType SelectedModelType { get; set; } = GoogleTtsModelType.Chirp3HD;
+
         [TempData]
         public string SuccessMessage { get; set; }
         [TempData]
@@ -40,6 +44,12 @@ namespace SubPhim.Server.Pages.Admin
         public async Task OnGetAsync()
         {
             ServiceAccounts = await _context.AioTtsServiceAccounts.OrderBy(sa => sa.ProjectId).ThenBy(sa => sa.ClientEmail).ToListAsync();
+        }
+
+        public long GetModelLimit(GoogleTtsModelType modelType)
+        {
+            var config = _context.GoogleTtsModelConfigs.AsNoTracking().FirstOrDefault(c => c.ModelType == modelType);
+            return config?.MonthlyFreeLimit ?? 1_000_000;
         }
 
         public async Task<IActionResult> OnPostAddKeysAsync()
@@ -90,6 +100,7 @@ namespace SubPhim.Server.Pages.Admin
                         ProjectId = projectId,
                         EncryptedJsonKey = encryptedKey,
                         Iv = iv,
+                        ModelType = SelectedModelType,
                         UsageMonth = DateTime.UtcNow.ToString("yyyy-MM")
                     };
 

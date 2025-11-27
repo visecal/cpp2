@@ -94,34 +94,58 @@ namespace SubPhim.Server.Services
             _logger.LogInformation("AIOLauncher TTS Dispatcher: Đã khởi tạo router với {ProjectCount} projects.", _saByProject.Count);
         }
 
-        // SỬA LẠI HÀM NÀY
-        private AioTtsServiceAccount? PickServiceAccount(int neededChars)
+        // Helper method để tạo tên voice dựa trên model type
+        private string BuildVoiceName(string language, GoogleTtsModelType modelType, string voiceId)
         {
-            var projectIds = _saByProject.Keys.ToList();
-            if (!projectIds.Any()) return null;
-
-            var shuffledProjectIds = projectIds.OrderBy(x => System.Guid.NewGuid()).ToList();
-
-            foreach (var projectId in shuffledProjectIds)
+            return modelType switch
             {
-                var accountList = _saByProject[projectId];
-                int startIndex = _projectRrIndex[projectId];
+                GoogleTtsModelType.Standard => $"{language}-Standard-{voiceId}",
+                GoogleTtsModelType.WaveNet => $"{language}-Wavenet-{voiceId}",
+                GoogleTtsModelType.Neural2 => $"{language}-Neural2-{voiceId}",
+                GoogleTtsModelType.Chirp3HD => $"{language}-Chirp3-HD-{voiceId}",
+                GoogleTtsModelType.ChirpHD => $"{language}-Chirp-HD-{voiceId}",
+                GoogleTtsModelType.Studio => $"{language}-Studio-{voiceId}",
+                GoogleTtsModelType.Polyglot => $"{language}-Polyglot-{voiceId}",
+                GoogleTtsModelType.News => $"{language}-News-{voiceId}",
+                GoogleTtsModelType.Casual => $"{language}-Casual-{voiceId}",
+                _ => $"{language}-Chirp3-HD-{voiceId}" // Default to Chirp3HD
+            };
+        }
+
+        // SỬA LẠI HÀM NÀY - Thêm modelType parameter
+        private AioTtsServiceAccount? PickServiceAccount(GoogleTtsModelType modelType, int neededChars)
+        {
+            // Lấy danh sách SA cho model type này
+            var accountsForModel = _saStore.GetAvailableAccountsByModelType(modelType);
+            if (!accountsForModel.Any())
+            {
+                _logger.LogWarning("Không tìm thấy SA nào cho model type {ModelType}", modelType);
+                return null;
+            }
+
+            // Nhóm theo project
+            var projectGroups = accountsForModel.GroupBy(a => a.ProjectId).ToList();
+            var shuffledProjects = projectGroups.OrderBy(x => System.Guid.NewGuid()).ToList();
+
+            foreach (var projectGroup in shuffledProjects)
+            {
+                var projectId = projectGroup.Key;
+                var accountList = projectGroup.ToList();
+
                 for (int i = 0; i < accountList.Count; i++)
                 {
-                    int currentIndex = (startIndex + i) % accountList.Count;
-                    var sa = accountList[currentIndex];
+                    var sa = accountList[i];
 
-                    // THAY ĐỔI CỐT LÕI: Dùng TryReserveQuota thay vì HasQuota
-                    if (_saStore.TryReserveQuota(sa.ClientEmail, neededChars))
+                    // THAY ĐỔI CỐT LÕI: Dùng TryReserveQuota với modelType
+                    if (_saStore.TryReserveQuota(sa.ClientEmail, modelType, neededChars))
                     {
-                        _projectRrIndex[projectId] = (currentIndex + 1) % accountList.Count;
                         return sa;
                     }
                 }
             }
             return null;
         }
-        public async Task<AioTtsDispatcherResult> SynthesizeAsync(string language, string voiceId, double rate, string text)
+        public async Task<AioTtsDispatcherResult> SynthesizeAsync(GoogleTtsModelType modelType, string language, string voiceId, double rate, string text)
         {
             await _globalConcurrencyLimiter.WaitAsync();
 
@@ -136,11 +160,11 @@ namespace SubPhim.Server.Services
 
             try
             {
-                // 1) Chọn SA và giữ quota cho toàn bộ văn bản
-                sa = PickServiceAccount(neededChars);
+                // 1) Chọn SA và giữ quota cho toàn bộ văn bản theo model type
+                sa = PickServiceAccount(modelType, neededChars);
                 if (sa == null)
                 {
-                    return new AioTtsDispatcherResult { IsSuccess = false, ErrorMessage = "Server đang bận. Vui lòng thử lại sau giây lát." };
+                    return new AioTtsDispatcherResult { IsSuccess = false, ErrorMessage = $"Server đang bận hoặc đã hết quota cho model {modelType}. Vui lòng thử lại sau." };
                 }
 
                 // 2) Tạo client một lần
@@ -164,6 +188,9 @@ namespace SubPhim.Server.Services
                 var audioParts = new byte[textBatches.Count][];
                 Exception? firstError = null;
 
+                // Kiểm tra model có hỗ trợ SSML, speaking rate, pitch không
+                bool supportsSpeakingRate = modelType != GoogleTtsModelType.Chirp3HD && modelType != GoogleTtsModelType.ChirpHD;
+
                 var tasks = textBatches.Select((payload, index) => Task.Run(async () =>
                 {
                     await parallelGate.WaitAsync();
@@ -171,19 +198,27 @@ namespace SubPhim.Server.Services
                     {
                         await limiter.AcquireAsync(1); // tôn trọng RPM
 
+                        var voiceName = BuildVoiceName(language, modelType, voiceId);
+                        var audioConfig = new Google.Cloud.TextToSpeech.V1.AudioConfig
+                        {
+                            AudioEncoding = Google.Cloud.TextToSpeech.V1.AudioEncoding.Mp3
+                        };
+
+                        // Chỉ thêm SpeakingRate nếu model hỗ trợ
+                        if (supportsSpeakingRate)
+                        {
+                            audioConfig.SpeakingRate = rate;
+                        }
+
                         var res = await client.SynthesizeSpeechAsync(new Google.Cloud.TextToSpeech.V1.SynthesizeSpeechRequest
                         {
                             Input = new Google.Cloud.TextToSpeech.V1.SynthesisInput { Text = payload }, // KHÔNG SSML
                             Voice = new Google.Cloud.TextToSpeech.V1.VoiceSelectionParams
                             {
                                 LanguageCode = language,
-                                Name = $"{language}-Chirp3-HD-{voiceId}"
+                                Name = voiceName
                             },
-                            AudioConfig = new Google.Cloud.TextToSpeech.V1.AudioConfig
-                            {
-                                AudioEncoding = Google.Cloud.TextToSpeech.V1.AudioEncoding.Mp3,
-                                SpeakingRate = rate
-                            }
+                            AudioConfig = audioConfig
                         });
 
                         audioParts[index] = res.AudioContent.ToByteArray();
@@ -210,7 +245,8 @@ namespace SubPhim.Server.Services
                 // 5) Ghép MP3 đúng chuẩn: giữ ID3v2 đầu, bỏ ID3v2 ở các chunk sau, bỏ ID3v1 ở giữa
                 var merged = ConcatenateMp3Chunks(audioParts);
 
-                _logger.LogInformation("TTS: Project {ProjectId} đã xử lý {CharCount} ký tự qua {BatchCount} batch (song song, plain text).", sa.ProjectId, neededChars, textBatches.Count);
+                _logger.LogInformation("TTS: Project {ProjectId}, Model {ModelType} đã xử lý {CharCount} ký tự qua {BatchCount} batch (song song, plain text).",
+                    sa.ProjectId, modelType, neededChars, textBatches.Count);
 
                 return new AioTtsDispatcherResult
                 {
@@ -220,12 +256,12 @@ namespace SubPhim.Server.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "TTS: Lỗi không xác định.");
+                _logger.LogError(ex, "TTS: Lỗi không xác định cho model {ModelType}.", modelType);
                 if (sa != null)
                 {
                     _saStore.ReleaseQuota(sa.ClientEmail, neededChars);
                 }
-                return new AioTtsDispatcherResult { IsSuccess = false, ErrorMessage = "Lỗi xử lý TTS." };
+                return new AioTtsDispatcherResult { IsSuccess = false, ErrorMessage = $"Lỗi xử lý TTS cho model {modelType}." };
             }
             finally
             {

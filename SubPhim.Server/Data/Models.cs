@@ -1,5 +1,4 @@
-﻿
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 
@@ -244,6 +243,18 @@ namespace SubPhim.Server.Data
 
         [Display(Name = "Nhóm API (Local)")]
         public ApiPoolType PoolType { get; set; } = ApiPoolType.Paid;
+
+        // === BẮT ĐẦU THÊM TRƯỜNG MỚI: Temporary Cooldown ===
+        [Display(Name = "Tạm thời vô hiệu đến (UTC)")]
+        public DateTime? TemporaryCooldownUntil { get; set; } // Null = không bị cooldown
+
+        [Display(Name = "Lý do bị vô hiệu hóa")]
+        [StringLength(300)]
+        public string? DisabledReason { get; set; }
+
+        [Display(Name = "Số lần gặp lỗi 429 liên tiếp")]
+        public int Consecutive429Count { get; set; } = 0;
+        // === KẾT THÚC THÊM TRƯỜNG MỚI ===
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }

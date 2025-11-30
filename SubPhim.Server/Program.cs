@@ -29,6 +29,10 @@ builder.Services.AddScoped<ITtsOrchestratorService, TtsOrchestratorService>();
 builder.Services.AddScoped<ITtsSettingsService, TtsSettingsService>();
 builder.Services.AddHostedService<TtsKeyResetService>();
 builder.Services.AddHostedService<AioKeyResetService>();
+// === BẮT ĐẦU THÊM: Register Cooldown Services ===
+builder.Services.AddSingleton<ApiKeyCooldownService>(); // Singleton để share cache
+builder.Services.AddHostedService<ManagedApiKeyResetService>(); // Background service
+// === KẾT THÚC THÊM ===
 builder.Services.AddHostedService<AioTtsBatchProcessorService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<CleanupService>();

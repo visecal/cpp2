@@ -14,14 +14,22 @@ namespace SubPhim.Server.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<TranslationOrchestratorService> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
+        // === BẮT ĐẦU THÊM: Cooldown Service ===
+        private readonly ApiKeyCooldownService _cooldownService;
+        // === KẾT THÚC THÊM ===
 
         public record CreateJobResult(string Status, string Message, string SessionId = null, int RemainingLines = 0);
 
-        public TranslationOrchestratorService(IServiceProvider serviceProvider, ILogger<TranslationOrchestratorService> logger, IHttpClientFactory httpClientFactory)
+        public TranslationOrchestratorService(
+            IServiceProvider serviceProvider, 
+            ILogger<TranslationOrchestratorService> logger, 
+            IHttpClientFactory httpClientFactory,
+            ApiKeyCooldownService cooldownService)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
             _httpClientFactory = httpClientFactory;
+            _cooldownService = cooldownService;
         }
 
         public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial)
@@ -146,8 +154,16 @@ namespace SubPhim.Server.Services
                 var activeModel = await context.AvailableApiModels.AsNoTracking().FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cts.Token);
                 if (activeModel == null) throw new Exception($"Không có model nào đang hoạt động cho nhóm '{poolToUse}'.");
 
-                var enabledKeys = await context.ManagedApiKeys.AsNoTracking().Where(k => k.IsEnabled && k.PoolType == poolToUse).ToListAsync(cts.Token);
-                if (!enabledKeys.Any()) throw new Exception($"Không có API key nào đang hoạt động cho nhóm '{poolToUse}'.");
+                // === SỬA ĐỔI: Lọc bỏ keys đang trong cooldown ===
+                var enabledKeys = await context.ManagedApiKeys.AsNoTracking()
+                    .Where(k => k.IsEnabled && k.PoolType == poolToUse)
+                    .ToListAsync(cts.Token);
+                
+                // Filter out keys in cooldown
+                enabledKeys = enabledKeys.Where(k => !_cooldownService.IsInCooldown(k.Id)).ToList();
+                
+                if (!enabledKeys.Any()) throw new Exception($"Không có API key nào đang hoạt động cho nhóm '{poolToUse}' (có thể tất cả đang trong cooldown).");
+                // === KẾT THÚC SỬA ĐỔI ===
 
                 const int RPM_PER_PAID_KEY = 150;
                 const int RPM_PER_FREE_KEY = 15;
@@ -181,11 +197,21 @@ namespace SubPhim.Server.Services
                     {
                         try
                         {
-                            var apiKeyRecord = enabledKeys[Random.Shared.Next(enabledKeys.Count)];
-                            var apiKey = encryptionService.Decrypt(apiKeyRecord.EncryptedApiKey, apiKeyRecord.Iv);
-                            var (translatedBatch, tokensUsed) = await TranslateBatchAsync(batch, job, settings, activeModel.ModelName, apiKey, job.SystemInstruction, cts.Token);
+                            // === SỬA ĐỔI: Gọi TranslateBatchAsync với context và settings ===
+                            var (translatedBatch, tokensUsed, usedKeyId) = await TranslateBatchAsync(
+                                batch, job, settings, activeModel.ModelName, job.SystemInstruction, 
+                                poolToUse, encryptionService, cts.Token);
+                            
                             await SaveResultsToDb(sessionId, translatedBatch);
-                            await UpdateUsageInDb(apiKeyRecord.Id, tokensUsed);
+                            
+                            if (usedKeyId.HasValue)
+                            {
+                                await UpdateUsageInDb(usedKeyId.Value, tokensUsed);
+                                
+                                // Reset cooldown nếu batch thành công
+                                await _cooldownService.ResetCooldownAsync(usedKeyId.Value);
+                            }
+                            // === KẾT THÚC SỬA ĐỔI ===
                         }
                         catch (OperationCanceledException) { }
                         catch (Exception ex)
@@ -208,10 +234,7 @@ namespace SubPhim.Server.Services
                 await Task.WhenAll(processingTasks);
                 _logger.LogInformation("All batches for job {SessionId} completed. Checking for errors and refunding if needed...", sessionId);
 
-                // ===== THÊM MỚI: Kiểm tra lỗi và hoàn trả lượt dịch =====
                 await CheckAndRefundFailedLinesAsync(sessionId);
-                // ===== KẾT THÚC THÊM MỚI =====
-
                 await UpdateJobStatus(sessionId, JobStatus.Completed);
 
             }
@@ -295,9 +318,10 @@ namespace SubPhim.Server.Services
         }
         // ===== KẾT THÚC THÊM MỚI =====
 
-        private async Task<(List<TranslatedSrtLineDb> results, int tokensUsed)> TranslateBatchAsync(
+        private async Task<(List<TranslatedSrtLineDb> results, int tokensUsed, int? usedKeyId)> TranslateBatchAsync(
             List<OriginalSrtLineDb> batch, TranslationJobDb job, LocalApiSetting settings,
-            string modelName, string apiKey, string systemInstruction, CancellationToken token)
+            string modelName, string systemInstruction, ApiPoolType poolType, 
+            IEncryptionService encryptionService, CancellationToken token)
         {
             var payloadBuilder = new StringBuilder();
             foreach (var line in batch)
@@ -326,65 +350,183 @@ namespace SubPhim.Server.Services
             };
 
             string jsonPayload = JsonConvert.SerializeObject(requestPayloadObject, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-            string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={apiKey}";
 
-            // ===== SỬA ĐỔI: Nhận thêm thông tin lỗi từ CallApiWithRetryAsync =====
-            var (responseText, tokensUsed, errorType, errorDetail, httpStatusCode) = await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, token);
-            // ===== KẾT THÚC SỬA ĐỔI =====
-
-            var results = new List<TranslatedSrtLineDb>();
-            if (responseText != null && !responseText.StartsWith("Lỗi", StringComparison.OrdinalIgnoreCase))
+            // === BẮT ĐẦU SỬA ĐỔI: Retry với auto key rotation ===
+            HashSet<int> triedKeyIds = new HashSet<int>();
+            int? successfulKeyId = null;
+            
+            for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
             {
-                var translatedLinesDict = new Dictionary<int, string>();
-                var regex = new Regex(@"^\s*(\d+):\s*(.*)$", RegexOptions.Multiline);
-                foreach (Match m in regex.Matches(responseText))
+                ManagedApiKey selectedKey = null;
+                
+                try
                 {
-                    if (int.TryParse(m.Groups[1].Value, out int idx))
-                        translatedLinesDict[idx] = m.Groups[2].Value.Trim();
-                }
-
-                foreach (var line in batch)
-                {
-                    if (translatedLinesDict.TryGetValue(line.LineIndex, out string translated))
-                        results.Add(new TranslatedSrtLineDb
-                        {
-                            SessionId = job.SessionId,
-                            LineIndex = line.LineIndex,
-                            TranslatedText = string.IsNullOrWhiteSpace(translated) ? "[API DỊCH RỖNG]" : translated,
-                            Success = true
-                        });
-                    else
-                        results.Add(new TranslatedSrtLineDb
-                        {
-                            SessionId = job.SessionId,
-                            LineIndex = line.LineIndex,
-                            TranslatedText = "[API KHÔNG TRẢ VỀ DÒNG NÀY]",
-                            Success = false,
-                            ErrorType = "MISSING_LINE",
-                            ErrorDetail = "API không trả về dòng này trong response"
-                        });
-                }
-            }
-            else
-            {
-                // ===== SỬA ĐỔI: Lưu thông tin lỗi chi tiết =====
-                foreach (var line in batch)
-                {
-                    results.Add(new TranslatedSrtLineDb
+                    // Lấy key khả dụng, loại trừ những key đã thử
+                    using var scope = _serviceProvider.CreateScope();
+                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    
+                    selectedKey = await GetAvailableKeyForBatchAsync(context, poolType, triedKeyIds);
+                    
+                    if (selectedKey == null)
                     {
-                        SessionId = job.SessionId,
-                        LineIndex = line.LineIndex,
-                        TranslatedText = $"[LỖI: {responseText}]",
-                        Success = false,
-                        ErrorType = errorType,
-                        ErrorDetail = errorDetail
-                    });
+                        _logger.LogWarning("Batch: Không còn key nào khả dụng sau {Attempts} lần thử với {TriedKeys} keys",
+                            attempt, triedKeyIds.Count);
+                        break; // Không còn key nào để thử
+                    }
+
+                    triedKeyIds.Add(selectedKey.Id);
+                    
+                    var apiKey = encryptionService.Decrypt(selectedKey.EncryptedApiKey, selectedKey.Iv);
+                    string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={apiKey}";
+
+                    _logger.LogInformation("Batch attempt {Attempt}/{MaxRetries}: Using Key ID {KeyId}", 
+                        attempt, settings.MaxRetries, selectedKey.Id);
+
+                    var (responseText, tokensUsed, errorType, errorDetail, httpStatusCode) = 
+                        await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, token);
+
+                    // === XỬ LÝ LỖI 429 ===
+                    if (httpStatusCode == 429)
+                    {
+                        _logger.LogWarning("Key ID {KeyId} gặp lỗi 429 Rate Limit. Đặt vào cooldown và chờ {Delay}ms trước khi thử key khác.", 
+                            selectedKey.Id, settings.RetryDelayMs);
+                        
+                        await _cooldownService.SetCooldownAsync(selectedKey.Id, $"HTTP 429 on attempt {attempt}");
+                        
+                        if (attempt < settings.MaxRetries)
+                        {
+                            // === SỬA LẠI: Delay theo cài đặt từ panel thay vì cố định ===
+                            await Task.Delay(settings.RetryDelayMs, token); // Tuân theo cài đặt RetryDelayMs từ Admin panel
+                            continue; // Thử lại với key khác
+                        }
+                    }
+                    
+                    // === XỬ LÝ CÁC LỖI NGHIÊM TRỌNG KHÁC ===
+                    if (httpStatusCode == 401 || httpStatusCode == 403 || 
+                        errorType == "INVALID_ARGUMENT" || errorDetail?.Contains("API key") == true)
+                    {
+                        _logger.LogError("Key ID {KeyId} gặp lỗi nghiêm trọng ({ErrorType}). Vô hiệu hóa vĩnh viễn và thử key khác NGAY.", 
+                            selectedKey.Id, errorType);
+                        
+                        await _cooldownService.DisableKeyPermanentlyAsync(selectedKey.Id, 
+                            $"{errorType}: {errorDetail}");
+                        
+                        if (attempt < settings.MaxRetries)
+                        {
+                            // Không delay cho lỗi nghiêm trọng - thử ngay với key khác
+                            continue;
+                        }
+                    }
+
+                    // === THÀNH CÔNG ===
+                    if (responseText != null && !responseText.StartsWith("Lỗi", StringComparison.OrdinalIgnoreCase))
+                    {
+                        successfulKeyId = selectedKey.Id;
+                        
+                        var results = new List<TranslatedSrtLineDb>();
+                        var translatedLinesDict = new Dictionary<int, string>();
+                        var regex = new Regex(@"^\s*(\d+):\s*(.*)$", RegexOptions.Multiline);
+                        
+                        foreach (Match m in regex.Matches(responseText))
+                        {
+                            if (int.TryParse(m.Groups[1].Value, out int idx))
+                                translatedLinesDict[idx] = m.Groups[2].Value.Trim();
+                        }
+
+                        foreach (var line in batch)
+                        {
+                            if (translatedLinesDict.TryGetValue(line.LineIndex, out string translated))
+                                results.Add(new TranslatedSrtLineDb
+                                {
+                                    SessionId = job.SessionId,
+                                    LineIndex = line.LineIndex,
+                                    TranslatedText = string.IsNullOrWhiteSpace(translated) ? "[API DỊCH RỖNG]" : translated,
+                                    Success = true
+                                });
+                            else
+                                results.Add(new TranslatedSrtLineDb
+                                {
+                                    SessionId = job.SessionId,
+                                    LineIndex = line.LineIndex,
+                                    TranslatedText = "[API KHÔNG TRẢ VỀ DÒNG NÀY]",
+                                    Success = false,
+                                    ErrorType = "MISSING_LINE",
+                                    ErrorDetail = "API không trả về dòng này trong response"
+                                });
+                        }
+                        
+                        return (results, tokensUsed, successfulKeyId);
+                    }
+                    
+                    // === LỖI KHÁC (không phải 429, không nghiêm trọng) ===
+                    if (attempt < settings.MaxRetries)
+                    {
+                        // Tính delay theo exponential backoff với hệ số từ cài đặt
+                        int delayMs = settings.RetryDelayMs * attempt;
+                        
+                        _logger.LogWarning("Batch attempt {Attempt} failed with Key ID {KeyId}. Error: {Error}. Retrying after {Delay}ms...",
+                            attempt, selectedKey.Id, errorType, delayMs);
+                        
+                        await Task.Delay(delayMs, token);
+                        continue;
+                    }
+
                 }
-                // ===== KẾT THÚC SỬA ĐỔI =====
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Exception during batch translation attempt {Attempt} with Key ID {KeyId}", 
+                        attempt, selectedKey?.Id);
+                    
+                    if (attempt >= settings.MaxRetries) break;
+                    await Task.Delay(settings.RetryDelayMs * attempt, token);
+                }
             }
-            return (results, tokensUsed);
+            
+            // === TẤT CẢ ATTEMPTS ĐỀU THẤT BẠI ===
+            _logger.LogError("Batch translation failed after {MaxRetries} attempts with {KeyCount} different keys",
+                settings.MaxRetries, triedKeyIds.Count);
+            
+            var failedResults = batch.Select(l => new TranslatedSrtLineDb
+            {
+                SessionId = job.SessionId,
+                LineIndex = l.LineIndex,
+                TranslatedText = "[LỖI: Không thể dịch sau nhiều lần thử]",
+                Success = false,
+                ErrorType = "MAX_RETRIES_EXCEEDED",
+                ErrorDetail = $"Failed after {settings.MaxRetries} attempts with {triedKeyIds.Count} keys"
+            }).ToList();
+            
+            return (failedResults, 0, null);
+            // === KẾT THÚC SỬA ĐỔI ===
         }
 
+        /// <summary>
+        /// Lấy key khả dụng cho batch, loại trừ những key đã thử và đang trong cooldown
+        /// </summary>
+        private async Task<ManagedApiKey> GetAvailableKeyForBatchAsync(
+            AppDbContext context, ApiPoolType poolType, HashSet<int> excludeKeyIds)
+        {
+            var query = context.ManagedApiKeys
+                .Where(k => k.IsEnabled && k.PoolType == poolType);
+            
+            if (excludeKeyIds.Any())
+            {
+                query = query.Where(k => !excludeKeyIds.Contains(k.Id));
+            }
+            
+            var eligibleKeys = await query.ToListAsync();
+            
+            // Filter out keys in cooldown (in-memory check)
+            eligibleKeys = eligibleKeys
+                .Where(k => !_cooldownService.IsInCooldown(k.Id))
+                .ToList();
+            
+            if (!eligibleKeys.Any()) return null;
+            
+            // Random selection từ pool
+            return eligibleKeys[Random.Shared.Next(eligibleKeys.Count)];
+        }
+        
         // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết =====
         private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
             string url, string jsonPayload, LocalApiSetting settings, CancellationToken token)

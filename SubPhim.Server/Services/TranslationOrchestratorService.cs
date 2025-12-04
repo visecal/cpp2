@@ -21,14 +21,21 @@ namespace SubPhim.Server.Services
 
         // === BẮT ĐẦU THÊM: Random User-Agent per API Key ===
         private static readonly ConcurrentDictionary<int, string> _apiKeyUserAgents = new();
-        private static readonly string[] _userAgentTemplates = new[]
+        
+        // Chrome-based templates use {0}=major, {1}=build, {2}=patch
+        // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
+        private static readonly string[] _chromeTemplates = new[]
         {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36 Edg/{0}.0.{1}.{2}",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36"
+        };
+        
+        private static readonly string[] _firefoxTemplates = new[]
+        {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:{0}.0) Gecko/20100101 Firefox/{0}.0",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:{0}.0) Gecko/20100101 Firefox/{0}.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36 Edg/{0}.0.{1}.{2}",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
             "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:{0}.0) Gecko/20100101 Firefox/{0}.0"
         };
 
@@ -37,11 +44,24 @@ namespace SubPhim.Server.Services
             return _apiKeyUserAgents.GetOrAdd(apiKeyId, id =>
             {
                 var random = new Random(id); // Sử dụng apiKeyId làm seed để đảm bảo cùng key luôn có cùng User-Agent
-                var template = _userAgentTemplates[random.Next(_userAgentTemplates.Length)];
-                var majorVersion = random.Next(100, 131); // Chrome/Firefox versions
-                var buildNumber = random.Next(1000, 9999);
-                var patchNumber = random.Next(100, 999);
-                return string.Format(template, majorVersion, buildNumber, patchNumber);
+                
+                // Chọn ngẫu nhiên giữa Chrome và Firefox
+                bool useChrome = random.Next(2) == 0;
+                
+                if (useChrome)
+                {
+                    var template = _chromeTemplates[random.Next(_chromeTemplates.Length)];
+                    var majorVersion = random.Next(100, 131); // Chrome versions 100-130
+                    var buildNumber = random.Next(1000, 9999);
+                    var patchNumber = random.Next(100, 999);
+                    return string.Format(template, majorVersion, buildNumber, patchNumber);
+                }
+                else
+                {
+                    var template = _firefoxTemplates[random.Next(_firefoxTemplates.Length)];
+                    var majorVersion = random.Next(100, 135); // Firefox versions 100-134
+                    return string.Format(template, majorVersion);
+                }
             });
         }
         // === KẾT THÚC THÊM ===
@@ -593,8 +613,8 @@ namespace SubPhim.Server.Services
                     // === THÊM: Random User-Agent header per API key để giảm 429 ===
                     request.Headers.Add("User-Agent", userAgent);
 
-                    _logger.LogInformation("Attempt {Attempt}/{MaxRetries}: Sending request to API with User-Agent: {UserAgent}", 
-                        attempt, settings.MaxRetries, userAgent.Substring(0, Math.Min(50, userAgent.Length)) + "...");
+                    _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request to API (Key ID: {KeyId})", 
+                        attempt, settings.MaxRetries, apiKeyId);
                     using HttpResponseMessage response = await httpClient.SendAsync(request, token);
                     string responseBody = await response.Content.ReadAsStringAsync(token);
 

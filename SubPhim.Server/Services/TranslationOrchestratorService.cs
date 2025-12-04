@@ -15,16 +15,20 @@ namespace SubPhim.Server.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<TranslationOrchestratorService> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
-        // === BẮT ĐẦU THÊM: Cooldown Service ===
         private readonly ApiKeyCooldownService _cooldownService;
-        // === KẾT THÚC THÊM ===
-
-        // === BẮT ĐẦU THÊM: Job Cancellation Service ===
         private readonly JobCancellationService _cancellationService;
-        // === KẾT THÚC THÊM ===
 
-        // === BẮT ĐẦU THÊM: Random User-Agent per API Key ===
-        private static readonly ConcurrentDictionary<int, string> _apiKeyUserAgents = new();
+        // === RPM Limiter per API Key - Đảm bảo mỗi key tôn trọng RPM riêng ===
+        private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
+        private static readonly ConcurrentDictionary<int, int> _keyRpmCapacities = new(); // Track capacity per key
+        
+        // === Round-Robin Index per Pool - Đảm bảo phân bổ đều request giữa các key ===
+        private static int _paidKeyRoundRobinIndex = 0;
+        private static int _freeKeyRoundRobinIndex = 0;
+        private static readonly object _roundRobinLock = new();
+        
+        // === Constants ===
+        private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
         // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
@@ -43,32 +47,89 @@ namespace SubPhim.Server.Services
             "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:{0}.0) Gecko/20100101 Firefox/{0}.0"
         };
 
-        private static string GetUserAgentForApiKey(int apiKeyId)
+        /// <summary>
+        /// Tạo User-Agent ngẫu nhiên cho mỗi request để tránh bị rate limit
+        /// </summary>
+        private static string GenerateRandomUserAgent()
         {
-            return _apiKeyUserAgents.GetOrAdd(apiKeyId, id =>
+            var random = new Random(Guid.NewGuid().GetHashCode()); // Random seed cho mỗi request
+            
+            // Chọn ngẫu nhiên giữa Chrome và Firefox
+            bool useChrome = random.Next(2) == 0;
+            
+            if (useChrome)
             {
-                var random = new Random(id); // Sử dụng apiKeyId làm seed để đảm bảo cùng key luôn có cùng User-Agent
-                
-                // Chọn ngẫu nhiên giữa Chrome và Firefox
-                bool useChrome = random.Next(2) == 0;
-                
-                if (useChrome)
+                var template = _chromeTemplates[random.Next(_chromeTemplates.Length)];
+                var majorVersion = random.Next(100, 131); // Chrome versions 100-130
+                var buildNumber = random.Next(1000, 9999);
+                var patchNumber = random.Next(100, 999);
+                return string.Format(template, majorVersion, buildNumber, patchNumber);
+            }
+            else
+            {
+                var template = _firefoxTemplates[random.Next(_firefoxTemplates.Length)];
+                var majorVersion = random.Next(100, 135); // Firefox versions 100-134
+                return string.Format(template, majorVersion);
+            }
+        }
+        
+        /// <summary>
+        /// Helper method để chọn key theo round-robin (sync, có thể dùng lock)
+        /// </summary>
+        private ManagedApiKey GetNextKeyRoundRobin(List<ManagedApiKey> eligibleKeys, ApiPoolType poolType)
+        {
+            lock (_roundRobinLock)
+            {
+                int currentIndex;
+                if (poolType == ApiPoolType.Paid)
                 {
-                    var template = _chromeTemplates[random.Next(_chromeTemplates.Length)];
-                    var majorVersion = random.Next(100, 131); // Chrome versions 100-130
-                    var buildNumber = random.Next(1000, 9999);
-                    var patchNumber = random.Next(100, 999);
-                    return string.Format(template, majorVersion, buildNumber, patchNumber);
+                    if (_paidKeyRoundRobinIndex >= eligibleKeys.Count)
+                        _paidKeyRoundRobinIndex = 0;
+                    currentIndex = _paidKeyRoundRobinIndex;
+                    _paidKeyRoundRobinIndex++;
                 }
                 else
                 {
-                    var template = _firefoxTemplates[random.Next(_firefoxTemplates.Length)];
-                    var majorVersion = random.Next(100, 135); // Firefox versions 100-134
-                    return string.Format(template, majorVersion);
+                    if (_freeKeyRoundRobinIndex >= eligibleKeys.Count)
+                        _freeKeyRoundRobinIndex = 0;
+                    currentIndex = _freeKeyRoundRobinIndex;
+                    _freeKeyRoundRobinIndex++;
                 }
-            });
+                return eligibleKeys[currentIndex];
+            }
         }
-        // === KẾT THÚC THÊM ===
+        
+        /// <summary>
+        /// Đảm bảo key có RPM limiter với capacity đúng. Tạo mới nếu cần.
+        /// </summary>
+        private void EnsureKeyRpmLimiter(int keyId, int rpmCapacity)
+        {
+            // Kiểm tra capacity đã lưu
+            if (_keyRpmCapacities.TryGetValue(keyId, out int currentCapacity) && currentCapacity == rpmCapacity)
+            {
+                // Capacity không thay đổi, không cần làm gì
+                return;
+            }
+            
+            // Capacity thay đổi hoặc chưa có, cần tạo/cập nhật semaphore
+            lock (_roundRobinLock) // Sử dụng lock để tránh race condition
+            {
+                // Double-check sau khi lấy lock
+                if (_keyRpmCapacities.TryGetValue(keyId, out currentCapacity) && currentCapacity == rpmCapacity)
+                    return;
+                
+                // Dispose old semaphore nếu có
+                if (_keyRpmLimiters.TryRemove(keyId, out var oldSemaphore))
+                {
+                    try { oldSemaphore.Dispose(); }
+                    catch { /* Ignore dispose errors */ }
+                }
+                
+                // Tạo semaphore mới
+                _keyRpmLimiters[keyId] = new SemaphoreSlim(rpmCapacity, rpmCapacity);
+                _keyRpmCapacities[keyId] = rpmCapacity;
+            }
+        }
 
         public record CreateJobResult(string Status, string Message, string SessionId = null, int RemainingLines = 0);
 
@@ -211,7 +272,7 @@ namespace SubPhim.Server.Services
                 var activeModel = await context.AvailableApiModels.AsNoTracking().FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cancellationToken);
                 if (activeModel == null) throw new Exception($"Không có model nào đang hoạt động cho nhóm '{poolToUse}'.");
 
-                // === SỬA ĐỔI: Lọc bỏ keys đang trong cooldown ===
+                // === SỬA ĐỔI: Load tất cả keys enabled và filter cooldown ===
                 var enabledKeys = await context.ManagedApiKeys.AsNoTracking()
                     .Where(k => k.IsEnabled && k.PoolType == poolToUse)
                     .ToListAsync(cancellationToken);
@@ -222,16 +283,18 @@ namespace SubPhim.Server.Services
                 if (!enabledKeys.Any()) throw new Exception($"Không có API key nào đang hoạt động cho nhóm '{poolToUse}' (có thể tất cả đang trong cooldown).");
                 // === KẾT THÚC SỬA ĐỔI ===
 
-                const int RPM_PER_PAID_KEY = 150;
-                const int RPM_PER_FREE_KEY = 15;
-                int rpmPerKey = (poolToUse == ApiPoolType.Paid) ? RPM_PER_PAID_KEY : RPM_PER_FREE_KEY;
-                int totalRpm = enabledKeys.Count * rpmPerKey;
-
-                using var rpmLimiter = new SemaphoreSlim(totalRpm, totalRpm);
-                using var rpmResetTimer = new Timer(_ => {
-                    try { if (rpmLimiter.CurrentCount < totalRpm) rpmLimiter.Release(totalRpm - rpmLimiter.CurrentCount); }
-                    catch (ObjectDisposedException) { }
-                }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+                // === MỚI: Lấy RPM từ Admin/LocalApi settings thay vì hardcode ===
+                int rpmPerKey = settings.Rpm; // RPM được cài đặt trên Admin panel
+                
+                // Đảm bảo mỗi key có SemaphoreSlim riêng để tuân thủ RPM
+                foreach (var key in enabledKeys)
+                {
+                    // Kiểm tra capacity đã lưu và tạo/cập nhật semaphore nếu cần
+                    EnsureKeyRpmLimiter(key.Id, rpmPerKey);
+                }
+                
+                _logger.LogInformation("Job {SessionId}: Using {KeyCount} API keys, each with {Rpm} RPM (from Admin settings)", 
+                    sessionId, enabledKeys.Count, rpmPerKey);
 
                 var allLines = await context.OriginalSrtLines.AsNoTracking()
                     .Where(l => l.SessionId == sessionId)
@@ -270,15 +333,15 @@ namespace SubPhim.Server.Services
                     }
                     // === KẾT THÚC THÊM ===
                     
-                    await rpmLimiter.WaitAsync(cancellationToken);
+                    // === MỚI: Không sử dụng global rpmLimiter, per-key limiter được xử lý trong TranslateBatchAsync ===
                     processingTasks.Add(Task.Run(async () =>
                     {
                         try
                         {
-                            // === SỬA ĐỔI: Gọi TranslateBatchAsync với context và settings ===
+                            // === SỬA ĐỔI: Truyền thêm enabledKeys và rpmPerKey để hỗ trợ round-robin và per-key RPM ===
                             var (translatedBatch, tokensUsed, usedKeyId) = await TranslateBatchAsync(
                                 batch, job, settings, activeModel.ModelName, job.SystemInstruction, 
-                                poolToUse, encryptionService, cancellationToken);
+                                poolToUse, encryptionService, enabledKeys, rpmPerKey, cancellationToken);
                             
                             await SaveResultsToDb(sessionId, translatedBatch);
                             
@@ -419,7 +482,7 @@ namespace SubPhim.Server.Services
         private async Task<(List<TranslatedSrtLineDb> results, int tokensUsed, int? usedKeyId)> TranslateBatchAsync(
             List<OriginalSrtLineDb> batch, TranslationJobDb job, LocalApiSetting settings,
             string modelName, string systemInstruction, ApiPoolType poolType, 
-            IEncryptionService encryptionService, CancellationToken token)
+            IEncryptionService encryptionService, List<ManagedApiKey> availableKeys, int rpmPerKey, CancellationToken token)
         {
             var payloadBuilder = new StringBuilder();
             foreach (var line in batch)
@@ -449,7 +512,7 @@ namespace SubPhim.Server.Services
 
             string jsonPayload = JsonConvert.SerializeObject(requestPayloadObject, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
 
-            // === BẮT ĐẦU SỬA ĐỔI: Retry với auto key rotation ===
+            // === MỚI: Sử dụng round-robin và per-key RPM limiter ===
             HashSet<int> triedKeyIds = new HashSet<int>();
             int? successfulKeyId = null;
             
@@ -459,11 +522,8 @@ namespace SubPhim.Server.Services
                 
                 try
                 {
-                    // Lấy key khả dụng, loại trừ những key đã thử
-                    using var scope = _serviceProvider.CreateScope();
-                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    
-                    selectedKey = await GetAvailableKeyForBatchAsync(context, poolType, triedKeyIds);
+                    // === MỚI: Chọn key bằng round-robin và chờ per-key RPM limiter ===
+                    selectedKey = await GetAvailableKeyWithRpmLimitAsync(availableKeys, poolType, triedKeyIds, rpmPerKey, token);
                     
                     if (selectedKey == null)
                     {
@@ -477,7 +537,7 @@ namespace SubPhim.Server.Services
                     var apiKey = encryptionService.Decrypt(selectedKey.EncryptedApiKey, selectedKey.Iv);
                     string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={apiKey}";
 
-                    _logger.LogInformation("Batch attempt {Attempt}/{MaxRetries}: Using Key ID {KeyId}", 
+                    _logger.LogInformation("Batch attempt {Attempt}/{MaxRetries}: Using Key ID {KeyId} (round-robin)", 
                         attempt, settings.MaxRetries, selectedKey.Id);
 
                     var (responseText, tokensUsed, errorType, errorDetail, httpStatusCode) = 
@@ -493,8 +553,7 @@ namespace SubPhim.Server.Services
                         
                         if (attempt < settings.MaxRetries)
                         {
-                            // === SỬA LẠI: Delay theo cài đặt từ panel thay vì cố định ===
-                            await Task.Delay(settings.RetryDelayMs, token); // Tuân theo cài đặt RetryDelayMs từ Admin panel
+                            await Task.Delay(settings.RetryDelayMs, token);
                             continue; // Thử lại với key khác
                         }
                     }
@@ -559,7 +618,6 @@ namespace SubPhim.Server.Services
                     // === LỖI KHÁC (không phải 429, không nghiêm trọng) ===
                     if (attempt < settings.MaxRetries)
                     {
-                        // Tính delay theo exponential backoff với hệ số từ cài đặt
                         int delayMs = settings.RetryDelayMs * attempt;
                         
                         _logger.LogWarning("Batch attempt {Attempt} failed with Key ID {KeyId}. Error: {Error}. Retrying after {Delay}ms...",
@@ -595,42 +653,84 @@ namespace SubPhim.Server.Services
             }).ToList();
             
             return (failedResults, 0, null);
-            // === KẾT THÚC SỬA ĐỔI ===
         }
 
         /// <summary>
-        /// Lấy key khả dụng cho batch, loại trừ những key đã thử và đang trong cooldown
+        /// Chọn key bằng round-robin và đợi per-key RPM limiter
         /// </summary>
-        private async Task<ManagedApiKey> GetAvailableKeyForBatchAsync(
-            AppDbContext context, ApiPoolType poolType, HashSet<int> excludeKeyIds)
+        private async Task<ManagedApiKey> GetAvailableKeyWithRpmLimitAsync(
+            List<ManagedApiKey> availableKeys, ApiPoolType poolType, HashSet<int> excludeKeyIds, int rpmPerKey, CancellationToken token)
         {
-            var query = context.ManagedApiKeys
-                .Where(k => k.IsEnabled && k.PoolType == poolType);
-            
-            if (excludeKeyIds.Any())
-            {
-                query = query.Where(k => !excludeKeyIds.Contains(k.Id));
-            }
-            
-            var eligibleKeys = await query.ToListAsync();
-            
-            // Filter out keys in cooldown (in-memory check)
-            eligibleKeys = eligibleKeys
-                .Where(k => !_cooldownService.IsInCooldown(k.Id))
+            // Lọc keys chưa thử và không trong cooldown
+            var eligibleKeys = availableKeys
+                .Where(k => !excludeKeyIds.Contains(k.Id) && !_cooldownService.IsInCooldown(k.Id))
                 .ToList();
             
             if (!eligibleKeys.Any()) return null;
             
-            // Random selection từ pool
-            return eligibleKeys[Random.Shared.Next(eligibleKeys.Count)];
+            // === ROUND-ROBIN SELECTION: Đảm bảo phân bổ đều ===
+            ManagedApiKey selectedKey = GetNextKeyRoundRobin(eligibleKeys, poolType);
+            
+            // === PER-KEY RPM LIMITER: Đảm bảo mỗi key tuân thủ RPM riêng ===
+            var semaphore = _keyRpmLimiters.GetOrAdd(selectedKey.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
+            
+            // Thử lấy slot từ semaphore (không chờ vô hạn)
+            if (await semaphore.WaitAsync(RPM_WAIT_TIMEOUT_MS, token))
+            {
+                // Tự động release sau 1 phút (60 giây = 1 phút trong context RPM)
+                ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
+                
+                _logger.LogDebug("Key ID {KeyId} selected via round-robin. RPM slots remaining: {Remaining}/{Total}", 
+                    selectedKey.Id, semaphore.CurrentCount, rpmPerKey);
+                
+                return selectedKey;
+            }
+            
+            // Nếu key đã đạt RPM limit, thử key tiếp theo
+            _logger.LogWarning("Key ID {KeyId} đã đạt giới hạn {Rpm} RPM, thử key khác", selectedKey.Id, rpmPerKey);
+            
+            // Thử các key còn lại
+            foreach (var key in eligibleKeys.Where(k => k.Id != selectedKey.Id))
+            {
+                var keySemaphore = _keyRpmLimiters.GetOrAdd(key.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
+                if (await keySemaphore.WaitAsync(RPM_WAIT_TIMEOUT_MS, token))
+                {
+                    ScheduleSemaphoreRelease(keySemaphore, TimeSpan.FromMinutes(1));
+                    
+                    _logger.LogDebug("Alternative Key ID {KeyId} selected. RPM slots remaining: {Remaining}/{Total}", 
+                        key.Id, keySemaphore.CurrentCount, rpmPerKey);
+                    
+                    return key;
+                }
+            }
+            
+            // Nếu tất cả key đều đạt RPM limit, chờ key đầu tiên
+            _logger.LogInformation("Tất cả keys đều đạt giới hạn RPM, đợi key ID {KeyId}...", selectedKey.Id);
+            await semaphore.WaitAsync(token);
+            ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
+            
+            return selectedKey;
         }
         
-        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết và random User-Agent ===== 
+        /// <summary>
+        /// Lên lịch release semaphore sau một khoảng thời gian (để đảm bảo RPM window)
+        /// </summary>
+        private static void ScheduleSemaphoreRelease(SemaphoreSlim semaphore, TimeSpan delay)
+        {
+            // Sử dụng Timer để release đáng tin cậy hơn fire-and-forget Task
+            var timer = new Timer(_ =>
+            {
+                try { semaphore.Release(); }
+                catch (ObjectDisposedException) { /* Semaphore đã bị disposed, ignore */ }
+            }, null, delay, Timeout.InfiniteTimeSpan);
+        }
+        
+        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết và random User-Agent per request ===== 
         private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
             string url, string jsonPayload, LocalApiSetting settings, int apiKeyId, CancellationToken token)
         {
-            // Lấy User-Agent cố định cho API key này
-            string userAgent = GetUserAgentForApiKey(apiKeyId);
+            // === MỚI: Tạo User-Agent ngẫu nhiên cho mỗi request để tránh fingerprinting ===
+            string userAgent = GenerateRandomUserAgent();
             
             for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
             {
@@ -645,7 +745,7 @@ namespace SubPhim.Server.Services
                         Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
                     };
                     
-                    // === THÊM: Random User-Agent header per API key để giảm 429 ===
+                    // === MỚI: Random User-Agent header per request để tránh rate limit ===
                     request.Headers.Add("User-Agent", userAgent);
 
                     _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request to API (Key ID: {KeyId})", 

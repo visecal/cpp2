@@ -31,6 +31,7 @@ builder.Services.AddHostedService<TtsKeyResetService>();
 builder.Services.AddHostedService<AioKeyResetService>();
 // === BẮT ĐẦU THÊM: Register Cooldown Services ===
 builder.Services.AddSingleton<ApiKeyCooldownService>(); // Singleton để share cache
+builder.Services.AddSingleton<JobCancellationService>(); // Singleton để quản lý cancellation tokens cho job dịch SRT
 builder.Services.AddHostedService<ManagedApiKeyResetService>(); // Background service
 // === KẾT THÚC THÊM ===
 builder.Services.AddHostedService<AioTtsBatchProcessorService>();

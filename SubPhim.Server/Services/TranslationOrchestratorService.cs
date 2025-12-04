@@ -19,6 +19,10 @@ namespace SubPhim.Server.Services
         private readonly ApiKeyCooldownService _cooldownService;
         // === KẾT THÚC THÊM ===
 
+        // === BẮT ĐẦU THÊM: Job Cancellation Service ===
+        private readonly JobCancellationService _cancellationService;
+        // === KẾT THÚC THÊM ===
+
         // === BẮT ĐẦU THÊM: Random User-Agent per API Key ===
         private static readonly ConcurrentDictionary<int, string> _apiKeyUserAgents = new();
         
@@ -72,12 +76,14 @@ namespace SubPhim.Server.Services
             IServiceProvider serviceProvider, 
             ILogger<TranslationOrchestratorService> logger, 
             IHttpClientFactory httpClientFactory,
-            ApiKeyCooldownService cooldownService)
+            ApiKeyCooldownService cooldownService,
+            JobCancellationService cancellationService)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
             _httpClientFactory = httpClientFactory;
             _cooldownService = cooldownService;
+            _cancellationService = cancellationService;
         }
 
         public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial)
@@ -107,7 +113,7 @@ namespace SubPhim.Server.Services
             {
                 user.LocalSrtLinesUsedToday += requestedLines;
                 var sessionId = await CreateJobInDb(user, genre, targetLanguage, systemInstruction, allLines, context);
-                _ = ProcessJob(sessionId, user.Tier);
+                _ = ProcessJob(sessionId, user.Id, user.Tier);
                 return new CreateJobResult("Accepted", "OK", sessionId);
             }
 
@@ -118,7 +124,7 @@ namespace SubPhim.Server.Services
                     var partialLines = allLines.Take(remainingLines).ToList();
                     user.LocalSrtLinesUsedToday += partialLines.Count;
                     var sessionId = await CreateJobInDb(user, genre, targetLanguage, systemInstruction, partialLines, context);
-                    _ = ProcessJob(sessionId, user.Tier);
+                    _ = ProcessJob(sessionId, user.Id, user.Tier);
                     return new CreateJobResult("Accepted", "OK", sessionId);
                 }
                 else
@@ -176,10 +182,13 @@ namespace SubPhim.Server.Services
             return (isFinished, job.ErrorMessage);
         }
 
-        private async Task ProcessJob(string sessionId, SubscriptionTier userTier)
+        private async Task ProcessJob(string sessionId, int userId, SubscriptionTier userTier)
         {
             _logger.LogInformation("Starting HIGH-SPEED processing for job {SessionId} using {Tier} tier API pool", sessionId, userTier);
-            var cts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
+            
+            // === SỬA ĐỔI: Sử dụng JobCancellationService thay vì tạo CTS mới ===
+            var cancellationToken = _cancellationService.RegisterJob(sessionId, userId, timeoutMinutes: 15);
+            
             ApiPoolType poolToUse = (userTier == SubscriptionTier.Free) ? ApiPoolType.Free : ApiPoolType.Paid;
 
             try
@@ -188,7 +197,7 @@ namespace SubPhim.Server.Services
                 var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var encryptionService = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
 
-                var job = await context.TranslationJobs.FindAsync(new object[] { sessionId }, cts.Token);
+                var job = await context.TranslationJobs.FindAsync(new object[] { sessionId }, cancellationToken);
                 if (job == null)
                 {
                     _logger.LogError("Job {SessionId} not found in database at the start of processing.", sessionId);
@@ -196,16 +205,16 @@ namespace SubPhim.Server.Services
                 }
 
                 job.Status = JobStatus.Processing;
-                await context.SaveChangesAsync(cts.Token);
+                await context.SaveChangesAsync(cancellationToken);
 
-                var settings = await context.LocalApiSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == 1, cts.Token) ?? new LocalApiSetting();
-                var activeModel = await context.AvailableApiModels.AsNoTracking().FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cts.Token);
+                var settings = await context.LocalApiSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == 1, cancellationToken) ?? new LocalApiSetting();
+                var activeModel = await context.AvailableApiModels.AsNoTracking().FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cancellationToken);
                 if (activeModel == null) throw new Exception($"Không có model nào đang hoạt động cho nhóm '{poolToUse}'.");
 
                 // === SỬA ĐỔI: Lọc bỏ keys đang trong cooldown ===
                 var enabledKeys = await context.ManagedApiKeys.AsNoTracking()
                     .Where(k => k.IsEnabled && k.PoolType == poolToUse)
-                    .ToListAsync(cts.Token);
+                    .ToListAsync(cancellationToken);
                 
                 // Filter out keys in cooldown
                 enabledKeys = enabledKeys.Where(k => !_cooldownService.IsInCooldown(k.Id)).ToList();
@@ -227,7 +236,7 @@ namespace SubPhim.Server.Services
                 var allLines = await context.OriginalSrtLines.AsNoTracking()
                     .Where(l => l.SessionId == sessionId)
                     .OrderBy(l => l.LineIndex)
-                    .ToListAsync(cts.Token);
+                    .ToListAsync(cancellationToken);
 
                 var batches = allLines
                     .Select((line, index) => new { line, index })
@@ -242,7 +251,13 @@ namespace SubPhim.Server.Services
 
                 for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                 {
-                    if (cts.IsCancellationRequested) break;
+                    // === THÊM MỚI: Kiểm tra cancellation trước mỗi batch ===
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        _logger.LogInformation("Job {SessionId}: Cancellation requested, stopping at batch {BatchIndex}/{TotalBatches}",
+                            sessionId, batchIndex + 1, batches.Count);
+                        break;
+                    }
                     
                     var batch = batches[batchIndex];
                     
@@ -251,11 +266,11 @@ namespace SubPhim.Server.Services
                     {
                         _logger.LogInformation("Job {SessionId}: Waiting {DelayMs}ms before batch {BatchIndex}/{TotalBatches}", 
                             sessionId, settings.DelayBetweenBatchesMs, batchIndex + 1, batches.Count);
-                        await Task.Delay(settings.DelayBetweenBatchesMs, cts.Token);
+                        await Task.Delay(settings.DelayBetweenBatchesMs, cancellationToken);
                     }
                     // === KẾT THÚC THÊM ===
                     
-                    await rpmLimiter.WaitAsync(cts.Token);
+                    await rpmLimiter.WaitAsync(cancellationToken);
                     processingTasks.Add(Task.Run(async () =>
                     {
                         try
@@ -263,7 +278,7 @@ namespace SubPhim.Server.Services
                             // === SỬA ĐỔI: Gọi TranslateBatchAsync với context và settings ===
                             var (translatedBatch, tokensUsed, usedKeyId) = await TranslateBatchAsync(
                                 batch, job, settings, activeModel.ModelName, job.SystemInstruction, 
-                                poolToUse, encryptionService, cts.Token);
+                                poolToUse, encryptionService, cancellationToken);
                             
                             await SaveResultsToDb(sessionId, translatedBatch);
                             
@@ -276,7 +291,10 @@ namespace SubPhim.Server.Services
                             }
                             // === KẾT THÚC SỬA ĐỔI ===
                         }
-                        catch (OperationCanceledException) { }
+                        catch (OperationCanceledException) 
+                        { 
+                            _logger.LogInformation("Batch processing cancelled for job {SessionId}", sessionId);
+                        }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "Lỗi xử lý batch cho job {SessionId}", sessionId);
@@ -291,25 +309,42 @@ namespace SubPhim.Server.Services
                             }).ToList();
                             await SaveResultsToDb(sessionId, errorResults);
                         }
-                    }, cts.Token));
+                    }, cancellationToken));
                 }
 
                 await Task.WhenAll(processingTasks);
                 _logger.LogInformation("All batches for job {SessionId} completed. Checking for errors and refunding if needed...", sessionId);
 
                 await CheckAndRefundFailedLinesAsync(sessionId);
-                await UpdateJobStatus(sessionId, JobStatus.Completed);
+                
+                // === SỬA ĐỔI: Kiểm tra nếu job bị hủy ===
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogWarning("Job {SessionId} đã bị hủy bởi người dùng.", sessionId);
+                    await UpdateJobStatus(sessionId, JobStatus.Failed, "Job đã bị hủy bởi người dùng.");
+                }
+                else
+                {
+                    await UpdateJobStatus(sessionId, JobStatus.Completed);
+                }
+                // === KẾT THÚC SỬA ĐỔI ===
 
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning("Job {SessionId} đã bị hủy do timeout.", sessionId);
-                await UpdateJobStatus(sessionId, JobStatus.Failed, "Job timed out.");
+                _logger.LogWarning("Job {SessionId} đã bị hủy (timeout hoặc user request).", sessionId);
+                await CheckAndRefundFailedLinesAsync(sessionId);
+                await UpdateJobStatus(sessionId, JobStatus.Failed, "Job đã bị hủy.");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Lỗi nghiêm trọng trong quá trình xử lý job {SessionId}", sessionId);
                 await UpdateJobStatus(sessionId, JobStatus.Failed, ex.Message);
+            }
+            finally
+            {
+                // === THÊM MỚI: Hủy đăng ký job khi hoàn thành ===
+                _cancellationService.UnregisterJob(sessionId, userId);
             }
         }
 

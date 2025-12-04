@@ -116,20 +116,20 @@ public class LauncherAioController : ControllerBase
 
             _logger.LogInformation("User ID {UserId} requested to cancel job {SessionId}", userId, sessionId);
 
-            var (success, message) = await _cancellationService.CancelJobAsync(sessionId, userId);
+            var (success, errorCode, message) = await _cancellationService.CancelJobAsync(sessionId, userId);
 
             if (success)
             {
                 return Ok(new CancelJobResponse(true, message));
             }
 
-            // Kiểm tra nếu lỗi là do không có quyền
-            if (message.Contains("quyền"))
+            // Sử dụng error code để xác định HTTP status
+            return errorCode switch
             {
-                return StatusCode(403, new CancelJobResponse(false, message));
-            }
-
-            return BadRequest(new CancelJobResponse(false, message));
+                "FORBIDDEN" => StatusCode(403, new CancelJobResponse(false, message)),
+                "NOT_FOUND" => NotFound(new CancelJobResponse(false, message)),
+                _ => BadRequest(new CancelJobResponse(false, message))
+            };
         }
         catch (Exception ex)
         {

@@ -538,5 +538,4 @@ if __name__ == '__main__':
 ## Liên hệ hỗ trợ
 
 Nếu có câu hỏi hoặc gặp vấn đề khi tích hợp, vui lòng liên hệ:
-- Email: support@example.com
-- Issues: https://github.com/your-repo/issues
+- GitHub Issues: https://github.com/visecal/cpp2/issues

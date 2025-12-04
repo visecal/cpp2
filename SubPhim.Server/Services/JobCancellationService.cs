@@ -13,11 +13,12 @@ namespace SubPhim.Server.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<JobCancellationService> _logger;
 
-        // Lưu trữ CancellationTokenSource cho mỗi job theo sessionId
-        private static readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCancellationTokens = new();
+        // Lưu trữ CancellationTokenSource cho mỗi job theo sessionId (instance field thay vì static)
+        private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCancellationTokens = new();
 
         // Lưu trữ mapping userId -> danh sách sessionId để hủy nhanh tất cả job của một user
-        private static readonly ConcurrentDictionary<int, ConcurrentBag<string>> _userJobs = new();
+        // Sử dụng ConcurrentDictionary<string, bool> thay vì ConcurrentBag để hỗ trợ O(1) removal
+        private readonly ConcurrentDictionary<int, ConcurrentDictionary<string, bool>> _userJobs = new();
 
         public JobCancellationService(IServiceProvider serviceProvider, ILogger<JobCancellationService> logger)
         {
@@ -38,9 +39,9 @@ namespace SubPhim.Server.Services
 
             if (_jobCancellationTokens.TryAdd(sessionId, cts))
             {
-                // Thêm sessionId vào danh sách job của user
-                var userJobs = _userJobs.GetOrAdd(userId, _ => new ConcurrentBag<string>());
-                userJobs.Add(sessionId);
+                // Thêm sessionId vào danh sách job của user (O(1) operation)
+                var userJobs = _userJobs.GetOrAdd(userId, _ => new ConcurrentDictionary<string, bool>());
+                userJobs.TryAdd(sessionId, true);
 
                 _logger.LogInformation("Registered job {SessionId} for User ID {UserId} with {Timeout} minute timeout",
                     sessionId, userId, timeoutMinutes);
@@ -57,8 +58,8 @@ namespace SubPhim.Server.Services
         /// </summary>
         /// <param name="sessionId">ID của job cần hủy</param>
         /// <param name="userId">ID của user (để xác thực quyền hủy)</param>
-        /// <returns>True nếu hủy thành công, False nếu không tìm thấy hoặc không có quyền</returns>
-        public async Task<(bool Success, string Message)> CancelJobAsync(string sessionId, int userId)
+        /// <returns>Tuple (Success, ErrorCode, Message) - ErrorCode: null nếu thành công, "NOT_FOUND", "FORBIDDEN", "ALREADY_COMPLETED", "ALREADY_FAILED"</returns>
+        public async Task<(bool Success, string? ErrorCode, string Message)> CancelJobAsync(string sessionId, int userId)
         {
             // Kiểm tra quyền sở hữu job
             using var scope = _serviceProvider.CreateScope();
@@ -70,25 +71,25 @@ namespace SubPhim.Server.Services
             if (job == null)
             {
                 _logger.LogWarning("Cancel request for non-existent job {SessionId}", sessionId);
-                return (false, "Không tìm thấy job.");
+                return (false, "NOT_FOUND", "Không tìm thấy job.");
             }
 
             if (job.UserId != userId)
             {
                 _logger.LogWarning("User {UserId} attempted to cancel job {SessionId} owned by User {OwnerId}",
                     userId, sessionId, job.UserId);
-                return (false, "Bạn không có quyền hủy job này.");
+                return (false, "FORBIDDEN", "Bạn không có quyền hủy job này.");
             }
 
             // Kiểm tra trạng thái job
             if (job.Status == JobStatus.Completed)
             {
-                return (false, "Job đã hoàn thành, không thể hủy.");
+                return (false, "ALREADY_COMPLETED", "Job đã hoàn thành, không thể hủy.");
             }
 
             if (job.Status == JobStatus.Failed)
             {
-                return (false, "Job đã thất bại trước đó.");
+                return (false, "ALREADY_FAILED", "Job đã thất bại trước đó.");
             }
 
             // Hủy CancellationToken
@@ -121,7 +122,7 @@ namespace SubPhim.Server.Services
             // Hoàn trả lượt dịch cho user
             await RefundCancelledJobAsync(sessionId, userId);
 
-            return (true, "Đã hủy job thành công.");
+            return (true, null, "Đã hủy job thành công.");
         }
 
         /// <summary>
@@ -135,7 +136,8 @@ namespace SubPhim.Server.Services
 
             if (_userJobs.TryGetValue(userId, out var userJobs))
             {
-                var sessionIds = userJobs.ToArray();
+                // Lấy danh sách sessionIds từ keys của dictionary
+                var sessionIds = userJobs.Keys.ToArray();
 
                 foreach (var sessionId in sessionIds)
                 {
@@ -194,12 +196,10 @@ namespace SubPhim.Server.Services
                 _logger.LogDebug("Unregistered job {SessionId}", sessionId);
             }
 
-            // Xóa khỏi danh sách user jobs (không quan trọng nếu thất bại)
+            // Xóa khỏi danh sách user jobs với O(1) operation
             if (_userJobs.TryGetValue(userId, out var userJobs))
             {
-                // ConcurrentBag không hỗ trợ remove, nên ta rebuild lại
-                var newBag = new ConcurrentBag<string>(userJobs.Where(s => s != sessionId));
-                _userJobs.TryUpdate(userId, newBag, userJobs);
+                userJobs.TryRemove(sessionId, out _);
             }
         }
 

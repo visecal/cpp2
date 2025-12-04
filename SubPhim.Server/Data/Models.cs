@@ -534,6 +534,13 @@ namespace SubPhim.Server.Data
         [Display(Name = "Thinking Budget (IQ AI)")]
         public int ThinkingBudget { get; set; } = 8192;
 
+        // --- GLOBAL RATE LIMIT SETTINGS ---
+        [Display(Name = "Giới hạn Request toàn server")]
+        public int GlobalMaxRequests { get; set; } = 20;
+
+        [Display(Name = "Cửa sổ thời gian (phút)")]
+        public int GlobalWindowMinutes { get; set; } = 2;
+
         // --- KẾT THÚC THÊM CÁC TRƯỜNG MỚI ---
     }
     public class AioTtsServiceAccount

@@ -69,6 +69,30 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <hr class="my-3" />
+                    <h6 class="text-primary mb-3"><i class="bi bi-speedometer2 me-1"></i> Giới hạn tốc độ toàn server</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.GlobalMaxRequests" class="form-label">Số Request tối đa</label>
+                            <input asp-for="GlobalSettings.GlobalMaxRequests" class="form-control" />
+                            <small class="text-muted">Số request tối đa được xử lý đồng thời trên toàn server</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.GlobalWindowMinutes" class="form-label">Thời gian cửa sổ (phút)</label>
+                            <input asp-for="GlobalSettings.GlobalWindowMinutes" class="form-control" />
+                            <small class="text-muted">Khi request hoàn thành, slot sẽ được giải phóng cho request mới</small>
+                        </div>
+                        <div class="col-md-4 mb-3 d-flex align-items-center">
+                            <div class="alert alert-info mb-0 py-2 w-100">
+                                <small>
+                                    <strong>Mặc định:</strong> 20 request / 2 phút<br/>
+                                    <i class="bi bi-info-circle me-1"></i>Áp dụng cho TẤT CẢ job từ mọi user
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <button type="submit" class="btn btn-info">Lưu Cài Đặt Chung</button>
                 </form>
             </div>

@@ -338,7 +338,7 @@ namespace SubPhim.Server.Services
                     }
                     // === KẾT THÚC THÊM ===
                     
-                    // Capture batch index for closure
+                    // Capture batch index for closure - cần thiết vì batchIndex được thay đổi trong loop
                     int currentBatchIndex = batchIndex;
                     
                     // === MỚI: Áp dụng Global Rate Limiter trước khi xử lý batch ===

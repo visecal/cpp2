@@ -23,6 +23,10 @@ namespace SubPhim.Server.Services
 
         // Lock để đảm bảo việc cập nhật settings thread-safe
         private readonly object _configLock = new();
+        
+        // Cache cho settings refresh - refresh tối đa mỗi 5 giây
+        private DateTime _lastSettingsRefresh = DateTime.MinValue;
+        private readonly TimeSpan _settingsRefreshInterval = TimeSpan.FromSeconds(5);
 
         public GlobalRequestRateLimiterService(
             IServiceProvider serviceProvider,
@@ -42,15 +46,24 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Cập nhật cài đặt từ database nếu có thay đổi
+        /// Cập nhật cài đặt từ database nếu có thay đổi.
+        /// Sử dụng cơ chế cache để giảm tải database.
         /// </summary>
-        public async Task RefreshSettingsAsync()
+        public async Task RefreshSettingsAsync(bool forceRefresh = false)
         {
+            // Kiểm tra cache - chỉ refresh nếu đã quá interval hoặc force
+            if (!forceRefresh && DateTime.UtcNow - _lastSettingsRefresh < _settingsRefreshInterval)
+            {
+                return;
+            }
+
             try
             {
                 using var scope = _serviceProvider.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var settings = await context.LocalApiSettings.FindAsync(1);
+
+                _lastSettingsRefresh = DateTime.UtcNow;
 
                 if (settings == null)
                 {
@@ -76,6 +89,7 @@ namespace SubPhim.Server.Services
 
                         // Tạo semaphore mới nếu capacity thay đổi
                         // Sử dụng volatile và chỉ swap reference - không dispose ngay để tránh race condition
+                        // với các thread đang chờ WaitAsync() hoặc gọi Release()
                         if (needsNewSemaphore)
                         {
                             _currentMaxRequests = newMaxRequests;

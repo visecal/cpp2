@@ -20,11 +20,15 @@ namespace SubPhim.Server.Services
 
         // === RPM Limiter per API Key - Đảm bảo mỗi key tôn trọng RPM riêng ===
         private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
+        private static readonly ConcurrentDictionary<int, int> _keyRpmCapacities = new(); // Track capacity per key
         
         // === Round-Robin Index per Pool - Đảm bảo phân bổ đều request giữa các key ===
         private static int _paidKeyRoundRobinIndex = 0;
         private static int _freeKeyRoundRobinIndex = 0;
         private static readonly object _roundRobinLock = new();
+        
+        // === Constants ===
+        private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
         // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
@@ -92,6 +96,38 @@ namespace SubPhim.Server.Services
                     _freeKeyRoundRobinIndex++;
                 }
                 return eligibleKeys[currentIndex];
+            }
+        }
+        
+        /// <summary>
+        /// Đảm bảo key có RPM limiter với capacity đúng. Tạo mới nếu cần.
+        /// </summary>
+        private void EnsureKeyRpmLimiter(int keyId, int rpmCapacity)
+        {
+            // Kiểm tra capacity đã lưu
+            if (_keyRpmCapacities.TryGetValue(keyId, out int currentCapacity) && currentCapacity == rpmCapacity)
+            {
+                // Capacity không thay đổi, không cần làm gì
+                return;
+            }
+            
+            // Capacity thay đổi hoặc chưa có, cần tạo/cập nhật semaphore
+            lock (_roundRobinLock) // Sử dụng lock để tránh race condition
+            {
+                // Double-check sau khi lấy lock
+                if (_keyRpmCapacities.TryGetValue(keyId, out currentCapacity) && currentCapacity == rpmCapacity)
+                    return;
+                
+                // Dispose old semaphore nếu có
+                if (_keyRpmLimiters.TryRemove(keyId, out var oldSemaphore))
+                {
+                    try { oldSemaphore.Dispose(); }
+                    catch { /* Ignore dispose errors */ }
+                }
+                
+                // Tạo semaphore mới
+                _keyRpmLimiters[keyId] = new SemaphoreSlim(rpmCapacity, rpmCapacity);
+                _keyRpmCapacities[keyId] = rpmCapacity;
             }
         }
 
@@ -253,13 +289,8 @@ namespace SubPhim.Server.Services
                 // Đảm bảo mỗi key có SemaphoreSlim riêng để tuân thủ RPM
                 foreach (var key in enabledKeys)
                 {
-                    var semaphore = _keyRpmLimiters.GetOrAdd(key.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
-                    // Reset semaphore nếu capacity thay đổi (admin thay đổi cài đặt RPM)
-                    if (semaphore.CurrentCount != rpmPerKey)
-                    {
-                        _keyRpmLimiters.TryRemove(key.Id, out _);
-                        _keyRpmLimiters.GetOrAdd(key.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
-                    }
+                    // Kiểm tra capacity đã lưu và tạo/cập nhật semaphore nếu cần
+                    EnsureKeyRpmLimiter(key.Id, rpmPerKey);
                 }
                 
                 _logger.LogInformation("Job {SessionId}: Using {KeyCount} API keys, each with {Rpm} RPM (from Admin settings)", 
@@ -643,15 +674,11 @@ namespace SubPhim.Server.Services
             // === PER-KEY RPM LIMITER: Đảm bảo mỗi key tuân thủ RPM riêng ===
             var semaphore = _keyRpmLimiters.GetOrAdd(selectedKey.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
             
-            // Thử lấy slot từ semaphore (không chờ vô hạn, thử trong 100ms)
-            if (await semaphore.WaitAsync(100, token))
+            // Thử lấy slot từ semaphore (không chờ vô hạn)
+            if (await semaphore.WaitAsync(RPM_WAIT_TIMEOUT_MS, token))
             {
-                // Tự động release sau 1 phút
-                _ = Task.Delay(TimeSpan.FromMinutes(1)).ContinueWith(_ => 
-                {
-                    try { semaphore.Release(); }
-                    catch (ObjectDisposedException) { }
-                });
+                // Tự động release sau 1 phút (60 giây = 1 phút trong context RPM)
+                ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
                 
                 _logger.LogDebug("Key ID {KeyId} selected via round-robin. RPM slots remaining: {Remaining}/{Total}", 
                     selectedKey.Id, semaphore.CurrentCount, rpmPerKey);
@@ -666,13 +693,9 @@ namespace SubPhim.Server.Services
             foreach (var key in eligibleKeys.Where(k => k.Id != selectedKey.Id))
             {
                 var keySemaphore = _keyRpmLimiters.GetOrAdd(key.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
-                if (await keySemaphore.WaitAsync(100, token))
+                if (await keySemaphore.WaitAsync(RPM_WAIT_TIMEOUT_MS, token))
                 {
-                    _ = Task.Delay(TimeSpan.FromMinutes(1)).ContinueWith(_ => 
-                    {
-                        try { keySemaphore.Release(); }
-                        catch (ObjectDisposedException) { }
-                    });
+                    ScheduleSemaphoreRelease(keySemaphore, TimeSpan.FromMinutes(1));
                     
                     _logger.LogDebug("Alternative Key ID {KeyId} selected. RPM slots remaining: {Remaining}/{Total}", 
                         key.Id, keySemaphore.CurrentCount, rpmPerKey);
@@ -684,13 +707,22 @@ namespace SubPhim.Server.Services
             // Nếu tất cả key đều đạt RPM limit, chờ key đầu tiên
             _logger.LogInformation("Tất cả keys đều đạt giới hạn RPM, đợi key ID {KeyId}...", selectedKey.Id);
             await semaphore.WaitAsync(token);
-            _ = Task.Delay(TimeSpan.FromMinutes(1)).ContinueWith(_ => 
-            {
-                try { semaphore.Release(); }
-                catch (ObjectDisposedException) { }
-            });
+            ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
             
             return selectedKey;
+        }
+        
+        /// <summary>
+        /// Lên lịch release semaphore sau một khoảng thời gian (để đảm bảo RPM window)
+        /// </summary>
+        private static void ScheduleSemaphoreRelease(SemaphoreSlim semaphore, TimeSpan delay)
+        {
+            // Sử dụng Timer để release đáng tin cậy hơn fire-and-forget Task
+            var timer = new Timer(_ =>
+            {
+                try { semaphore.Release(); }
+                catch (ObjectDisposedException) { /* Semaphore đã bị disposed, ignore */ }
+            }, null, delay, Timeout.InfiniteTimeSpan);
         }
         
         // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết và random User-Agent per request ===== 

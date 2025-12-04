@@ -14,12 +14,12 @@ namespace SubPhim.Server.Services
         private readonly ILogger<GlobalRequestRateLimiterService> _logger;
 
         // Semaphore để kiểm soát số concurrent requests
-        private SemaphoreSlim _semaphore;
-        private int _currentMaxRequests;
-        private int _currentWindowMinutes;
+        private volatile SemaphoreSlim _semaphore;
+        private volatile int _currentMaxRequests;
+        private volatile int _currentWindowMinutes;
 
         // Track timestamps của các request đang chạy để auto-release
-        private readonly ConcurrentDictionary<string, DateTime> _activeRequests = new();
+        private readonly ConcurrentDictionary<string, (DateTime StartTime, CancellationTokenSource AutoReleaseCts)> _activeRequests = new();
 
         // Lock để đảm bảo việc cập nhật settings thread-safe
         private readonly object _configLock = new();
@@ -63,25 +63,26 @@ namespace SubPhim.Server.Services
 
                 lock (_configLock)
                 {
-                    if (newMaxRequests != _currentMaxRequests || newWindowMinutes != _currentWindowMinutes)
+                    bool needsNewSemaphore = newMaxRequests != _currentMaxRequests;
+                    
+                    if (needsNewSemaphore || newWindowMinutes != _currentWindowMinutes)
                     {
                         _logger.LogInformation(
                             "Updating GlobalRequestRateLimiter: {OldMax}/{OldWindow}min -> {NewMax}/{NewWindow}min",
                             _currentMaxRequests, _currentWindowMinutes, newMaxRequests, newWindowMinutes);
 
-                        // Tạo semaphore mới nếu capacity thay đổi
-                        if (newMaxRequests != _currentMaxRequests)
-                        {
-                            var oldSemaphore = _semaphore;
-                            _semaphore = new SemaphoreSlim(newMaxRequests, newMaxRequests);
-                            _currentMaxRequests = newMaxRequests;
-
-                            // Dispose old semaphore
-                            try { oldSemaphore?.Dispose(); }
-                            catch { /* Ignore */ }
-                        }
-
+                        // Cập nhật window minutes trước
                         _currentWindowMinutes = newWindowMinutes;
+
+                        // Tạo semaphore mới nếu capacity thay đổi
+                        // Sử dụng volatile và chỉ swap reference - không dispose ngay để tránh race condition
+                        if (needsNewSemaphore)
+                        {
+                            _currentMaxRequests = newMaxRequests;
+                            // Tạo semaphore mới, để cho GC thu dọn cái cũ
+                            // Việc này an toàn hơn so với dispose vì các thread đang chờ sẽ không bị exception
+                            _semaphore = new SemaphoreSlim(newMaxRequests, newMaxRequests);
+                        }
                     }
                 }
             }
@@ -96,10 +97,11 @@ namespace SubPhim.Server.Services
         /// </summary>
         public (int maxRequests, int windowMinutes, int availableSlots, int activeRequests) GetCurrentStatus()
         {
+            var semaphore = _semaphore; // Capture reference để tránh race condition
             return (
                 _currentMaxRequests,
                 _currentWindowMinutes,
-                _semaphore.CurrentCount,
+                semaphore.CurrentCount,
                 _activeRequests.Count
             );
         }
@@ -115,23 +117,27 @@ namespace SubPhim.Server.Services
 
             var requestId = $"{jobId}_{Guid.NewGuid():N}";
             var startWait = DateTime.UtcNow;
+            var semaphore = _semaphore; // Capture reference
 
             _logger.LogDebug(
                 "Job {JobId} waiting for global rate limit slot. Available: {Available}/{Max}",
-                jobId, _semaphore.CurrentCount, _currentMaxRequests);
+                jobId, semaphore.CurrentCount, _currentMaxRequests);
 
             // Đợi có slot khả dụng
-            await _semaphore.WaitAsync(cancellationToken);
+            await semaphore.WaitAsync(cancellationToken);
 
             var waitTime = DateTime.UtcNow - startWait;
-            _activeRequests[requestId] = DateTime.UtcNow;
+            
+            // Tạo CTS cho auto-release
+            var autoReleaseCts = new CancellationTokenSource();
+            _activeRequests[requestId] = (DateTime.UtcNow, autoReleaseCts);
 
             _logger.LogInformation(
                 "Job {JobId} acquired slot after {WaitMs}ms. Active: {Active}/{Max}",
                 jobId, waitTime.TotalMilliseconds, _activeRequests.Count, _currentMaxRequests);
 
             // Đặt timer tự động release sau window time để tránh leak
-            ScheduleAutoRelease(requestId, TimeSpan.FromMinutes(_currentWindowMinutes));
+            ScheduleAutoRelease(requestId, semaphore, TimeSpan.FromMinutes(_currentWindowMinutes), autoReleaseCts.Token);
 
             return requestId;
         }
@@ -141,9 +147,20 @@ namespace SubPhim.Server.Services
         /// </summary>
         public void ReleaseSlot(string requestId)
         {
-            if (_activeRequests.TryRemove(requestId, out var startTime))
+            if (_activeRequests.TryRemove(requestId, out var entry))
             {
-                var duration = DateTime.UtcNow - startTime;
+                var duration = DateTime.UtcNow - entry.StartTime;
+
+                // Hủy auto-release timer
+                try
+                {
+                    entry.AutoReleaseCts.Cancel();
+                    entry.AutoReleaseCts.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Ignore - already disposed
+                }
 
                 try
                 {
@@ -157,6 +174,11 @@ namespace SubPhim.Server.Services
                     // Đã được release bởi auto-release timer
                     _logger.LogDebug("Slot {RequestId} was already released by auto-release", requestId);
                 }
+                catch (ObjectDisposedException)
+                {
+                    // Semaphore đã bị disposed do settings change - ignore
+                    _logger.LogDebug("Slot {RequestId} release skipped - semaphore was replaced", requestId);
+                }
             }
         }
 
@@ -164,28 +186,47 @@ namespace SubPhim.Server.Services
         /// Lên lịch tự động release slot sau một khoảng thời gian.
         /// Đây là failsafe để tránh leak slot nếu request không gọi ReleaseSlot.
         /// </summary>
-        private void ScheduleAutoRelease(string requestId, TimeSpan delay)
+        private void ScheduleAutoRelease(string requestId, SemaphoreSlim semaphore, TimeSpan delay, CancellationToken cancellationToken)
         {
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
-                await Task.Delay(delay);
-
-                // Chỉ release nếu slot vẫn đang active (chưa được release manually)
-                if (_activeRequests.TryRemove(requestId, out _))
+                try
                 {
-                    try
+                    await Task.Delay(delay, cancellationToken);
+
+                    // Chỉ release nếu slot vẫn đang active (chưa được release manually)
+                    if (_activeRequests.TryRemove(requestId, out var entry))
                     {
-                        _semaphore.Release();
-                        _logger.LogWarning(
-                            "Auto-released slot {RequestId} after timeout {DelayMinutes}min",
-                            requestId, delay.TotalMinutes);
-                    }
-                    catch (SemaphoreFullException)
-                    {
-                        // Ignore - already at full capacity
+                        // Dispose CTS
+                        try { entry.AutoReleaseCts.Dispose(); }
+                        catch { /* Ignore */ }
+
+                        try
+                        {
+                            semaphore.Release();
+                            _logger.LogWarning(
+                                "Auto-released slot {RequestId} after timeout {DelayMinutes}min",
+                                requestId, delay.TotalMinutes);
+                        }
+                        catch (SemaphoreFullException)
+                        {
+                            // Ignore - already at full capacity
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            // Semaphore đã bị disposed - ignore
+                        }
                     }
                 }
-            });
+                catch (OperationCanceledException)
+                {
+                    // Task was cancelled because slot was released manually - this is expected
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error in auto-release for slot {RequestId}", requestId);
+                }
+            }, CancellationToken.None); // Use CancellationToken.None for the Task itself
         }
 
         /// <summary>

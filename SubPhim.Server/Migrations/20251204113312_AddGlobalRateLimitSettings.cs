@@ -15,14 +15,14 @@ namespace SubPhim.Server.Migrations
                 table: "LocalApiSettings",
                 type: "INTEGER",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 20);
 
             migrationBuilder.AddColumn<int>(
                 name: "GlobalWindowMinutes",
                 table: "LocalApiSettings",
                 type: "INTEGER",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 2);
         }
 
         /// <inheritdoc />

@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SubPhim.Server.Data;
 using SubPhim.Server.Models;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -16,6 +17,33 @@ namespace SubPhim.Server.Services
         private readonly IHttpClientFactory _httpClientFactory;
         // === BẮT ĐẦU THÊM: Cooldown Service ===
         private readonly ApiKeyCooldownService _cooldownService;
+        // === KẾT THÚC THÊM ===
+
+        // === BẮT ĐẦU THÊM: Random User-Agent per API Key ===
+        private static readonly ConcurrentDictionary<int, string> _apiKeyUserAgents = new();
+        private static readonly string[] _userAgentTemplates = new[]
+        {
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:{0}.0) Gecko/20100101 Firefox/{0}.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:{0}.0) Gecko/20100101 Firefox/{0}.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36 Edg/{0}.0.{1}.{2}",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
+            "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:{0}.0) Gecko/20100101 Firefox/{0}.0"
+        };
+
+        private static string GetUserAgentForApiKey(int apiKeyId)
+        {
+            return _apiKeyUserAgents.GetOrAdd(apiKeyId, id =>
+            {
+                var random = new Random(id); // Sử dụng apiKeyId làm seed để đảm bảo cùng key luôn có cùng User-Agent
+                var template = _userAgentTemplates[random.Next(_userAgentTemplates.Length)];
+                var majorVersion = random.Next(100, 131); // Chrome/Firefox versions
+                var buildNumber = random.Next(1000, 9999);
+                var patchNumber = random.Next(100, 999);
+                return string.Format(template, majorVersion, buildNumber, patchNumber);
+            });
+        }
         // === KẾT THÚC THÊM ===
 
         public record CreateJobResult(string Status, string Message, string SessionId = null, int RemainingLines = 0);
@@ -188,10 +216,25 @@ namespace SubPhim.Server.Services
                     .ToList();
 
                 var processingTasks = new List<Task>();
+                
+                _logger.LogInformation("Job {SessionId}: Processing {BatchCount} batches with {DelayMs}ms delay between batches", 
+                    sessionId, batches.Count, settings.DelayBetweenBatchesMs);
 
-                foreach (var batch in batches)
+                for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                 {
                     if (cts.IsCancellationRequested) break;
+                    
+                    var batch = batches[batchIndex];
+                    
+                    // === BẮT ĐẦU THÊM: Delay giữa các batch theo cài đặt ===
+                    if (batchIndex > 0 && settings.DelayBetweenBatchesMs > 0)
+                    {
+                        _logger.LogInformation("Job {SessionId}: Waiting {DelayMs}ms before batch {BatchIndex}/{TotalBatches}", 
+                            sessionId, settings.DelayBetweenBatchesMs, batchIndex + 1, batches.Count);
+                        await Task.Delay(settings.DelayBetweenBatchesMs, cts.Token);
+                    }
+                    // === KẾT THÚC THÊM ===
+                    
                     await rpmLimiter.WaitAsync(cts.Token);
                     processingTasks.Add(Task.Run(async () =>
                     {
@@ -383,7 +426,7 @@ namespace SubPhim.Server.Services
                         attempt, settings.MaxRetries, selectedKey.Id);
 
                     var (responseText, tokensUsed, errorType, errorDetail, httpStatusCode) = 
-                        await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, token);
+                        await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, selectedKey.Id, token);
 
                     // === XỬ LÝ LỖI 429 ===
                     if (httpStatusCode == 429)
@@ -527,10 +570,13 @@ namespace SubPhim.Server.Services
             return eligibleKeys[Random.Shared.Next(eligibleKeys.Count)];
         }
         
-        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết =====
+        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết và random User-Agent ===== 
         private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
-            string url, string jsonPayload, LocalApiSetting settings, CancellationToken token)
+            string url, string jsonPayload, LocalApiSetting settings, int apiKeyId, CancellationToken token)
         {
+            // Lấy User-Agent cố định cho API key này
+            string userAgent = GetUserAgentForApiKey(apiKeyId);
+            
             for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
             {
                 if (token.IsCancellationRequested)
@@ -543,8 +589,12 @@ namespace SubPhim.Server.Services
                     {
                         Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
                     };
+                    
+                    // === THÊM: Random User-Agent header per API key để giảm 429 ===
+                    request.Headers.Add("User-Agent", userAgent);
 
-                    _logger.LogInformation("Attempt {Attempt}/{MaxRetries}: Sending request to {Url}", attempt, settings.MaxRetries, url);
+                    _logger.LogInformation("Attempt {Attempt}/{MaxRetries}: Sending request to API with User-Agent: {UserAgent}", 
+                        attempt, settings.MaxRetries, userAgent.Substring(0, Math.Min(50, userAgent.Length)) + "...");
                     using HttpResponseMessage response = await httpClient.SendAsync(request, token);
                     string responseBody = await response.Content.ReadAsStringAsync(token);
 
@@ -554,8 +604,8 @@ namespace SubPhim.Server.Services
                         string errorType = $"HTTP_{statusCode}";
                         string errorMsg = $"HTTP Error {statusCode}";
 
-                        _logger.LogWarning("HTTP Error {StatusCode} from {Url}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
-                            statusCode, url, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
+                        _logger.LogWarning("HTTP Error {StatusCode}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
+                            statusCode, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
 
                         if (attempt < settings.MaxRetries)
                         {

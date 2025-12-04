@@ -17,6 +17,7 @@ namespace SubPhim.Server.Services
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ApiKeyCooldownService _cooldownService;
         private readonly JobCancellationService _cancellationService;
+        private readonly GlobalRequestRateLimiterService _globalRateLimiter;
 
         // === RPM Limiter per API Key - Đảm bảo mỗi key tôn trọng RPM riêng ===
         private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
@@ -138,13 +139,15 @@ namespace SubPhim.Server.Services
             ILogger<TranslationOrchestratorService> logger, 
             IHttpClientFactory httpClientFactory,
             ApiKeyCooldownService cooldownService,
-            JobCancellationService cancellationService)
+            JobCancellationService cancellationService,
+            GlobalRequestRateLimiterService globalRateLimiter)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
             _httpClientFactory = httpClientFactory;
             _cooldownService = cooldownService;
             _cancellationService = cancellationService;
+            _globalRateLimiter = globalRateLimiter;
         }
 
         public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial)
@@ -309,8 +312,10 @@ namespace SubPhim.Server.Services
 
                 var processingTasks = new List<Task>();
                 
-                _logger.LogInformation("Job {SessionId}: Processing {BatchCount} batches with {DelayMs}ms delay between batches", 
-                    sessionId, batches.Count, settings.DelayBetweenBatchesMs);
+                // Log global rate limiter status
+                var (maxReqs, windowMins, availSlots, activeReqs) = _globalRateLimiter.GetCurrentStatus();
+                _logger.LogInformation("Job {SessionId}: Processing {BatchCount} batches. Global rate limit: {MaxReqs}/{WindowMins}min (Available: {AvailSlots})",
+                    sessionId, batches.Count, maxReqs, windowMins, availSlots);
 
                 for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                 {
@@ -333,11 +338,19 @@ namespace SubPhim.Server.Services
                     }
                     // === KẾT THÚC THÊM ===
                     
-                    // === MỚI: Không sử dụng global rpmLimiter, per-key limiter được xử lý trong TranslateBatchAsync ===
+                    // Capture batch index for closure - cần thiết vì batchIndex được thay đổi trong loop
+                    int currentBatchIndex = batchIndex;
+                    
+                    // === MỚI: Áp dụng Global Rate Limiter trước khi xử lý batch ===
                     processingTasks.Add(Task.Run(async () =>
                     {
+                        string? rateLimitSlotId = null;
                         try
                         {
+                            // === GLOBAL RATE LIMIT: Đợi slot khả dụng trước khi gửi API request ===
+                            rateLimitSlotId = await _globalRateLimiter.AcquireSlotAsync(
+                                $"{sessionId}_batch{currentBatchIndex}", cancellationToken);
+                            
                             // === SỬA ĐỔI: Truyền thêm enabledKeys và rpmPerKey để hỗ trợ round-robin và per-key RPM ===
                             var (translatedBatch, tokensUsed, usedKeyId) = await TranslateBatchAsync(
                                 batch, job, settings, activeModel.ModelName, job.SystemInstruction, 
@@ -371,6 +384,14 @@ namespace SubPhim.Server.Services
                                 ErrorDetail = ex.Message
                             }).ToList();
                             await SaveResultsToDb(sessionId, errorResults);
+                        }
+                        finally
+                        {
+                            // === GLOBAL RATE LIMIT: Giải phóng slot sau khi hoàn thành ===
+                            if (rateLimitSlotId != null)
+                            {
+                                _globalRateLimiter.ReleaseSlot(rateLimitSlotId);
+                            }
                         }
                     }, cancellationToken));
                 }

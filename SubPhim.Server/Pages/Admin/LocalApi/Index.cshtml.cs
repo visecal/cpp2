@@ -66,6 +66,10 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
             [Required][Range(1, 32000)] public int MaxOutputTokens { get; set; }
             public bool EnableThinkingBudget { get; set; }
             [Range(0, 16384)] public int ThinkingBudget { get; set; }
+            
+            // Global Rate Limiting Settings
+            [Required][Range(1, 1000)] public int GlobalMaxRequests { get; set; }
+            [Required][Range(1, 60)] public int GlobalWindowMinutes { get; set; }
         }
         #endregion
 
@@ -83,7 +87,9 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 Temperature = settingsFromDb.Temperature,
                 MaxOutputTokens = settingsFromDb.MaxOutputTokens,
                 EnableThinkingBudget = settingsFromDb.EnableThinkingBudget,
-                ThinkingBudget = settingsFromDb.ThinkingBudget
+                ThinkingBudget = settingsFromDb.ThinkingBudget,
+                GlobalMaxRequests = settingsFromDb.GlobalMaxRequests,
+                GlobalWindowMinutes = settingsFromDb.GlobalWindowMinutes
             };
         }
         public async Task<IActionResult> OnPostDeleteSelectedKeysAsync([FromForm] int[] selectedKeyIds)
@@ -183,6 +189,8 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 settingsInDb.MaxOutputTokens = GlobalSettings.MaxOutputTokens;
                 settingsInDb.EnableThinkingBudget = GlobalSettings.EnableThinkingBudget;
                 settingsInDb.ThinkingBudget = GlobalSettings.ThinkingBudget;
+                settingsInDb.GlobalMaxRequests = GlobalSettings.GlobalMaxRequests;
+                settingsInDb.GlobalWindowMinutes = GlobalSettings.GlobalWindowMinutes;
                 await _context.SaveChangesAsync();
                 SuccessMessage = "Đã lưu thành công cài đặt chung.";
             }

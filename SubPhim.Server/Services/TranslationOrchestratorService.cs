@@ -753,28 +753,27 @@ namespace SubPhim.Server.Services
         private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
             string url, string jsonPayload, LocalApiSetting settings, int apiKeyId, CancellationToken token)
         {
-            // === MỚI: Tạo User-Agent ngẫu nhiên cho mỗi request để tránh fingerprinting ===
+            // Generate random User-Agent once per request to avoid fingerprinting
             string userAgent = GenerateRandomUserAgent();
+            
+            // Get proxy once at the start - reuse for all retries unless connection fails
+            Proxy? currentProxy = await _proxyService.GetNextProxyAsync();
             
             for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
             {
                 if (token.IsCancellationRequested)
                     return ("Lỗi: Tác vụ đã bị hủy.", 0, "CANCELLED", "Task was cancelled", 0);
 
-                // === MỚI: Lấy proxy cho mỗi request để phân tán traffic ===
-                Proxy? currentProxy = null;
                 try
                 {
-                    currentProxy = await _proxyService.GetNextProxyAsync();
-                    
-                    // Tạo HttpClient với proxy (hoặc trực tiếp nếu không có proxy)
+                    // Create HttpClient with the current proxy (or direct if no proxy)
                     using var httpClient = _proxyService.CreateHttpClientWithProxy(currentProxy);
                     using var request = new HttpRequestMessage(HttpMethod.Post, url)
                     {
                         Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
                     };
                     
-                    // === MỚI: Random User-Agent header per request để tránh rate limit ===
+                    // Add random User-Agent header to avoid rate limiting
                     request.Headers.Add("User-Agent", userAgent);
 
                     if (currentProxy != null)
@@ -870,7 +869,6 @@ namespace SubPhim.Server.Services
 
                         return ($"Lỗi: {errorMsg}", 0, "FINISH_REASON", errorMsg, 200);
                     }
-                    // ===== KẾT THÚC THÊM MỚI =====
 
                     int tokens = parsedBody?["usageMetadata"]?["totalTokenCount"]?.Value<int>() ?? 0;
                     string responseText = parsedBody?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
@@ -889,17 +887,20 @@ namespace SubPhim.Server.Services
                         return ("Lỗi: API trả về phản hồi rỗng.", 0, "EMPTY_RESPONSE", "API returned empty response", 200);
                     }
 
-                    // Thành công
+                    // Success
                     return (responseText, tokens, null, null, 200);
                 }
                 catch (Exception ex)
                 {
-                    // Ghi nhận proxy failure nếu là lỗi kết nối
+                    // Record proxy failure and switch to a new proxy on connection errors
                     if (currentProxy != null && (ex is HttpRequestException || ex is TaskCanceledException))
                     {
                         await _proxyService.RecordProxyFailureAsync(currentProxy.Id, ex.Message);
-                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) failed: {Error}", 
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) connection failed: {Error}. Switching to a new proxy.", 
                             currentProxy.Id, currentProxy.Host, currentProxy.Port, ex.Message);
+                        
+                        // Get a new proxy for the next retry attempt on connection failures
+                        currentProxy = await _proxyService.GetNextProxyAsync();
                     }
                     
                     _logger.LogError(ex, "Exception during API call. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
@@ -914,7 +915,6 @@ namespace SubPhim.Server.Services
 
             return ("Lỗi API: Hết số lần thử lại.", 0, "MAX_RETRIES", "Exceeded maximum retry attempts", 0);
         }
-        // ===== KẾT THÚC SỬA ĐỔI =====
 
         private async Task UpdateJobStatus(string sessionId, JobStatus status, string errorMessage = null)
         {

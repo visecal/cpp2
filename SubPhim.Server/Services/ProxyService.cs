@@ -7,19 +7,23 @@ using System.Net.Sockets;
 namespace SubPhim.Server.Services
 {
     /// <summary>
-    /// Service để quản lý và luân phiên proxy cho các request HTTP đến Google API
-    /// Hỗ trợ SOCKS4, SOCKS5 và HTTP proxy
+    /// Service for managing and rotating proxies for Google API HTTP requests.
+    /// Supports SOCKS4, SOCKS5 and HTTP proxies.
     /// </summary>
     public class ProxyService
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<ProxyService> _logger;
         
-        // Round-robin index cho việc chọn proxy
+        // Configuration constants
+        private const int MaxConsecutiveFailuresBeforeDisable = 5;
+        private const int MaxFailureReasonLength = 500;
+        
+        // Round-robin index for proxy selection
         private static int _proxyRoundRobinIndex = 0;
         private static readonly object _proxyLock = new();
         
-        // Cache danh sách proxy để tránh query DB quá nhiều
+        // Proxy cache to avoid excessive DB queries
         private static List<Proxy> _cachedProxies = new();
         private static DateTime _lastCacheUpdate = DateTime.MinValue;
         private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(1);
@@ -31,7 +35,7 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Lấy proxy tiếp theo theo round-robin
+        /// Get the next proxy using round-robin selection.
         /// </summary>
         public async Task<Proxy?> GetNextProxyAsync()
         {
@@ -39,7 +43,7 @@ namespace SubPhim.Server.Services
             
             if (!proxies.Any())
             {
-                _logger.LogWarning("Không có proxy nào được kích hoạt. Request sẽ được gửi trực tiếp.");
+                _logger.LogWarning("No proxies are enabled. Requests will be sent directly.");
                 return null;
             }
 
@@ -59,11 +63,11 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Lấy danh sách proxy đang hoạt động (có cache)
+        /// Get list of enabled proxies (with caching).
         /// </summary>
         private async Task<List<Proxy>> GetEnabledProxiesAsync()
         {
-            // Kiểm tra cache
+            // Check cache validity
             if (DateTime.UtcNow - _lastCacheUpdate < CacheDuration && _cachedProxies.Any())
             {
                 return _cachedProxies;
@@ -85,7 +89,7 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Làm mới cache proxy (gọi khi có thay đổi từ Admin panel)
+        /// Invalidate proxy cache (call when changes are made from Admin panel).
         /// </summary>
         public void RefreshCache()
         {
@@ -94,7 +98,7 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Tạo HttpClient với proxy được cấu hình
+        /// Create HttpClient with the configured proxy.
         /// </summary>
         public HttpClient CreateHttpClientWithProxy(Proxy? proxy)
         {
@@ -117,7 +121,7 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Tạo HttpMessageHandler dựa trên loại proxy
+        /// Create HttpMessageHandler based on proxy type.
         /// </summary>
         private HttpMessageHandler CreateHttpMessageHandler(Proxy proxy)
         {
@@ -137,7 +141,7 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Tạo handler cho HTTP proxy
+        /// Create handler for HTTP proxy.
         /// </summary>
         private HttpClientHandler CreateHttpProxyHandler(Proxy proxy)
         {
@@ -157,7 +161,7 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Tạo handler cho SOCKS proxy (SOCKS4/SOCKS5)
+        /// Create handler for SOCKS proxy (SOCKS4/SOCKS5).
         /// </summary>
         private SocketsHttpHandler CreateSocksProxyHandler(Proxy proxy)
         {
@@ -175,7 +179,7 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Ghi nhận proxy đã được sử dụng thành công
+        /// Record a successful proxy usage.
         /// </summary>
         public async Task RecordProxySuccessAsync(int proxyId)
         {
@@ -199,7 +203,7 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Ghi nhận proxy bị lỗi
+        /// Record a proxy failure and optionally disable if too many consecutive failures.
         /// </summary>
         public async Task RecordProxyFailureAsync(int proxyId, string reason)
         {
@@ -213,15 +217,22 @@ namespace SubPhim.Server.Services
                 {
                     proxy.FailureCount++;
                     proxy.LastFailedAt = DateTime.UtcNow;
-                    proxy.LastFailureReason = reason?.Length > 500 ? reason.Substring(0, 500) : reason;
                     
-                    // Tự động vô hiệu hóa proxy nếu lỗi quá nhiều (5 lần liên tiếp)
-                    if (proxy.FailureCount >= 5)
+                    // Safely truncate reason to max length
+                    if (!string.IsNullOrEmpty(reason))
+                    {
+                        proxy.LastFailureReason = reason.Length > MaxFailureReasonLength 
+                            ? reason.Substring(0, MaxFailureReasonLength) 
+                            : reason;
+                    }
+                    
+                    // Auto-disable proxy after too many consecutive failures
+                    if (proxy.FailureCount >= MaxConsecutiveFailuresBeforeDisable)
                     {
                         proxy.IsEnabled = false;
-                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) disabled due to too many failures", 
-                            proxyId, proxy.Host, proxy.Port);
-                        RefreshCache(); // Refresh cache khi proxy bị disable
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) disabled due to {FailureCount} consecutive failures", 
+                            proxyId, proxy.Host, proxy.Port, proxy.FailureCount);
+                        RefreshCache();
                     }
                     
                     await context.SaveChangesAsync();
@@ -234,11 +245,11 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Parse danh sách proxy từ text (mỗi dòng một proxy)
-        /// Hỗ trợ các định dạng:
-        /// - host:port (mặc định SOCKS5)
+        /// Parse proxy list from text (one proxy per line).
+        /// Supported formats:
+        /// - host:port (defaults to SOCKS5)
         /// - type://host:port (type = http, socks4, socks5)
-        /// - type://username:password@host:port (có authentication)
+        /// - type://username:password@host:port (with authentication)
         /// </summary>
         public List<Proxy> ParseProxyList(string proxyText)
         {
@@ -272,7 +283,7 @@ namespace SubPhim.Server.Services
             {
                 var proxy = new Proxy();
                 
-                // Xác định loại proxy
+                // Determine proxy type from scheme
                 if (line.StartsWith("socks5://", StringComparison.OrdinalIgnoreCase))
                 {
                     proxy.Type = ProxyType.Socks5;
@@ -295,11 +306,11 @@ namespace SubPhim.Server.Services
                 }
                 else
                 {
-                    // Mặc định là SOCKS5
+                    // Default to SOCKS5
                     proxy.Type = ProxyType.Socks5;
                 }
 
-                // Kiểm tra authentication (username:password@host:port)
+                // Check for authentication (username:password@host:port)
                 var atIndex = line.LastIndexOf('@');
                 if (atIndex > 0)
                 {
@@ -310,7 +321,7 @@ namespace SubPhim.Server.Services
                     if (authParts.Length >= 2)
                     {
                         proxy.Username = authParts[0];
-                        proxy.Password = string.Join(":", authParts.Skip(1)); // Password có thể chứa ':'
+                        proxy.Password = string.Join(":", authParts.Skip(1)); // Password may contain ':'
                     }
                     
                     line = hostPort;
@@ -351,7 +362,7 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Lấy số lượng proxy đang hoạt động
+        /// Get the count of active proxies.
         /// </summary>
         public async Task<int> GetActiveProxyCountAsync()
         {

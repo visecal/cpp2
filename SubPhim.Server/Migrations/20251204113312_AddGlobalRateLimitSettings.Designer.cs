@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SubPhim.Server.Data;
 
@@ -10,9 +11,11 @@ using SubPhim.Server.Data;
 namespace SubPhim.Server.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251204113312_AddGlobalRateLimitSettings")]
+    partial class AddGlobalRateLimitSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.7");
@@ -640,58 +643,6 @@ namespace SubPhim.Server.Migrations
                     b.HasIndex("SessionId");
 
                     b.ToTable("OriginalSrtLines");
-                });
-
-            modelBuilder.Entity("SubPhim.Server.Data.Proxy", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("FailureCount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Host")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("LastFailedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LastFailureReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("LastUsedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Password")
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Port")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("UsageCount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Username")
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Proxies");
                 });
 
             modelBuilder.Entity("SubPhim.Server.Data.SaOcrServiceAccount", b =>

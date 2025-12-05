@@ -28,6 +28,7 @@ namespace SubPhim.Server.Data
         public DbSet<TtsModelSetting> TtsModelSettings { get; set; }
         public DbSet<UpdateInfo> UpdateInfos { get; set; }
         public DbSet<SaOcrServiceAccount> SaOcrServiceAccounts { get; set; }
+        public DbSet<Proxy> Proxies { get; set; }
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
         protected override void OnModelCreating(ModelBuilder modelBuilder)

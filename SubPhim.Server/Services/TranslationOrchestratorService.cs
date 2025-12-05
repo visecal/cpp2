@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SubPhim.Server.Data;
 using SubPhim.Server.Models;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -14,9 +15,123 @@ namespace SubPhim.Server.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<TranslationOrchestratorService> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
-        // === BẮT ĐẦU THÊM: Cooldown Service ===
         private readonly ApiKeyCooldownService _cooldownService;
-        // === KẾT THÚC THÊM ===
+        private readonly JobCancellationService _cancellationService;
+        private readonly GlobalRequestRateLimiterService _globalRateLimiter;
+        private readonly ProxyService _proxyService;
+
+        // === RPM Limiter per API Key - Đảm bảo mỗi key tôn trọng RPM riêng ===
+        private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
+        private static readonly ConcurrentDictionary<int, int> _keyRpmCapacities = new(); // Track capacity per key
+        
+        // === Round-Robin Index per Pool - Đảm bảo phân bổ đều request giữa các key ===
+        private static int _paidKeyRoundRobinIndex = 0;
+        private static int _freeKeyRoundRobinIndex = 0;
+        private static readonly object _roundRobinLock = new();
+        
+        // === Constants ===
+        private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
+        
+        // Chrome-based templates use {0}=major, {1}=build, {2}=patch
+        // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
+        private static readonly string[] _chromeTemplates = new[]
+        {
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36 Edg/{0}.0.{1}.{2}",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36"
+        };
+        
+        private static readonly string[] _firefoxTemplates = new[]
+        {
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:{0}.0) Gecko/20100101 Firefox/{0}.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:{0}.0) Gecko/20100101 Firefox/{0}.0",
+            "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:{0}.0) Gecko/20100101 Firefox/{0}.0"
+        };
+
+        /// <summary>
+        /// Tạo User-Agent ngẫu nhiên cho mỗi request để tránh bị rate limit
+        /// </summary>
+        private static string GenerateRandomUserAgent()
+        {
+            var random = new Random(Guid.NewGuid().GetHashCode()); // Random seed cho mỗi request
+            
+            // Chọn ngẫu nhiên giữa Chrome và Firefox
+            bool useChrome = random.Next(2) == 0;
+            
+            if (useChrome)
+            {
+                var template = _chromeTemplates[random.Next(_chromeTemplates.Length)];
+                var majorVersion = random.Next(100, 131); // Chrome versions 100-130
+                var buildNumber = random.Next(1000, 9999);
+                var patchNumber = random.Next(100, 999);
+                return string.Format(template, majorVersion, buildNumber, patchNumber);
+            }
+            else
+            {
+                var template = _firefoxTemplates[random.Next(_firefoxTemplates.Length)];
+                var majorVersion = random.Next(100, 135); // Firefox versions 100-134
+                return string.Format(template, majorVersion);
+            }
+        }
+        
+        /// <summary>
+        /// Helper method để chọn key theo round-robin (sync, có thể dùng lock)
+        /// </summary>
+        private ManagedApiKey GetNextKeyRoundRobin(List<ManagedApiKey> eligibleKeys, ApiPoolType poolType)
+        {
+            lock (_roundRobinLock)
+            {
+                int currentIndex;
+                if (poolType == ApiPoolType.Paid)
+                {
+                    if (_paidKeyRoundRobinIndex >= eligibleKeys.Count)
+                        _paidKeyRoundRobinIndex = 0;
+                    currentIndex = _paidKeyRoundRobinIndex;
+                    _paidKeyRoundRobinIndex++;
+                }
+                else
+                {
+                    if (_freeKeyRoundRobinIndex >= eligibleKeys.Count)
+                        _freeKeyRoundRobinIndex = 0;
+                    currentIndex = _freeKeyRoundRobinIndex;
+                    _freeKeyRoundRobinIndex++;
+                }
+                return eligibleKeys[currentIndex];
+            }
+        }
+        
+        /// <summary>
+        /// Đảm bảo key có RPM limiter với capacity đúng. Tạo mới nếu cần.
+        /// </summary>
+        private void EnsureKeyRpmLimiter(int keyId, int rpmCapacity)
+        {
+            // Kiểm tra capacity đã lưu
+            if (_keyRpmCapacities.TryGetValue(keyId, out int currentCapacity) && currentCapacity == rpmCapacity)
+            {
+                // Capacity không thay đổi, không cần làm gì
+                return;
+            }
+            
+            // Capacity thay đổi hoặc chưa có, cần tạo/cập nhật semaphore
+            lock (_roundRobinLock) // Sử dụng lock để tránh race condition
+            {
+                // Double-check sau khi lấy lock
+                if (_keyRpmCapacities.TryGetValue(keyId, out currentCapacity) && currentCapacity == rpmCapacity)
+                    return;
+                
+                // Dispose old semaphore nếu có
+                if (_keyRpmLimiters.TryRemove(keyId, out var oldSemaphore))
+                {
+                    try { oldSemaphore.Dispose(); }
+                    catch { /* Ignore dispose errors */ }
+                }
+                
+                // Tạo semaphore mới
+                _keyRpmLimiters[keyId] = new SemaphoreSlim(rpmCapacity, rpmCapacity);
+                _keyRpmCapacities[keyId] = rpmCapacity;
+            }
+        }
 
         public record CreateJobResult(string Status, string Message, string SessionId = null, int RemainingLines = 0);
 
@@ -24,12 +139,18 @@ namespace SubPhim.Server.Services
             IServiceProvider serviceProvider, 
             ILogger<TranslationOrchestratorService> logger, 
             IHttpClientFactory httpClientFactory,
-            ApiKeyCooldownService cooldownService)
+            ApiKeyCooldownService cooldownService,
+            JobCancellationService cancellationService,
+            GlobalRequestRateLimiterService globalRateLimiter,
+            ProxyService proxyService)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
             _httpClientFactory = httpClientFactory;
             _cooldownService = cooldownService;
+            _cancellationService = cancellationService;
+            _globalRateLimiter = globalRateLimiter;
+            _proxyService = proxyService;
         }
 
         public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial)
@@ -59,7 +180,7 @@ namespace SubPhim.Server.Services
             {
                 user.LocalSrtLinesUsedToday += requestedLines;
                 var sessionId = await CreateJobInDb(user, genre, targetLanguage, systemInstruction, allLines, context);
-                _ = ProcessJob(sessionId, user.Tier);
+                _ = ProcessJob(sessionId, user.Id, user.Tier);
                 return new CreateJobResult("Accepted", "OK", sessionId);
             }
 
@@ -70,7 +191,7 @@ namespace SubPhim.Server.Services
                     var partialLines = allLines.Take(remainingLines).ToList();
                     user.LocalSrtLinesUsedToday += partialLines.Count;
                     var sessionId = await CreateJobInDb(user, genre, targetLanguage, systemInstruction, partialLines, context);
-                    _ = ProcessJob(sessionId, user.Tier);
+                    _ = ProcessJob(sessionId, user.Id, user.Tier);
                     return new CreateJobResult("Accepted", "OK", sessionId);
                 }
                 else
@@ -128,10 +249,13 @@ namespace SubPhim.Server.Services
             return (isFinished, job.ErrorMessage);
         }
 
-        private async Task ProcessJob(string sessionId, SubscriptionTier userTier)
+        private async Task ProcessJob(string sessionId, int userId, SubscriptionTier userTier)
         {
             _logger.LogInformation("Starting HIGH-SPEED processing for job {SessionId} using {Tier} tier API pool", sessionId, userTier);
-            var cts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
+            
+            // === SỬA ĐỔI: Sử dụng JobCancellationService thay vì tạo CTS mới ===
+            var cancellationToken = _cancellationService.RegisterJob(sessionId, userId, timeoutMinutes: 15);
+            
             ApiPoolType poolToUse = (userTier == SubscriptionTier.Free) ? ApiPoolType.Free : ApiPoolType.Paid;
 
             try
@@ -140,7 +264,7 @@ namespace SubPhim.Server.Services
                 var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var encryptionService = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
 
-                var job = await context.TranslationJobs.FindAsync(new object[] { sessionId }, cts.Token);
+                var job = await context.TranslationJobs.FindAsync(new object[] { sessionId }, cancellationToken);
                 if (job == null)
                 {
                     _logger.LogError("Job {SessionId} not found in database at the start of processing.", sessionId);
@@ -148,16 +272,16 @@ namespace SubPhim.Server.Services
                 }
 
                 job.Status = JobStatus.Processing;
-                await context.SaveChangesAsync(cts.Token);
+                await context.SaveChangesAsync(cancellationToken);
 
-                var settings = await context.LocalApiSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == 1, cts.Token) ?? new LocalApiSetting();
-                var activeModel = await context.AvailableApiModels.AsNoTracking().FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cts.Token);
+                var settings = await context.LocalApiSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == 1, cancellationToken) ?? new LocalApiSetting();
+                var activeModel = await context.AvailableApiModels.AsNoTracking().FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cancellationToken);
                 if (activeModel == null) throw new Exception($"Không có model nào đang hoạt động cho nhóm '{poolToUse}'.");
 
-                // === SỬA ĐỔI: Lọc bỏ keys đang trong cooldown ===
+                // === SỬA ĐỔI: Load tất cả keys enabled và filter cooldown ===
                 var enabledKeys = await context.ManagedApiKeys.AsNoTracking()
                     .Where(k => k.IsEnabled && k.PoolType == poolToUse)
-                    .ToListAsync(cts.Token);
+                    .ToListAsync(cancellationToken);
                 
                 // Filter out keys in cooldown
                 enabledKeys = enabledKeys.Where(k => !_cooldownService.IsInCooldown(k.Id)).ToList();
@@ -165,21 +289,23 @@ namespace SubPhim.Server.Services
                 if (!enabledKeys.Any()) throw new Exception($"Không có API key nào đang hoạt động cho nhóm '{poolToUse}' (có thể tất cả đang trong cooldown).");
                 // === KẾT THÚC SỬA ĐỔI ===
 
-                const int RPM_PER_PAID_KEY = 150;
-                const int RPM_PER_FREE_KEY = 15;
-                int rpmPerKey = (poolToUse == ApiPoolType.Paid) ? RPM_PER_PAID_KEY : RPM_PER_FREE_KEY;
-                int totalRpm = enabledKeys.Count * rpmPerKey;
-
-                using var rpmLimiter = new SemaphoreSlim(totalRpm, totalRpm);
-                using var rpmResetTimer = new Timer(_ => {
-                    try { if (rpmLimiter.CurrentCount < totalRpm) rpmLimiter.Release(totalRpm - rpmLimiter.CurrentCount); }
-                    catch (ObjectDisposedException) { }
-                }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+                // === MỚI: Lấy RPM từ Admin/LocalApi settings thay vì hardcode ===
+                int rpmPerKey = settings.Rpm; // RPM được cài đặt trên Admin panel
+                
+                // Đảm bảo mỗi key có SemaphoreSlim riêng để tuân thủ RPM
+                foreach (var key in enabledKeys)
+                {
+                    // Kiểm tra capacity đã lưu và tạo/cập nhật semaphore nếu cần
+                    EnsureKeyRpmLimiter(key.Id, rpmPerKey);
+                }
+                
+                _logger.LogInformation("Job {SessionId}: Using {KeyCount} API keys, each with {Rpm} RPM (from Admin settings)", 
+                    sessionId, enabledKeys.Count, rpmPerKey);
 
                 var allLines = await context.OriginalSrtLines.AsNoTracking()
                     .Where(l => l.SessionId == sessionId)
                     .OrderBy(l => l.LineIndex)
-                    .ToListAsync(cts.Token);
+                    .ToListAsync(cancellationToken);
 
                 var batches = allLines
                     .Select((line, index) => new { line, index })
@@ -188,19 +314,50 @@ namespace SubPhim.Server.Services
                     .ToList();
 
                 var processingTasks = new List<Task>();
+                
+                // Log global rate limiter status
+                var (maxReqs, windowMins, availSlots, activeReqs) = _globalRateLimiter.GetCurrentStatus();
+                _logger.LogInformation("Job {SessionId}: Processing {BatchCount} batches. Global rate limit: {MaxReqs}/{WindowMins}min (Available: {AvailSlots})",
+                    sessionId, batches.Count, maxReqs, windowMins, availSlots);
 
-                foreach (var batch in batches)
+                for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                 {
-                    if (cts.IsCancellationRequested) break;
-                    await rpmLimiter.WaitAsync(cts.Token);
+                    // === THÊM MỚI: Kiểm tra cancellation trước mỗi batch ===
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        _logger.LogInformation("Job {SessionId}: Cancellation requested, stopping at batch {BatchIndex}/{TotalBatches}",
+                            sessionId, batchIndex + 1, batches.Count);
+                        break;
+                    }
+                    
+                    var batch = batches[batchIndex];
+                    
+                    // === BẮT ĐẦU THÊM: Delay giữa các batch theo cài đặt ===
+                    if (batchIndex > 0 && settings.DelayBetweenBatchesMs > 0)
+                    {
+                        _logger.LogInformation("Job {SessionId}: Waiting {DelayMs}ms before batch {BatchIndex}/{TotalBatches}", 
+                            sessionId, settings.DelayBetweenBatchesMs, batchIndex + 1, batches.Count);
+                        await Task.Delay(settings.DelayBetweenBatchesMs, cancellationToken);
+                    }
+                    // === KẾT THÚC THÊM ===
+                    
+                    // Capture batch index for closure - cần thiết vì batchIndex được thay đổi trong loop
+                    int currentBatchIndex = batchIndex;
+                    
+                    // === MỚI: Áp dụng Global Rate Limiter trước khi xử lý batch ===
                     processingTasks.Add(Task.Run(async () =>
                     {
+                        string? rateLimitSlotId = null;
                         try
                         {
-                            // === SỬA ĐỔI: Gọi TranslateBatchAsync với context và settings ===
+                            // === GLOBAL RATE LIMIT: Đợi slot khả dụng trước khi gửi API request ===
+                            rateLimitSlotId = await _globalRateLimiter.AcquireSlotAsync(
+                                $"{sessionId}_batch{currentBatchIndex}", cancellationToken);
+                            
+                            // === SỬA ĐỔI: Truyền thêm enabledKeys và rpmPerKey để hỗ trợ round-robin và per-key RPM ===
                             var (translatedBatch, tokensUsed, usedKeyId) = await TranslateBatchAsync(
                                 batch, job, settings, activeModel.ModelName, job.SystemInstruction, 
-                                poolToUse, encryptionService, cts.Token);
+                                poolToUse, encryptionService, enabledKeys, rpmPerKey, cancellationToken);
                             
                             await SaveResultsToDb(sessionId, translatedBatch);
                             
@@ -213,7 +370,10 @@ namespace SubPhim.Server.Services
                             }
                             // === KẾT THÚC SỬA ĐỔI ===
                         }
-                        catch (OperationCanceledException) { }
+                        catch (OperationCanceledException) 
+                        { 
+                            _logger.LogInformation("Batch processing cancelled for job {SessionId}", sessionId);
+                        }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "Lỗi xử lý batch cho job {SessionId}", sessionId);
@@ -228,25 +388,59 @@ namespace SubPhim.Server.Services
                             }).ToList();
                             await SaveResultsToDb(sessionId, errorResults);
                         }
-                    }, cts.Token));
+                        finally
+                        {
+                            // === GLOBAL RATE LIMIT: Giải phóng slot sau khi hoàn thành ===
+                            if (rateLimitSlotId != null)
+                            {
+                                _globalRateLimiter.ReleaseSlot(rateLimitSlotId);
+                            }
+                        }
+                    }, cancellationToken));
                 }
 
                 await Task.WhenAll(processingTasks);
-                _logger.LogInformation("All batches for job {SessionId} completed. Checking for errors and refunding if needed...", sessionId);
+                _logger.LogInformation("All batches completed for job {SessionId}", sessionId);
 
-                await CheckAndRefundFailedLinesAsync(sessionId);
+                // ✅ Kiểm tra status trước khi làm gì
+                using (var checkScope = _serviceProvider.CreateScope())
+                {
+                    var checkContext = checkScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var currentJob = await checkContext.TranslationJobs.AsNoTracking()
+                        .FirstOrDefaultAsync(j => j.SessionId == sessionId);
+
+                    // Nếu job đã bị cancel hoặc completed, thoát sớm
+                    if (currentJob == null ||
+                        currentJob.Status == JobStatus.Failed ||
+                        currentJob.Status == JobStatus.Completed)
+                    {
+                        _logger.LogInformation("Job {SessionId} đã xử lý trước đó, bỏ qua.", sessionId);
+                        return;
+                    }
+                }
+
+                try { await CheckAndRefundFailedLinesAsync(sessionId); }
+                catch (Exception ex) { _logger.LogError(ex, "CheckAndRefund failed"); }
+
                 await UpdateJobStatus(sessionId, JobStatus.Completed);
+                _logger.LogInformation("🎉 Job {SessionId} COMPLETED!", sessionId);
 
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning("Job {SessionId} đã bị hủy do timeout.", sessionId);
-                await UpdateJobStatus(sessionId, JobStatus.Failed, "Job timed out.");
+                _logger.LogWarning("Job {SessionId} đã bị hủy (timeout hoặc user request).", sessionId);
+                await CheckAndRefundFailedLinesAsync(sessionId);
+                await UpdateJobStatus(sessionId, JobStatus.Failed, "Job đã bị hủy.");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Lỗi nghiêm trọng trong quá trình xử lý job {SessionId}", sessionId);
                 await UpdateJobStatus(sessionId, JobStatus.Failed, ex.Message);
+            }
+            finally
+            {
+                // === THÊM MỚI: Hủy đăng ký job khi hoàn thành ===
+                _cancellationService.UnregisterJob(sessionId, userId);
             }
         }
 
@@ -321,7 +515,7 @@ namespace SubPhim.Server.Services
         private async Task<(List<TranslatedSrtLineDb> results, int tokensUsed, int? usedKeyId)> TranslateBatchAsync(
             List<OriginalSrtLineDb> batch, TranslationJobDb job, LocalApiSetting settings,
             string modelName, string systemInstruction, ApiPoolType poolType, 
-            IEncryptionService encryptionService, CancellationToken token)
+            IEncryptionService encryptionService, List<ManagedApiKey> availableKeys, int rpmPerKey, CancellationToken token)
         {
             var payloadBuilder = new StringBuilder();
             foreach (var line in batch)
@@ -351,7 +545,7 @@ namespace SubPhim.Server.Services
 
             string jsonPayload = JsonConvert.SerializeObject(requestPayloadObject, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
 
-            // === BẮT ĐẦU SỬA ĐỔI: Retry với auto key rotation ===
+            // === MỚI: Sử dụng round-robin và per-key RPM limiter ===
             HashSet<int> triedKeyIds = new HashSet<int>();
             int? successfulKeyId = null;
             
@@ -361,11 +555,8 @@ namespace SubPhim.Server.Services
                 
                 try
                 {
-                    // Lấy key khả dụng, loại trừ những key đã thử
-                    using var scope = _serviceProvider.CreateScope();
-                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    
-                    selectedKey = await GetAvailableKeyForBatchAsync(context, poolType, triedKeyIds);
+                    // === MỚI: Chọn key bằng round-robin và chờ per-key RPM limiter ===
+                    selectedKey = await GetAvailableKeyWithRpmLimitAsync(availableKeys, poolType, triedKeyIds, rpmPerKey, token);
                     
                     if (selectedKey == null)
                     {
@@ -379,11 +570,11 @@ namespace SubPhim.Server.Services
                     var apiKey = encryptionService.Decrypt(selectedKey.EncryptedApiKey, selectedKey.Iv);
                     string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={apiKey}";
 
-                    _logger.LogInformation("Batch attempt {Attempt}/{MaxRetries}: Using Key ID {KeyId}", 
+                    _logger.LogInformation("Batch attempt {Attempt}/{MaxRetries}: Using Key ID {KeyId} (round-robin)", 
                         attempt, settings.MaxRetries, selectedKey.Id);
 
                     var (responseText, tokensUsed, errorType, errorDetail, httpStatusCode) = 
-                        await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, token);
+                        await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, selectedKey.Id, token);
 
                     // === XỬ LÝ LỖI 429 ===
                     if (httpStatusCode == 429)
@@ -395,8 +586,7 @@ namespace SubPhim.Server.Services
                         
                         if (attempt < settings.MaxRetries)
                         {
-                            // === SỬA LẠI: Delay theo cài đặt từ panel thay vì cố định ===
-                            await Task.Delay(settings.RetryDelayMs, token); // Tuân theo cài đặt RetryDelayMs từ Admin panel
+                            await Task.Delay(settings.RetryDelayMs, token);
                             continue; // Thử lại với key khác
                         }
                     }
@@ -461,7 +651,6 @@ namespace SubPhim.Server.Services
                     // === LỖI KHÁC (không phải 429, không nghiêm trọng) ===
                     if (attempt < settings.MaxRetries)
                     {
-                        // Tính delay theo exponential backoff với hệ số từ cài đặt
                         int delayMs = settings.RetryDelayMs * attempt;
                         
                         _logger.LogWarning("Batch attempt {Attempt} failed with Key ID {KeyId}. Error: {Error}. Retrying after {Delay}ms...",
@@ -497,40 +686,91 @@ namespace SubPhim.Server.Services
             }).ToList();
             
             return (failedResults, 0, null);
-            // === KẾT THÚC SỬA ĐỔI ===
         }
 
         /// <summary>
-        /// Lấy key khả dụng cho batch, loại trừ những key đã thử và đang trong cooldown
+        /// Chọn key bằng round-robin và đợi per-key RPM limiter
         /// </summary>
-        private async Task<ManagedApiKey> GetAvailableKeyForBatchAsync(
-            AppDbContext context, ApiPoolType poolType, HashSet<int> excludeKeyIds)
+        private async Task<ManagedApiKey> GetAvailableKeyWithRpmLimitAsync(
+            List<ManagedApiKey> availableKeys, ApiPoolType poolType, HashSet<int> excludeKeyIds, int rpmPerKey, CancellationToken token)
         {
-            var query = context.ManagedApiKeys
-                .Where(k => k.IsEnabled && k.PoolType == poolType);
-            
-            if (excludeKeyIds.Any())
-            {
-                query = query.Where(k => !excludeKeyIds.Contains(k.Id));
-            }
-            
-            var eligibleKeys = await query.ToListAsync();
-            
-            // Filter out keys in cooldown (in-memory check)
-            eligibleKeys = eligibleKeys
-                .Where(k => !_cooldownService.IsInCooldown(k.Id))
+            // Lọc keys chưa thử và không trong cooldown
+            var eligibleKeys = availableKeys
+                .Where(k => !excludeKeyIds.Contains(k.Id) && !_cooldownService.IsInCooldown(k.Id))
                 .ToList();
             
             if (!eligibleKeys.Any()) return null;
             
-            // Random selection từ pool
-            return eligibleKeys[Random.Shared.Next(eligibleKeys.Count)];
+            // === ROUND-ROBIN SELECTION: Đảm bảo phân bổ đều ===
+            ManagedApiKey selectedKey = GetNextKeyRoundRobin(eligibleKeys, poolType);
+            
+            // === PER-KEY RPM LIMITER: Đảm bảo mỗi key tuân thủ RPM riêng ===
+            var semaphore = _keyRpmLimiters.GetOrAdd(selectedKey.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
+            
+            // Thử lấy slot từ semaphore (không chờ vô hạn)
+            if (await semaphore.WaitAsync(RPM_WAIT_TIMEOUT_MS, token))
+            {
+                // Tự động release sau 1 phút (60 giây = 1 phút trong context RPM)
+                ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
+                
+                _logger.LogDebug("Key ID {KeyId} selected via round-robin. RPM slots remaining: {Remaining}/{Total}", 
+                    selectedKey.Id, semaphore.CurrentCount, rpmPerKey);
+                
+                return selectedKey;
+            }
+            
+            // Nếu key đã đạt RPM limit, thử key tiếp theo
+            _logger.LogWarning("Key ID {KeyId} đã đạt giới hạn {Rpm} RPM, thử key khác", selectedKey.Id, rpmPerKey);
+            
+            // Thử các key còn lại
+            foreach (var key in eligibleKeys.Where(k => k.Id != selectedKey.Id))
+            {
+                var keySemaphore = _keyRpmLimiters.GetOrAdd(key.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
+                if (await keySemaphore.WaitAsync(RPM_WAIT_TIMEOUT_MS, token))
+                {
+                    ScheduleSemaphoreRelease(keySemaphore, TimeSpan.FromMinutes(1));
+                    
+                    _logger.LogDebug("Alternative Key ID {KeyId} selected. RPM slots remaining: {Remaining}/{Total}", 
+                        key.Id, keySemaphore.CurrentCount, rpmPerKey);
+                    
+                    return key;
+                }
+            }
+            
+            // Nếu tất cả key đều đạt RPM limit, chờ key đầu tiên
+            _logger.LogInformation("Tất cả keys đều đạt giới hạn RPM, đợi key ID {KeyId}...", selectedKey.Id);
+            await semaphore.WaitAsync(token);
+            ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
+            
+            return selectedKey;
         }
         
-        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết =====
-        private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
-            string url, string jsonPayload, LocalApiSetting settings, CancellationToken token)
+        /// <summary>
+        /// Lên lịch release semaphore sau một khoảng thời gian (để đảm bảo RPM window)
+        /// </summary>
+        private static void ScheduleSemaphoreRelease(SemaphoreSlim semaphore, TimeSpan delay)
         {
+            // Sử dụng Timer để release đáng tin cậy hơn fire-and-forget Task
+            var timer = new Timer(_ =>
+            {
+                try { semaphore.Release(); }
+                catch (ObjectDisposedException) { /* Semaphore đã bị disposed, ignore */ }
+            }, null, delay, Timeout.InfiniteTimeSpan);
+        }
+        
+        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết, random User-Agent và PROXY support ===== 
+        private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
+            string url, string jsonPayload, LocalApiSetting settings, int apiKeyId, CancellationToken token)
+        {
+            // Generate random User-Agent once per request to avoid fingerprinting
+            string userAgent = GenerateRandomUserAgent();
+            
+            // Track failed proxy IDs to exclude them from subsequent attempts within this request
+            var failedProxyIds = new HashSet<int>();
+            
+            // Get initial proxy - will switch if connection fails
+            Proxy? currentProxy = await _proxyService.GetNextProxyAsync();
+            
             for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
             {
                 if (token.IsCancellationRequested)
@@ -538,13 +778,27 @@ namespace SubPhim.Server.Services
 
                 try
                 {
-                    using var httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(5) };
+                    // Create HttpClient with the current proxy (or direct if no proxy)
+                    using var httpClient = _proxyService.CreateHttpClientWithProxy(currentProxy);
                     using var request = new HttpRequestMessage(HttpMethod.Post, url)
                     {
                         Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
                     };
+                    
+                    // Add random User-Agent header to avoid rate limiting
+                    request.Headers.Add("User-Agent", userAgent);
 
-                    _logger.LogInformation("Attempt {Attempt}/{MaxRetries}: Sending request to {Url}", attempt, settings.MaxRetries, url);
+                    if (currentProxy != null)
+                    {
+                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request via Proxy {ProxyId} ({Type}://{Host}:{Port}) (Key ID: {KeyId})", 
+                            attempt, settings.MaxRetries, currentProxy.Id, currentProxy.Type, currentProxy.Host, currentProxy.Port, apiKeyId);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request directly (no proxy) (Key ID: {KeyId})", 
+                            attempt, settings.MaxRetries, apiKeyId);
+                    }
+                    
                     using HttpResponseMessage response = await httpClient.SendAsync(request, token);
                     string responseBody = await response.Content.ReadAsStringAsync(token);
 
@@ -554,8 +808,14 @@ namespace SubPhim.Server.Services
                         string errorType = $"HTTP_{statusCode}";
                         string errorMsg = $"HTTP Error {statusCode}";
 
-                        _logger.LogWarning("HTTP Error {StatusCode} from {Url}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
-                            statusCode, url, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
+                        _logger.LogWarning("HTTP Error {StatusCode}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
+                            statusCode, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
+
+                        // Ghi nhận proxy failure nếu lỗi không phải 429 (429 là do API, không phải proxy)
+                        if (currentProxy != null && statusCode != 429)
+                        {
+                            await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"HTTP {statusCode}");
+                        }
 
                         if (attempt < settings.MaxRetries)
                         {
@@ -567,7 +827,52 @@ namespace SubPhim.Server.Services
                         return ($"Lỗi API: {response.StatusCode}", 0, errorType, errorMsg, statusCode);
                     }
 
-                    JObject parsedBody = JObject.Parse(responseBody);
+                    // === Request thành công, ghi nhận proxy success ===
+                    if (currentProxy != null)
+                    {
+                        await _proxyService.RecordProxySuccessAsync(currentProxy.Id);
+                    }
+
+                    // === Parse JSON response với error handling ===
+                    JObject parsedBody;
+                    try
+                    {
+                        parsedBody = JObject.Parse(responseBody);
+                    }
+                    catch (JsonReaderException jsonEx)
+                    {
+                        // Response không phải JSON (có thể là HTML error page từ proxy hoặc server)
+                        var previewBody = responseBody.Length > 200 ? responseBody.Substring(0, 200) + "..." : responseBody;
+                        _logger.LogWarning("Response is not valid JSON (possibly HTML error page). Preview: {Preview}. Retrying... (Attempt {Attempt}/{MaxRetries})",
+                            previewBody, attempt, settings.MaxRetries);
+                        
+                        // Nếu response bắt đầu bằng HTML tag, có thể proxy trả về error page
+                        // Đây là lỗi INTERMITTENT - proxy có thể hoạt động lần sau
+                        if (responseBody.TrimStart().StartsWith("<", StringComparison.Ordinal))
+                        {
+                            if (currentProxy != null)
+                            {
+                                // isIntermittent = true: sử dụng threshold cao hơn (10 thay vì 5)
+                                await _proxyService.RecordProxyFailureAsync(currentProxy.Id, "Proxy returned HTML instead of JSON", isIntermittent: true);
+                                failedProxyIds.Add(currentProxy.Id);
+                                
+                                // Try a different proxy
+                                currentProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
+                                if (currentProxy == null)
+                                {
+                                    _logger.LogInformation("All proxies returned invalid responses. Falling back to direct connection.");
+                                }
+                            }
+                        }
+                        
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+                        
+                        return ("Lỗi: Response không phải JSON hợp lệ", 0, "INVALID_JSON", $"JSON parse error: {jsonEx.Message}", 200);
+                    }
 
                     // Kiểm tra lỗi trong response body
                     if (parsedBody?["error"] != null)
@@ -615,7 +920,6 @@ namespace SubPhim.Server.Services
 
                         return ($"Lỗi: {errorMsg}", 0, "FINISH_REASON", errorMsg, 200);
                     }
-                    // ===== KẾT THÚC THÊM MỚI =====
 
                     int tokens = parsedBody?["usageMetadata"]?["totalTokenCount"]?.Value<int>() ?? 0;
                     string responseText = parsedBody?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
@@ -634,11 +938,84 @@ namespace SubPhim.Server.Services
                         return ("Lỗi: API trả về phản hồi rỗng.", 0, "EMPTY_RESPONSE", "API returned empty response", 200);
                     }
 
-                    // Thành công
+                    // Success
                     return (responseText, tokens, null, null, 200);
+                }
+                catch (HttpRequestException ex) when (IsProxyTunnelError(ex))
+                {
+                    // === PROXY TUNNEL ERROR: Immediately switch to different proxy or direct connection ===
+                    if (currentProxy != null)
+                    {
+                        failedProxyIds.Add(currentProxy.Id);
+                        await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"Proxy tunnel failed: {ex.Message}");
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) tunnel connection failed: {Error}. Excluding and trying another proxy immediately.", 
+                            currentProxy.Id, currentProxy.Host, currentProxy.Port, ex.Message);
+                    }
+                    
+                    // Get a new proxy excluding all previously failed ones
+                    currentProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
+                    
+                    if (currentProxy == null)
+                    {
+                        _logger.LogInformation("All proxies failed ({FailedCount} excluded). Falling back to direct connection.", failedProxyIds.Count);
+                    }
+                    
+                    // Don't count proxy failures as API retry attempts - retry immediately with new proxy
+                    // Only add minimal delay to prevent tight loop
+                    if (attempt < settings.MaxRetries)
+                    {
+                        await Task.Delay(500, token); // Short delay before retry with new proxy
+                        continue;
+                    }
+                    
+                    return ($"Lỗi Proxy: {ex.Message}", 0, "PROXY_TUNNEL_ERROR", ex.Message, 0);
                 }
                 catch (Exception ex)
                 {
+                    // Check if this is a CRITICAL proxy error (connection timeout, host unreachable, etc.)
+                    // These proxies should be disabled IMMEDIATELY and PERMANENTLY
+                    if (currentProxy != null && ProxyService.IsCriticalProxyError(ex))
+                    {
+                        var errorDescription = ProxyService.GetProxyErrorDescription(ex);
+                        _logger.LogError("🚫 CRITICAL PROXY ERROR for Proxy {ProxyId} ({Host}:{Port}): {Error}. Disabling proxy PERMANENTLY.", 
+                            currentProxy.Id, currentProxy.Host, currentProxy.Port, errorDescription);
+                        
+                        // Disable proxy immediately - don't wait for consecutive failures
+                        await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, errorDescription);
+                        failedProxyIds.Add(currentProxy.Id);
+                        
+                        // Get a new proxy excluding all failed ones
+                        currentProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
+                        
+                        if (currentProxy == null)
+                        {
+                            _logger.LogInformation("All proxies failed ({FailedCount} excluded). Falling back to direct connection.", failedProxyIds.Count);
+                        }
+                        
+                        // Retry immediately with new proxy (don't count as retry attempt for critical proxy errors)
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(500, token); // Short delay before retry
+                            continue;
+                        }
+                    }
+                    // Record non-critical proxy failure and switch to a new proxy
+                    else if (currentProxy != null && (ex is HttpRequestException || ex is TaskCanceledException))
+                    {
+                        failedProxyIds.Add(currentProxy.Id);
+                        await _proxyService.RecordProxyFailureAsync(currentProxy.Id, ex.Message);
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) connection failed: {Error}. Switching to a new proxy.", 
+                            currentProxy.Id, currentProxy.Host, currentProxy.Port, ex.Message);
+                        
+                        // Get a new proxy excluding all previously failed ones
+                        currentProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
+                        
+                        if (currentProxy == null)
+                        {
+                            _logger.LogInformation("All proxies failed ({FailedCount} excluded). Falling back to direct connection.", failedProxyIds.Count);
+                        }
+                    }
+                    
                     _logger.LogError(ex, "Exception during API call. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
                         settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
 
@@ -651,21 +1028,51 @@ namespace SubPhim.Server.Services
 
             return ("Lỗi API: Hết số lần thử lại.", 0, "MAX_RETRIES", "Exceeded maximum retry attempts", 0);
         }
-        // ===== KẾT THÚC SỬA ĐỔI =====
-
-        private async Task UpdateJobStatus(string sessionId, JobStatus status, string errorMessage = null)
+        
+        /// <summary>
+        /// Check if the exception is a proxy tunnel error (HTTP 400/407 during CONNECT).
+        /// </summary>
+        private static bool IsProxyTunnelError(HttpRequestException ex)
         {
-            using var scope = _serviceProvider.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var job = await context.TranslationJobs.FindAsync(sessionId);
-            if (job != null)
-            {
-                job.Status = status;
-                if (errorMessage != null) job.ErrorMessage = errorMessage;
-                await context.SaveChangesAsync();
-            }
+            // Check for proxy tunnel error patterns in the exception message
+            var message = ex.Message ?? string.Empty;
+            return message.Contains("proxy tunnel", StringComparison.OrdinalIgnoreCase) ||
+                   message.Contains("proxy", StringComparison.OrdinalIgnoreCase) && 
+                   (message.Contains("400") || message.Contains("407") || message.Contains("403"));
         }
 
+        private async Task UpdateJobStatus(string sessionId, JobStatus newStatus, string errorMessage = null)
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var job = await context.TranslationJobs.FindAsync(sessionId);
+
+                if (job == null)
+                {
+                    _logger.LogWarning("Job {SessionId} không tồn tại!", sessionId);
+                    return;
+                }
+
+                // ✅ KHÔNG update nếu đã ở trạng thái cuối
+                if (job.Status == JobStatus.Completed || job.Status == JobStatus.Failed)
+                {
+                    _logger.LogInformation("Job {SessionId} đã ở trạng thái {Status}, bỏ qua.", sessionId, job.Status);
+                    return;
+                }
+
+                job.Status = newStatus;
+                if (errorMessage != null) job.ErrorMessage = errorMessage;
+                await context.SaveChangesAsync();
+
+                _logger.LogInformation("✅ Job {SessionId} -> {Status}", sessionId, newStatus);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ UpdateJobStatus FAILED: {SessionId}", sessionId);
+            }
+        }
         private async Task SaveResultsToDb(string sessionId, List<TranslatedSrtLineDb> results)
         {
             using var scope = _serviceProvider.CreateScope();

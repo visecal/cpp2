@@ -34,6 +34,7 @@ builder.Services.AddSingleton<ApiKeyCooldownService>(); // Singleton để share
 builder.Services.AddSingleton<JobCancellationService>(); // Singleton để quản lý cancellation tokens cho job dịch SRT
 builder.Services.AddSingleton<GlobalRequestRateLimiterService>(); // Singleton để kiểm soát rate limit toàn server
 builder.Services.AddSingleton<ProxyService>(); // Singleton để quản lý và luân phiên proxy
+builder.Services.AddSingleton<ProxyRateLimiterService>(); // Singleton để quản lý RPM per proxy
 builder.Services.AddHostedService<ManagedApiKeyResetService>(); // Background service
 // === KẾT THÚC THÊM ===
 builder.Services.AddHostedService<AioTtsBatchProcessorService>();

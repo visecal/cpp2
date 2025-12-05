@@ -70,6 +70,9 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
             // Global Rate Limiting Settings
             [Required][Range(1, 1000)] public int GlobalMaxRequests { get; set; }
             [Required][Range(1, 60)] public int GlobalWindowMinutes { get; set; }
+            
+            // Proxy Rate Limiting Settings
+            [Required][Range(1, 1000)] public int RpmPerProxy { get; set; }
         }
         #endregion
 
@@ -89,7 +92,8 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 EnableThinkingBudget = settingsFromDb.EnableThinkingBudget,
                 ThinkingBudget = settingsFromDb.ThinkingBudget,
                 GlobalMaxRequests = settingsFromDb.GlobalMaxRequests,
-                GlobalWindowMinutes = settingsFromDb.GlobalWindowMinutes
+                GlobalWindowMinutes = settingsFromDb.GlobalWindowMinutes,
+                RpmPerProxy = settingsFromDb.RpmPerProxy
             };
         }
         public async Task<IActionResult> OnPostDeleteSelectedKeysAsync([FromForm] int[] selectedKeyIds)
@@ -191,6 +195,7 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 settingsInDb.ThinkingBudget = GlobalSettings.ThinkingBudget;
                 settingsInDb.GlobalMaxRequests = GlobalSettings.GlobalMaxRequests;
                 settingsInDb.GlobalWindowMinutes = GlobalSettings.GlobalWindowMinutes;
+                settingsInDb.RpmPerProxy = GlobalSettings.RpmPerProxy;
                 await _context.SaveChangesAsync();
                 SuccessMessage = "Đã lưu thành công cài đặt chung.";
             }

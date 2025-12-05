@@ -93,6 +93,25 @@
                         </div>
                     </div>
                     
+                    <hr class="my-3" />
+                    <h6 class="text-success mb-3"><i class="bi bi-router me-1"></i> Giới hạn tốc độ Proxy</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.RpmPerProxy" class="form-label">Request/Phút/Proxy (RPM)</label>
+                            <input asp-for="GlobalSettings.RpmPerProxy" class="form-control" />
+                            <small class="text-muted">Số request tối đa mỗi proxy có thể xử lý trong 1 phút</small>
+                        </div>
+                        <div class="col-md-8 mb-3 d-flex align-items-center">
+                            <div class="alert alert-success mb-0 py-2 w-100">
+                                <small>
+                                    <strong>Mặc định:</strong> 10 request/phút/proxy<br/>
+                                    <i class="bi bi-info-circle me-1"></i>Mỗi proxy chỉ nhận tối đa X request/phút. Nếu đạt giới hạn, hệ thống sẽ chuyển sang proxy khác.<br/>
+                                    <i class="bi bi-exclamation-triangle text-warning me-1"></i>Chỉ tính request khi kết nối thành công đến API Gemini, lỗi kết nối proxy không tính.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <button type="submit" class="btn btn-info">Lưu Cài Đặt Chung</button>
                 </form>
             </div>

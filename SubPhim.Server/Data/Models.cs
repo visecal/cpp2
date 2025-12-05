@@ -541,6 +541,10 @@ namespace SubPhim.Server.Data
         [Display(Name = "Cửa sổ thời gian (phút)")]
         public int GlobalWindowMinutes { get; set; } = 2;
 
+        // --- PROXY RATE LIMIT SETTINGS ---
+        [Display(Name = "Request/Phút/Proxy (RPM)")]
+        public int RpmPerProxy { get; set; } = 10;
+
         // --- KẾT THÚC THÊM CÁC TRƯỜNG MỚI ---
     }
     public class AioTtsServiceAccount

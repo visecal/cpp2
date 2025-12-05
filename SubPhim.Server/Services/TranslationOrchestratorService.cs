@@ -19,6 +19,7 @@ namespace SubPhim.Server.Services
         private readonly JobCancellationService _cancellationService;
         private readonly GlobalRequestRateLimiterService _globalRateLimiter;
         private readonly ProxyService _proxyService;
+        private readonly ProxyRateLimiterService _proxyRateLimiter;
 
         // === RPM Limiter per API Key - Đảm bảo mỗi key tôn trọng RPM riêng ===
         private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
@@ -31,6 +32,7 @@ namespace SubPhim.Server.Services
         
         // === Constants ===
         private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
+        private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
         // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
@@ -142,7 +144,8 @@ namespace SubPhim.Server.Services
             ApiKeyCooldownService cooldownService,
             JobCancellationService cancellationService,
             GlobalRequestRateLimiterService globalRateLimiter,
-            ProxyService proxyService)
+            ProxyService proxyService,
+            ProxyRateLimiterService proxyRateLimiter)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
@@ -151,6 +154,7 @@ namespace SubPhim.Server.Services
             _cancellationService = cancellationService;
             _globalRateLimiter = globalRateLimiter;
             _proxyService = proxyService;
+            _proxyRateLimiter = proxyRateLimiter;
         }
 
         public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial)
@@ -758,7 +762,7 @@ namespace SubPhim.Server.Services
             }, null, delay, Timeout.InfiniteTimeSpan);
         }
         
-        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết, random User-Agent và PROXY support ===== 
+        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết, random User-Agent, PROXY support và PROXY RPM LIMITING ===== 
         private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
             string url, string jsonPayload, LocalApiSetting settings, int apiKeyId, CancellationToken token)
         {
@@ -768,13 +772,50 @@ namespace SubPhim.Server.Services
             // Track failed proxy IDs to exclude them from subsequent attempts within this request
             var failedProxyIds = new HashSet<int>();
             
-            // Get initial proxy - will switch if connection fails
-            Proxy? currentProxy = await _proxyService.GetNextProxyAsync();
+            // Track current proxy slot for RPM limiting
+            string? currentProxySlotId = null;
+            Proxy? currentProxy = null;
+            
+            // Create unique request ID for tracking
+            string requestId = $"key{apiKeyId}_{Guid.NewGuid():N}";
             
             for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
             {
                 if (token.IsCancellationRequested)
                     return ("Lỗi: Tác vụ đã bị hủy.", 0, "CANCELLED", "Task was cancelled", 0);
+
+                // === PROXY SELECTION WITH RPM LIMITING ===
+                // Release previous proxy slot if switching proxy
+                if (currentProxySlotId != null)
+                {
+                    _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                    currentProxySlotId = null;
+                }
+                
+                // Get a proxy with available RPM slots
+                currentProxy = await GetProxyWithAvailableRpmSlotAsync(failedProxyIds, requestId, token);
+                
+                // Acquire RPM slot for this proxy (if proxy is available)
+                if (currentProxy != null)
+                {
+                    currentProxySlotId = await _proxyRateLimiter.TryAcquireSlotWithTimeoutAsync(
+                        currentProxy.Id, requestId, PROXY_RPM_WAIT_TIMEOUT_MS, token);
+                    
+                    if (currentProxySlotId == null)
+                    {
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) đã đạt giới hạn RPM, thử proxy khác",
+                            currentProxy.Id, currentProxy.Host, currentProxy.Port);
+                        failedProxyIds.Add(currentProxy.Id); // Tạm exclude proxy này
+                        
+                        // Try to get another proxy
+                        currentProxy = await GetProxyWithAvailableRpmSlotAsync(failedProxyIds, requestId, token);
+                        if (currentProxy != null)
+                        {
+                            currentProxySlotId = await _proxyRateLimiter.TryAcquireSlotWithTimeoutAsync(
+                                currentProxy.Id, requestId, PROXY_RPM_WAIT_TIMEOUT_MS, token);
+                        }
+                    }
+                }
 
                 try
                 {
@@ -790,8 +831,9 @@ namespace SubPhim.Server.Services
 
                     if (currentProxy != null)
                     {
-                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request via Proxy {ProxyId} ({Type}://{Host}:{Port}) (Key ID: {KeyId})", 
-                            attempt, settings.MaxRetries, currentProxy.Id, currentProxy.Type, currentProxy.Host, currentProxy.Port, apiKeyId);
+                        var (rpmPerProxy, availSlots, _) = _proxyRateLimiter.GetProxyStatus(currentProxy.Id);
+                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request via Proxy {ProxyId} ({Type}://{Host}:{Port}) (Key ID: {KeyId}) RPM slots: {Available}/{Max}", 
+                            attempt, settings.MaxRetries, currentProxy.Id, currentProxy.Type, currentProxy.Host, currentProxy.Port, apiKeyId, availSlots, rpmPerProxy);
                     }
                     else
                     {
@@ -801,6 +843,15 @@ namespace SubPhim.Server.Services
                     
                     using HttpResponseMessage response = await httpClient.SendAsync(request, token);
                     string responseBody = await response.Content.ReadAsStringAsync(token);
+
+                    // === REQUEST ĐÃ KẾT NỐI THÀNH CÔNG ĐẾN API GEMINI ===
+                    // Tại đây, request đã được gửi thành công qua proxy và nhận response từ Gemini
+                    // => Đánh dấu slot đã được sử dụng (sẽ tự auto-release sau 1 phút)
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.MarkSlotAsUsed(currentProxySlotId);
+                        currentProxySlotId = null; // Prevent early release
+                    }
 
                     if (!response.IsSuccessStatusCode)
                     {
@@ -855,13 +906,6 @@ namespace SubPhim.Server.Services
                                 // isIntermittent = true: sử dụng threshold cao hơn (10 thay vì 5)
                                 await _proxyService.RecordProxyFailureAsync(currentProxy.Id, "Proxy returned HTML instead of JSON", isIntermittent: true);
                                 failedProxyIds.Add(currentProxy.Id);
-                                
-                                // Try a different proxy
-                                currentProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
-                                if (currentProxy == null)
-                                {
-                                    _logger.LogInformation("All proxies returned invalid responses. Falling back to direct connection.");
-                                }
                             }
                         }
                         
@@ -944,20 +988,19 @@ namespace SubPhim.Server.Services
                 catch (HttpRequestException ex) when (IsProxyTunnelError(ex))
                 {
                     // === PROXY TUNNEL ERROR: Immediately switch to different proxy or direct connection ===
+                    // Lỗi kết nối proxy - KHÔNG tính vào RPM (release slot early)
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                        currentProxySlotId = null;
+                    }
+                    
                     if (currentProxy != null)
                     {
                         failedProxyIds.Add(currentProxy.Id);
                         await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"Proxy tunnel failed: {ex.Message}");
                         _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) tunnel connection failed: {Error}. Excluding and trying another proxy immediately.", 
                             currentProxy.Id, currentProxy.Host, currentProxy.Port, ex.Message);
-                    }
-                    
-                    // Get a new proxy excluding all previously failed ones
-                    currentProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
-                    
-                    if (currentProxy == null)
-                    {
-                        _logger.LogInformation("All proxies failed ({FailedCount} excluded). Falling back to direct connection.", failedProxyIds.Count);
                     }
                     
                     // Don't count proxy failures as API retry attempts - retry immediately with new proxy
@@ -972,6 +1015,13 @@ namespace SubPhim.Server.Services
                 }
                 catch (Exception ex)
                 {
+                    // === Lỗi kết nối - KHÔNG tính vào RPM (release slot early) ===
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                        currentProxySlotId = null;
+                    }
+                    
                     // Check if this is a CRITICAL proxy error (connection timeout, host unreachable, etc.)
                     // These proxies should be disabled IMMEDIATELY and PERMANENTLY
                     if (currentProxy != null && ProxyService.IsCriticalProxyError(ex))
@@ -983,14 +1033,6 @@ namespace SubPhim.Server.Services
                         // Disable proxy immediately - don't wait for consecutive failures
                         await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, errorDescription);
                         failedProxyIds.Add(currentProxy.Id);
-                        
-                        // Get a new proxy excluding all failed ones
-                        currentProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
-                        
-                        if (currentProxy == null)
-                        {
-                            _logger.LogInformation("All proxies failed ({FailedCount} excluded). Falling back to direct connection.", failedProxyIds.Count);
-                        }
                         
                         // Retry immediately with new proxy (don't count as retry attempt for critical proxy errors)
                         if (attempt < settings.MaxRetries)
@@ -1006,14 +1048,6 @@ namespace SubPhim.Server.Services
                         await _proxyService.RecordProxyFailureAsync(currentProxy.Id, ex.Message);
                         _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) connection failed: {Error}. Switching to a new proxy.", 
                             currentProxy.Id, currentProxy.Host, currentProxy.Port, ex.Message);
-                        
-                        // Get a new proxy excluding all previously failed ones
-                        currentProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
-                        
-                        if (currentProxy == null)
-                        {
-                            _logger.LogInformation("All proxies failed ({FailedCount} excluded). Falling back to direct connection.", failedProxyIds.Count);
-                        }
                     }
                     
                     _logger.LogError(ex, "Exception during API call. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
@@ -1026,7 +1060,57 @@ namespace SubPhim.Server.Services
                 }
             }
 
+            // Cleanup: release slot if still held
+            if (currentProxySlotId != null)
+            {
+                _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+            }
+
             return ("Lỗi API: Hết số lần thử lại.", 0, "MAX_RETRIES", "Exceeded maximum retry attempts", 0);
+        }
+        
+        /// <summary>
+        /// Lấy proxy có RPM slot khả dụng, loại trừ các proxy đã failed.
+        /// </summary>
+        private async Task<Proxy?> GetProxyWithAvailableRpmSlotAsync(HashSet<int> excludeProxyIds, string requestId, CancellationToken token)
+        {
+            // Get list of available proxies
+            var proxy = await _proxyService.GetNextProxyAsync(excludeProxyIds);
+            if (proxy == null)
+            {
+                return null;
+            }
+            
+            // Check if this proxy has available RPM slots
+            if (_proxyRateLimiter.HasAvailableSlot(proxy.Id))
+            {
+                return proxy;
+            }
+            
+            // Current proxy is at RPM limit, try to find another one
+            var triedProxyIds = new HashSet<int>(excludeProxyIds) { proxy.Id };
+            int maxAttempts = 10; // Prevent infinite loop
+            
+            for (int i = 0; i < maxAttempts; i++)
+            {
+                var nextProxy = await _proxyService.GetNextProxyAsync(triedProxyIds);
+                if (nextProxy == null)
+                {
+                    // No more proxies available - return the original one (will wait for slot)
+                    _logger.LogInformation("All proxies at RPM limit or excluded. Using proxy {ProxyId} and waiting for slot.", proxy.Id);
+                    return proxy;
+                }
+                
+                if (_proxyRateLimiter.HasAvailableSlot(nextProxy.Id))
+                {
+                    return nextProxy;
+                }
+                
+                triedProxyIds.Add(nextProxy.Id);
+            }
+            
+            // All proxies at RPM limit, return the first one
+            return proxy;
         }
         
         /// <summary>

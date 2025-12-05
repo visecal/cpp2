@@ -18,6 +18,7 @@ namespace SubPhim.Server.Services
         private readonly ApiKeyCooldownService _cooldownService;
         private readonly JobCancellationService _cancellationService;
         private readonly GlobalRequestRateLimiterService _globalRateLimiter;
+        private readonly ProxyService _proxyService;
 
         // === RPM Limiter per API Key - Đảm bảo mỗi key tôn trọng RPM riêng ===
         private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
@@ -140,7 +141,8 @@ namespace SubPhim.Server.Services
             IHttpClientFactory httpClientFactory,
             ApiKeyCooldownService cooldownService,
             JobCancellationService cancellationService,
-            GlobalRequestRateLimiterService globalRateLimiter)
+            GlobalRequestRateLimiterService globalRateLimiter,
+            ProxyService proxyService)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
@@ -148,6 +150,7 @@ namespace SubPhim.Server.Services
             _cooldownService = cooldownService;
             _cancellationService = cancellationService;
             _globalRateLimiter = globalRateLimiter;
+            _proxyService = proxyService;
         }
 
         public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial)
@@ -746,12 +749,15 @@ namespace SubPhim.Server.Services
             }, null, delay, Timeout.InfiniteTimeSpan);
         }
         
-        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết và random User-Agent per request ===== 
+        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết, random User-Agent và PROXY support ===== 
         private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
             string url, string jsonPayload, LocalApiSetting settings, int apiKeyId, CancellationToken token)
         {
-            // === MỚI: Tạo User-Agent ngẫu nhiên cho mỗi request để tránh fingerprinting ===
+            // Generate random User-Agent once per request to avoid fingerprinting
             string userAgent = GenerateRandomUserAgent();
+            
+            // Get proxy once at the start - reuse for all retries unless connection fails
+            Proxy? currentProxy = await _proxyService.GetNextProxyAsync();
             
             for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
             {
@@ -760,17 +766,27 @@ namespace SubPhim.Server.Services
 
                 try
                 {
-                    using var httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(5) };
+                    // Create HttpClient with the current proxy (or direct if no proxy)
+                    using var httpClient = _proxyService.CreateHttpClientWithProxy(currentProxy);
                     using var request = new HttpRequestMessage(HttpMethod.Post, url)
                     {
                         Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
                     };
                     
-                    // === MỚI: Random User-Agent header per request để tránh rate limit ===
+                    // Add random User-Agent header to avoid rate limiting
                     request.Headers.Add("User-Agent", userAgent);
 
-                    _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request to API (Key ID: {KeyId})", 
-                        attempt, settings.MaxRetries, apiKeyId);
+                    if (currentProxy != null)
+                    {
+                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request via Proxy {ProxyId} ({Type}://{Host}:{Port}) (Key ID: {KeyId})", 
+                            attempt, settings.MaxRetries, currentProxy.Id, currentProxy.Type, currentProxy.Host, currentProxy.Port, apiKeyId);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request directly (no proxy) (Key ID: {KeyId})", 
+                            attempt, settings.MaxRetries, apiKeyId);
+                    }
+                    
                     using HttpResponseMessage response = await httpClient.SendAsync(request, token);
                     string responseBody = await response.Content.ReadAsStringAsync(token);
 
@@ -783,6 +799,12 @@ namespace SubPhim.Server.Services
                         _logger.LogWarning("HTTP Error {StatusCode}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
                             statusCode, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
 
+                        // Ghi nhận proxy failure nếu lỗi không phải 429 (429 là do API, không phải proxy)
+                        if (currentProxy != null && statusCode != 429)
+                        {
+                            await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"HTTP {statusCode}");
+                        }
+
                         if (attempt < settings.MaxRetries)
                         {
                             await Task.Delay(settings.RetryDelayMs * attempt, token);
@@ -791,6 +813,12 @@ namespace SubPhim.Server.Services
 
                         // Hết số lần retry, trả về lỗi
                         return ($"Lỗi API: {response.StatusCode}", 0, errorType, errorMsg, statusCode);
+                    }
+
+                    // === Request thành công, ghi nhận proxy success ===
+                    if (currentProxy != null)
+                    {
+                        await _proxyService.RecordProxySuccessAsync(currentProxy.Id);
                     }
 
                     JObject parsedBody = JObject.Parse(responseBody);
@@ -841,7 +869,6 @@ namespace SubPhim.Server.Services
 
                         return ($"Lỗi: {errorMsg}", 0, "FINISH_REASON", errorMsg, 200);
                     }
-                    // ===== KẾT THÚC THÊM MỚI =====
 
                     int tokens = parsedBody?["usageMetadata"]?["totalTokenCount"]?.Value<int>() ?? 0;
                     string responseText = parsedBody?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
@@ -860,11 +887,22 @@ namespace SubPhim.Server.Services
                         return ("Lỗi: API trả về phản hồi rỗng.", 0, "EMPTY_RESPONSE", "API returned empty response", 200);
                     }
 
-                    // Thành công
+                    // Success
                     return (responseText, tokens, null, null, 200);
                 }
                 catch (Exception ex)
                 {
+                    // Record proxy failure and switch to a new proxy on connection errors
+                    if (currentProxy != null && (ex is HttpRequestException || ex is TaskCanceledException))
+                    {
+                        await _proxyService.RecordProxyFailureAsync(currentProxy.Id, ex.Message);
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) connection failed: {Error}. Switching to a new proxy.", 
+                            currentProxy.Id, currentProxy.Host, currentProxy.Port, ex.Message);
+                        
+                        // Get a new proxy for the next retry attempt on connection failures
+                        currentProxy = await _proxyService.GetNextProxyAsync();
+                    }
+                    
                     _logger.LogError(ex, "Exception during API call. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
                         settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
 
@@ -877,7 +915,6 @@ namespace SubPhim.Server.Services
 
             return ("Lỗi API: Hết số lần thử lại.", 0, "MAX_RETRIES", "Exceeded maximum retry attempts", 0);
         }
-        // ===== KẾT THÚC SỬA ĐỔI =====
 
         private async Task UpdateJobStatus(string sessionId, JobStatus status, string errorMessage = null)
         {

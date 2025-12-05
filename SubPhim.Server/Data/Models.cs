@@ -700,4 +700,57 @@ namespace SubPhim.Server.Data
         public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
     }
 
+    public enum ProxyType
+    {
+        Http = 1,
+        Socks4 = 2,
+        Socks5 = 3
+    }
+
+    public class Proxy
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [StringLength(255)]
+        [Display(Name = "Địa chỉ Proxy")]
+        public string Host { get; set; }
+
+        [Required]
+        [Display(Name = "Cổng")]
+        public int Port { get; set; }
+
+        [Display(Name = "Loại Proxy")]
+        public ProxyType Type { get; set; } = ProxyType.Socks5;
+
+        [StringLength(100)]
+        [Display(Name = "Username (nếu có)")]
+        public string? Username { get; set; }
+
+        [StringLength(100)]
+        [Display(Name = "Password (nếu có)")]
+        public string? Password { get; set; }
+
+        [Display(Name = "Đang hoạt động")]
+        public bool IsEnabled { get; set; } = true;
+
+        [Display(Name = "Số lần sử dụng")]
+        public int UsageCount { get; set; } = 0;
+
+        [Display(Name = "Số lần lỗi")]
+        public int FailureCount { get; set; } = 0;
+
+        [Display(Name = "Lần sử dụng cuối")]
+        public DateTime? LastUsedAt { get; set; }
+
+        [Display(Name = "Lần lỗi cuối")]
+        public DateTime? LastFailedAt { get; set; }
+
+        [StringLength(500)]
+        [Display(Name = "Lý do lỗi cuối")]
+        public string? LastFailureReason { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
 }

@@ -18,6 +18,7 @@ namespace SubPhim.Server.Services
         private readonly ApiKeyCooldownService _cooldownService;
         private readonly JobCancellationService _cancellationService;
         private readonly GlobalRequestRateLimiterService _globalRateLimiter;
+        private readonly ProxyService _proxyService;
 
         // === RPM Limiter per API Key - Đảm bảo mỗi key tôn trọng RPM riêng ===
         private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
@@ -140,7 +141,8 @@ namespace SubPhim.Server.Services
             IHttpClientFactory httpClientFactory,
             ApiKeyCooldownService cooldownService,
             JobCancellationService cancellationService,
-            GlobalRequestRateLimiterService globalRateLimiter)
+            GlobalRequestRateLimiterService globalRateLimiter,
+            ProxyService proxyService)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
@@ -148,6 +150,7 @@ namespace SubPhim.Server.Services
             _cooldownService = cooldownService;
             _cancellationService = cancellationService;
             _globalRateLimiter = globalRateLimiter;
+            _proxyService = proxyService;
         }
 
         public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial)
@@ -746,7 +749,7 @@ namespace SubPhim.Server.Services
             }, null, delay, Timeout.InfiniteTimeSpan);
         }
         
-        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết và random User-Agent per request ===== 
+        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết, random User-Agent và PROXY support ===== 
         private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
             string url, string jsonPayload, LocalApiSetting settings, int apiKeyId, CancellationToken token)
         {
@@ -758,9 +761,14 @@ namespace SubPhim.Server.Services
                 if (token.IsCancellationRequested)
                     return ("Lỗi: Tác vụ đã bị hủy.", 0, "CANCELLED", "Task was cancelled", 0);
 
+                // === MỚI: Lấy proxy cho mỗi request để phân tán traffic ===
+                Proxy? currentProxy = null;
                 try
                 {
-                    using var httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(5) };
+                    currentProxy = await _proxyService.GetNextProxyAsync();
+                    
+                    // Tạo HttpClient với proxy (hoặc trực tiếp nếu không có proxy)
+                    using var httpClient = _proxyService.CreateHttpClientWithProxy(currentProxy);
                     using var request = new HttpRequestMessage(HttpMethod.Post, url)
                     {
                         Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
@@ -769,8 +777,17 @@ namespace SubPhim.Server.Services
                     // === MỚI: Random User-Agent header per request để tránh rate limit ===
                     request.Headers.Add("User-Agent", userAgent);
 
-                    _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request to API (Key ID: {KeyId})", 
-                        attempt, settings.MaxRetries, apiKeyId);
+                    if (currentProxy != null)
+                    {
+                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request via Proxy {ProxyId} ({Type}://{Host}:{Port}) (Key ID: {KeyId})", 
+                            attempt, settings.MaxRetries, currentProxy.Id, currentProxy.Type, currentProxy.Host, currentProxy.Port, apiKeyId);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request directly (no proxy) (Key ID: {KeyId})", 
+                            attempt, settings.MaxRetries, apiKeyId);
+                    }
+                    
                     using HttpResponseMessage response = await httpClient.SendAsync(request, token);
                     string responseBody = await response.Content.ReadAsStringAsync(token);
 
@@ -783,6 +800,12 @@ namespace SubPhim.Server.Services
                         _logger.LogWarning("HTTP Error {StatusCode}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
                             statusCode, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
 
+                        // Ghi nhận proxy failure nếu lỗi không phải 429 (429 là do API, không phải proxy)
+                        if (currentProxy != null && statusCode != 429)
+                        {
+                            await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"HTTP {statusCode}");
+                        }
+
                         if (attempt < settings.MaxRetries)
                         {
                             await Task.Delay(settings.RetryDelayMs * attempt, token);
@@ -791,6 +814,12 @@ namespace SubPhim.Server.Services
 
                         // Hết số lần retry, trả về lỗi
                         return ($"Lỗi API: {response.StatusCode}", 0, errorType, errorMsg, statusCode);
+                    }
+
+                    // === Request thành công, ghi nhận proxy success ===
+                    if (currentProxy != null)
+                    {
+                        await _proxyService.RecordProxySuccessAsync(currentProxy.Id);
                     }
 
                     JObject parsedBody = JObject.Parse(responseBody);
@@ -865,6 +894,14 @@ namespace SubPhim.Server.Services
                 }
                 catch (Exception ex)
                 {
+                    // Ghi nhận proxy failure nếu là lỗi kết nối
+                    if (currentProxy != null && (ex is HttpRequestException || ex is TaskCanceledException))
+                    {
+                        await _proxyService.RecordProxyFailureAsync(currentProxy.Id, ex.Message);
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) failed: {Error}", 
+                            currentProxy.Id, currentProxy.Host, currentProxy.Port, ex.Message);
+                    }
+                    
                     _logger.LogError(ex, "Exception during API call. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
                         settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
 

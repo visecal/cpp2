@@ -141,6 +141,29 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
+        /// Check if proxy has valid authentication credentials.
+        /// </summary>
+        private static bool HasCredentials(Proxy proxy)
+        {
+            return !string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password);
+        }
+
+        /// <summary>
+        /// Build proxy URI with optional embedded credentials.
+        /// </summary>
+        private static Uri BuildProxyUri(string scheme, Proxy proxy)
+        {
+            if (HasCredentials(proxy))
+            {
+                // URL-encode username and password to handle special characters
+                var encodedUsername = Uri.EscapeDataString(proxy.Username!);
+                var encodedPassword = Uri.EscapeDataString(proxy.Password!);
+                return new Uri($"{scheme}://{encodedUsername}:{encodedPassword}@{proxy.Host}:{proxy.Port}");
+            }
+            return new Uri($"{scheme}://{proxy.Host}:{proxy.Port}");
+        }
+
+        /// <summary>
         /// Create handler for HTTP proxy.
         /// Uses SocketsHttpHandler with DefaultProxyCredentials for proper HTTPS tunneling
         /// authentication on Linux/Google Cloud VM environments.
@@ -149,23 +172,11 @@ namespace SubPhim.Server.Services
         {
             // Build proxy URI with embedded credentials for HTTPS CONNECT tunnel authentication
             // This approach works better on Linux environments and Google Cloud VMs
-            Uri proxyUri;
-            if (!string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password))
-            {
-                // URL-encode username and password to handle special characters
-                var encodedUsername = Uri.EscapeDataString(proxy.Username);
-                var encodedPassword = Uri.EscapeDataString(proxy.Password);
-                proxyUri = new Uri($"http://{encodedUsername}:{encodedPassword}@{proxy.Host}:{proxy.Port}");
-            }
-            else
-            {
-                proxyUri = new Uri($"http://{proxy.Host}:{proxy.Port}");
-            }
-
+            var proxyUri = BuildProxyUri("http", proxy);
             var webProxy = new WebProxy(proxyUri);
             
             // Also set credentials on WebProxy for compatibility with some proxy servers
-            if (!string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password))
+            if (HasCredentials(proxy))
             {
                 webProxy.Credentials = new NetworkCredential(proxy.Username, proxy.Password);
             }
@@ -176,7 +187,7 @@ namespace SubPhim.Server.Services
                 UseProxy = true,
                 ConnectTimeout = TimeSpan.FromSeconds(30),
                 // Set default proxy credentials for CONNECT tunnel authentication
-                DefaultProxyCredentials = !string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password)
+                DefaultProxyCredentials = HasCredentials(proxy)
                     ? new NetworkCredential(proxy.Username, proxy.Password)
                     : null
             };
@@ -190,18 +201,7 @@ namespace SubPhim.Server.Services
         private SocketsHttpHandler CreateSocksProxyHandler(Proxy proxy)
         {
             var socksScheme = proxy.Type == ProxyType.Socks5 ? "socks5" : "socks4";
-            Uri proxyUri;
-            if (!string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password))
-            {
-                // URL-encode username and password to handle special characters
-                var encodedUsername = Uri.EscapeDataString(proxy.Username);
-                var encodedPassword = Uri.EscapeDataString(proxy.Password);
-                proxyUri = new Uri($"{socksScheme}://{encodedUsername}:{encodedPassword}@{proxy.Host}:{proxy.Port}");
-            }
-            else
-            {
-                proxyUri = new Uri($"{socksScheme}://{proxy.Host}:{proxy.Port}");
-            }
+            var proxyUri = BuildProxyUri(socksScheme, proxy);
 
             return new SocketsHttpHandler
             {

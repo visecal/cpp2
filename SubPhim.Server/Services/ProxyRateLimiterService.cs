@@ -13,6 +13,10 @@ namespace SubPhim.Server.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<ProxyRateLimiterService> _logger;
 
+        // Constants
+        private const int DEFAULT_RPM_PER_PROXY = 10;
+        private static readonly TimeSpan RPM_WINDOW = TimeSpan.FromMinutes(1);
+
         // Dictionary chứa semaphore cho mỗi proxy (key = proxyId)
         private readonly ConcurrentDictionary<int, SemaphoreSlim> _proxySemaphores = new();
         
@@ -23,7 +27,7 @@ namespace SubPhim.Server.Services
         private readonly ConcurrentDictionary<string, (int ProxyId, DateTime ReleaseTime, CancellationTokenSource AutoReleaseCts)> _activeSlots = new();
         
         // Cache cho RPM settings
-        private volatile int _currentRpmPerProxy = 10;
+        private volatile int _currentRpmPerProxy = DEFAULT_RPM_PER_PROXY;
         private DateTime _lastSettingsRefresh = DateTime.MinValue;
         private readonly TimeSpan _settingsRefreshInterval = TimeSpan.FromSeconds(5);
         private readonly object _configLock = new();
@@ -62,7 +66,7 @@ namespace SubPhim.Server.Services
                     return;
                 }
 
-                int newRpmPerProxy = settings.RpmPerProxy > 0 ? settings.RpmPerProxy : 10;
+                int newRpmPerProxy = settings.RpmPerProxy > 0 ? settings.RpmPerProxy : DEFAULT_RPM_PER_PROXY;
 
                 lock (_configLock)
                 {
@@ -267,7 +271,7 @@ namespace SubPhim.Server.Services
         {
             var slotId = $"{requestId}_proxy{proxyId}_{Guid.NewGuid():N}";
             var autoReleaseCts = new CancellationTokenSource();
-            var releaseTime = DateTime.UtcNow.AddMinutes(1);
+            var releaseTime = DateTime.UtcNow.Add(RPM_WINDOW);
             
             _activeSlots[slotId] = (proxyId, releaseTime, autoReleaseCts);
             
@@ -275,23 +279,31 @@ namespace SubPhim.Server.Services
                 "Acquired slot {SlotId} for proxy {ProxyId}. Available: {Available}/{Max}",
                 slotId, proxyId, semaphore.CurrentCount, _currentRpmPerProxy);
             
-            // Schedule auto-release sau 1 phút (RPM window)
+            // Schedule auto-release sau RPM window (1 phút) sử dụng Timer
             ScheduleAutoRelease(slotId, proxyId, semaphore, autoReleaseCts.Token);
             
             return slotId;
         }
 
         /// <summary>
-        /// Lên lịch tự động release slot sau 1 phút.
+        /// Lên lịch tự động release slot sau RPM window sử dụng Timer.
+        /// Timer hiệu quả hơn Task.Run vì không tạo thread mới cho mỗi slot.
         /// </summary>
         private void ScheduleAutoRelease(string slotId, int proxyId, SemaphoreSlim semaphore, CancellationToken cancellationToken)
         {
-            Task.Run(async () =>
+            // Use Timer for more efficient scheduling
+            Timer? timer = null;
+            timer = new Timer(_ =>
             {
+                // Check if cancelled
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    timer?.Dispose();
+                    return;
+                }
+                
                 try
                 {
-                    await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
-
                     if (_activeSlots.TryRemove(slotId, out var entry))
                     {
                         try { entry.AutoReleaseCts.Dispose(); }
@@ -301,8 +313,8 @@ namespace SubPhim.Server.Services
                         {
                             semaphore.Release();
                             _logger.LogDebug(
-                                "Auto-released slot {SlotId} for proxy {ProxyId} after 1 minute",
-                                slotId, proxyId);
+                                "Auto-released slot {SlotId} for proxy {ProxyId} after {Window}",
+                                slotId, proxyId, RPM_WINDOW);
                         }
                         catch (SemaphoreFullException)
                         {
@@ -314,15 +326,22 @@ namespace SubPhim.Server.Services
                         }
                     }
                 }
-                catch (OperationCanceledException)
-                {
-                    // Cancelled by early release - expected
-                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error in auto-release for slot {SlotId}", slotId);
                 }
-            }, CancellationToken.None);
+                finally
+                {
+                    timer?.Dispose();
+                }
+            }, null, RPM_WINDOW, Timeout.InfiniteTimeSpan);
+            
+            // Register cancellation to dispose timer if slot is released early
+            cancellationToken.Register(() =>
+            {
+                try { timer?.Dispose(); }
+                catch { /* Ignore */ }
+            });
         }
     }
 }

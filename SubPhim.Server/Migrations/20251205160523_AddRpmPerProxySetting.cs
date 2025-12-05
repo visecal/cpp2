@@ -15,7 +15,7 @@ namespace SubPhim.Server.Migrations
                 table: "LocalApiSettings",
                 type: "INTEGER",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 10); // Default RPM per proxy
         }
 
         /// <inheritdoc />

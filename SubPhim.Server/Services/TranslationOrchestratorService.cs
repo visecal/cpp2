@@ -33,6 +33,7 @@ namespace SubPhim.Server.Services
         // === Constants ===
         private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
+        private const int MAX_PROXY_SEARCH_ATTEMPTS = 10; // Số lần thử tìm proxy có RPM slot
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
         // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
@@ -1089,9 +1090,8 @@ namespace SubPhim.Server.Services
             
             // Current proxy is at RPM limit, try to find another one
             var triedProxyIds = new HashSet<int>(excludeProxyIds) { proxy.Id };
-            int maxAttempts = 10; // Prevent infinite loop
             
-            for (int i = 0; i < maxAttempts; i++)
+            for (int i = 0; i < MAX_PROXY_SEARCH_ATTEMPTS; i++)
             {
                 var nextProxy = await _proxyService.GetNextProxyAsync(triedProxyIds);
                 if (nextProxy == null)

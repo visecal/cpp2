@@ -142,22 +142,46 @@ namespace SubPhim.Server.Services
 
         /// <summary>
         /// Create handler for HTTP proxy.
+        /// Uses SocketsHttpHandler with DefaultProxyCredentials for proper HTTPS tunneling
+        /// authentication on Linux/Google Cloud VM environments.
         /// </summary>
-        private HttpClientHandler CreateHttpProxyHandler(Proxy proxy)
+        private SocketsHttpHandler CreateHttpProxyHandler(Proxy proxy)
         {
-            var proxyUri = new Uri($"http://{proxy.Host}:{proxy.Port}");
+            // Build proxy URI with embedded credentials for HTTPS CONNECT tunnel authentication
+            // This approach works better on Linux environments and Google Cloud VMs
+            Uri proxyUri;
+            if (!string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password))
+            {
+                // URL-encode username and password to handle special characters
+                var encodedUsername = Uri.EscapeDataString(proxy.Username);
+                var encodedPassword = Uri.EscapeDataString(proxy.Password);
+                proxyUri = new Uri($"http://{encodedUsername}:{encodedPassword}@{proxy.Host}:{proxy.Port}");
+            }
+            else
+            {
+                proxyUri = new Uri($"http://{proxy.Host}:{proxy.Port}");
+            }
+
             var webProxy = new WebProxy(proxyUri);
             
+            // Also set credentials on WebProxy for compatibility with some proxy servers
             if (!string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password))
             {
                 webProxy.Credentials = new NetworkCredential(proxy.Username, proxy.Password);
             }
 
-            return new HttpClientHandler
+            var handler = new SocketsHttpHandler
             {
                 Proxy = webProxy,
-                UseProxy = true
+                UseProxy = true,
+                ConnectTimeout = TimeSpan.FromSeconds(30),
+                // Set default proxy credentials for CONNECT tunnel authentication
+                DefaultProxyCredentials = !string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password)
+                    ? new NetworkCredential(proxy.Username, proxy.Password)
+                    : null
             };
+
+            return handler;
         }
 
         /// <summary>
@@ -166,9 +190,18 @@ namespace SubPhim.Server.Services
         private SocketsHttpHandler CreateSocksProxyHandler(Proxy proxy)
         {
             var socksScheme = proxy.Type == ProxyType.Socks5 ? "socks5" : "socks4";
-            var proxyUri = !string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password)
-                ? new Uri($"{socksScheme}://{proxy.Username}:{proxy.Password}@{proxy.Host}:{proxy.Port}")
-                : new Uri($"{socksScheme}://{proxy.Host}:{proxy.Port}");
+            Uri proxyUri;
+            if (!string.IsNullOrEmpty(proxy.Username) && !string.IsNullOrEmpty(proxy.Password))
+            {
+                // URL-encode username and password to handle special characters
+                var encodedUsername = Uri.EscapeDataString(proxy.Username);
+                var encodedPassword = Uri.EscapeDataString(proxy.Password);
+                proxyUri = new Uri($"{socksScheme}://{encodedUsername}:{encodedPassword}@{proxy.Host}:{proxy.Port}");
+            }
+            else
+            {
+                proxyUri = new Uri($"{socksScheme}://{proxy.Host}:{proxy.Port}");
+            }
 
             return new SocketsHttpHandler
             {

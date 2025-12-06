@@ -57,7 +57,6 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
 
         public class GlobalSettingsInputModel
         {
-            [Required][Range(1, 1000)] public int Rpm { get; set; }
             [Required][Range(1, 500)] public int BatchSize { get; set; }
             [Required][Range(0, 10)] public int MaxRetries { get; set; }
             [Required][Range(0, 60000)] public int RetryDelayMs { get; set; }
@@ -67,12 +66,16 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
             public bool EnableThinkingBudget { get; set; }
             [Range(0, 16384)] public int ThinkingBudget { get; set; }
             
-            // Global Rate Limiting Settings
-            [Required][Range(1, 1000)] public int GlobalMaxRequests { get; set; }
-            [Required][Range(1, 60)] public int GlobalWindowMinutes { get; set; }
+            // Professional Model Settings
+            [Required][StringLength(100)] public string ProfessionalModel { get; set; }
+            [Required][Range(1, 1000)] public int ProRpm { get; set; }
+            [Required][Range(1, 10000)] public int ProRpdPerKey { get; set; }
+            [Required][Range(1, 1000)] public int ProRpmPerProxy { get; set; }
             
-            // Proxy Rate Limiting Settings
-            [Required][Range(1, 1000)] public int RpmPerProxy { get; set; }
+            // Flash Model Settings
+            [Required][Range(1, 1000)] public int FlashRpm { get; set; }
+            [Required][Range(1, 10000)] public int FlashRpdPerKey { get; set; }
+            [Required][Range(1, 1000)] public int FlashRpmPerProxy { get; set; }
         }
         #endregion
 
@@ -82,7 +85,6 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
             var settingsFromDb = await _context.LocalApiSettings.FindAsync(1) ?? new LocalApiSetting();
             GlobalSettings = new GlobalSettingsInputModel
             {
-                Rpm = settingsFromDb.Rpm,
                 BatchSize = settingsFromDb.BatchSize,
                 MaxRetries = settingsFromDb.MaxRetries,
                 RetryDelayMs = settingsFromDb.RetryDelayMs,
@@ -91,9 +93,13 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 MaxOutputTokens = settingsFromDb.MaxOutputTokens,
                 EnableThinkingBudget = settingsFromDb.EnableThinkingBudget,
                 ThinkingBudget = settingsFromDb.ThinkingBudget,
-                GlobalMaxRequests = settingsFromDb.GlobalMaxRequests,
-                GlobalWindowMinutes = settingsFromDb.GlobalWindowMinutes,
-                RpmPerProxy = settingsFromDb.RpmPerProxy
+                ProfessionalModel = settingsFromDb.ProfessionalModel,
+                ProRpm = settingsFromDb.ProRpm,
+                ProRpdPerKey = settingsFromDb.ProRpdPerKey,
+                ProRpmPerProxy = settingsFromDb.ProRpmPerProxy,
+                FlashRpm = settingsFromDb.FlashRpm,
+                FlashRpdPerKey = settingsFromDb.FlashRpdPerKey,
+                FlashRpmPerProxy = settingsFromDb.FlashRpmPerProxy
             };
         }
         public async Task<IActionResult> OnPostDeleteSelectedKeysAsync([FromForm] int[] selectedKeyIds)
@@ -184,7 +190,6 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                     settingsInDb = new LocalApiSetting { Id = 1 };
                     _context.LocalApiSettings.Add(settingsInDb);
                 }
-                settingsInDb.Rpm = GlobalSettings.Rpm;
                 settingsInDb.BatchSize = GlobalSettings.BatchSize;
                 settingsInDb.MaxRetries = GlobalSettings.MaxRetries;
                 settingsInDb.RetryDelayMs = GlobalSettings.RetryDelayMs;
@@ -193,9 +198,13 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 settingsInDb.MaxOutputTokens = GlobalSettings.MaxOutputTokens;
                 settingsInDb.EnableThinkingBudget = GlobalSettings.EnableThinkingBudget;
                 settingsInDb.ThinkingBudget = GlobalSettings.ThinkingBudget;
-                settingsInDb.GlobalMaxRequests = GlobalSettings.GlobalMaxRequests;
-                settingsInDb.GlobalWindowMinutes = GlobalSettings.GlobalWindowMinutes;
-                settingsInDb.RpmPerProxy = GlobalSettings.RpmPerProxy;
+                settingsInDb.ProfessionalModel = GlobalSettings.ProfessionalModel;
+                settingsInDb.ProRpm = GlobalSettings.ProRpm;
+                settingsInDb.ProRpdPerKey = GlobalSettings.ProRpdPerKey;
+                settingsInDb.ProRpmPerProxy = GlobalSettings.ProRpmPerProxy;
+                settingsInDb.FlashRpm = GlobalSettings.FlashRpm;
+                settingsInDb.FlashRpdPerKey = GlobalSettings.FlashRpdPerKey;
+                settingsInDb.FlashRpmPerProxy = GlobalSettings.FlashRpmPerProxy;
                 await _context.SaveChangesAsync();
                 SuccessMessage = "Đã lưu thành công cài đặt chung.";
             }

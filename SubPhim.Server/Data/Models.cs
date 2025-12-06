@@ -56,6 +56,13 @@ namespace SubPhim.Server.Data
         Paid = 1, // Dành cho các gói trả phí
         Free = 2  // Dành cho gói Free
     }
+    
+    public enum GeminiLocalModelType
+    {
+        Flash = 1,  // gemini-2.5-flash và các biến thể flash
+        Pro = 2     // gemini-2.5-pro và các biến thể pro
+    }
+    
     public enum SubscriptionTier { Free, Daily, Monthly, Yearly, Lifetime }
 
     public class User
@@ -237,6 +244,12 @@ namespace SubPhim.Server.Data
 
         [Display(Name = "Số Request Hôm Nay")]
         public int RequestsToday { get; set; } = 0;
+        
+        [Display(Name = "Số Request Pro Hôm Nay")]
+        public int ProRequestsToday { get; set; } = 0;
+        
+        [Display(Name = "Số Request Flash Hôm Nay")]
+        public int FlashRequestsToday { get; set; } = 0;
 
         [Display(Name = "Lần cuối reset bộ đếm Request (UTC)")]
         public DateTime LastRequestCountResetUtc { get; set; } = DateTime.UtcNow;
@@ -504,8 +517,13 @@ namespace SubPhim.Server.Data
 
         [Display(Name = "Đang được kích hoạt")]
         public bool IsActive { get; set; }
+        
         [Display(Name = "Nhóm API")]
         public ApiPoolType PoolType { get; set; } = ApiPoolType.Paid;
+        
+        [Display(Name = "Loại Model Gemini (Pro/Flash)")]
+        public GeminiLocalModelType? ModelType { get; set; } // Nullable để tương thích ngược
+        
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
     public class LocalApiSetting
@@ -513,9 +531,6 @@ namespace SubPhim.Server.Data
         // Dùng Id cố định là 1 để luôn chỉ có 1 dòng setting
         [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; } = 1;
-
-        [Display(Name = "Request/Phút (RPM)")]
-        public int Rpm { get; set; } = 100;
 
         [Display(Name = "Số dòng/Request (Batch Size)")]
         public int BatchSize { get; set; } = 40;
@@ -544,15 +559,35 @@ namespace SubPhim.Server.Data
         [Display(Name = "Thinking Budget (IQ AI)")]
         public int ThinkingBudget { get; set; } = 8192;
 
-        // --- GLOBAL RATE LIMIT SETTINGS ---
-        [Display(Name = "Giới hạn Request toàn server")]
-        public int GlobalMaxRequests { get; set; } = 20;
+        // --- PRO MODEL SETTINGS ---
+        [Display(Name = "Model Chuyên Nghiệp (Pro)")]
+        [StringLength(100)]
+        public string ProfessionalModel { get; set; } = "gemini-2.5-pro";
+        
+        [Display(Name = "Request/Phút Pro (RPM)")]
+        public int ProRpm { get; set; } = 100;
+        
+        [Display(Name = "Request/Ngày/Key Pro (RPD)")]
+        public int ProRpdPerKey { get; set; } = 250;
+        
+        [Display(Name = "Request/Phút/Proxy Pro")]
+        public int ProRpmPerProxy { get; set; } = 10;
 
-        [Display(Name = "Cửa sổ thời gian (phút)")]
-        public int GlobalWindowMinutes { get; set; } = 2;
+        // --- FLASH MODEL SETTINGS ---
+        [Display(Name = "Request/Phút Flash (RPM)")]
+        public int FlashRpm { get; set; } = 100;
+        
+        [Display(Name = "Request/Ngày/Key Flash (RPD)")]
+        public int FlashRpdPerKey { get; set; } = 250;
+        
+        [Display(Name = "Request/Phút/Proxy Flash")]
+        public int FlashRpmPerProxy { get; set; } = 10;
 
-        // --- PROXY RATE LIMIT SETTINGS ---
-        [Display(Name = "Request/Phút/Proxy (RPM)")]
+        // --- LEGACY FIELDS (Kept for backward compatibility, deprecated) ---
+        [Display(Name = "Request/Phút (RPM) - DEPRECATED")]
+        public int Rpm { get; set; } = 100;
+
+        [Display(Name = "Request/Phút/Proxy (RPM) - DEPRECATED")]
         public int RpmPerProxy { get; set; } = 10;
 
         // --- KẾT THÚC THÊM CÁC TRƯỜNG MỚI ---

@@ -33,8 +33,13 @@ namespace SubPhim.Server.Controllers
             {
                 return BadRequest("Nội dung dịch không được để trống.");
             }
+            
+            if (string.IsNullOrWhiteSpace(request.SystemInstruction))
+            {
+                return BadRequest("System Instruction không được để trống.");
+            }
 
-            _logger.LogInformation("Received AIO translation request from User ID {UserId} for genre '{Genre}'", userId, request.Genre);
+            _logger.LogInformation("Received AIO translation request from User ID {UserId}", userId);
 
             var result = await _aioLauncherService.CreateJobAsync(userId, request);
 

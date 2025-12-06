@@ -1,7 +1,7 @@
 ﻿namespace SubPhim.Server.Services.Aio
 {
     // DTO client gửi lên
-    public record AioTranslationRequest(string Genre, string TargetLanguage, string Content);
+    public record AioTranslationRequest(string SystemInstruction, string Content, string TargetLanguage = "Vietnamese");
 
     // DTO server trả về khi tạo job
     public record CreateJobResult(bool IsSuccess, string Message, string SessionId = null);

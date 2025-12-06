@@ -130,6 +130,8 @@ namespace SubPhim.Server.Pages.Admin
                 settingsInDb.MaxOutputTokens = Settings.MaxOutputTokens;
                 settingsInDb.RpmPerKey = Settings.RpmPerKey;
                 settingsInDb.RpdPerKey = Settings.RpdPerKey;
+                settingsInDb.RpmPerProxy = Settings.RpmPerProxy;
+                settingsInDb.RpdPerProxy = Settings.RpdPerProxy;
                 settingsInDb.EnableThinkingBudget = Settings.EnableThinkingBudget;
                 settingsInDb.ThinkingBudget = Settings.ThinkingBudget;
                 settingsInDb.MaxApiRetries = Settings.MaxApiRetries;

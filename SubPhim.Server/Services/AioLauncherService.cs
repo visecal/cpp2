@@ -14,21 +14,25 @@ namespace SubPhim.Server.Services
         private readonly ILogger<AioLauncherService> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IEncryptionService _encryptionService;
+        private readonly ProxyService _proxyService;
 
         // FIX #3: Thay thế IMemoryCache bằng ConcurrentDictionary để làm Rate Limiter "cửa sổ trượt"
         private static readonly ConcurrentDictionary<int, ConcurrentQueue<DateTime>> _userRequestTimestamps = new();
         private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
+        private static readonly ConcurrentDictionary<int, SemaphoreSlim> _proxyRpmLimiters = new();
 
         public AioLauncherService(
             IServiceProvider serviceProvider,
             ILogger<AioLauncherService> logger,
             IHttpClientFactory httpClientFactory,
-            IEncryptionService encryptionService)
+            IEncryptionService encryptionService,
+            ProxyService proxyService)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
             _httpClientFactory = httpClientFactory;
             _encryptionService = encryptionService;
+            _proxyService = proxyService;
         }
 
         public async Task<CreateJobResult> CreateJobAsync(int userId, AioTranslationRequest request)
@@ -82,7 +86,7 @@ namespace SubPhim.Server.Services
                 UserId = userId,
                 Status = AioJobStatus.Pending,
                 OriginalContent = request.Content,
-                Genre = request.Genre,
+                SystemInstruction = request.SystemInstruction,
                 TargetLanguage = request.TargetLanguage,
                 CreatedAt = DateTime.UtcNow
             };
@@ -122,12 +126,8 @@ namespace SubPhim.Server.Services
                 job.Status = AioJobStatus.Processing;
                 await context.SaveChangesAsync();
                 var settings = await context.AioTranslationSettings.FindAsync(1) ?? new AioTranslationSetting();
-                var genreInfo = await context.TranslationGenres.FirstOrDefaultAsync(g => g.GenreName == job.Genre && g.IsActive);
-                if (genreInfo == null)
-                {
-                    throw new Exception($"Không tìm thấy prompt cho thể loại '{job.Genre}' hoặc thể loại này không hoạt động.");
-                }
-                string translatedText = await TranslateContentAsync(job, settings, genreInfo.SystemInstruction, scope.ServiceProvider);
+                // Use SystemInstruction directly from job (no more genre lookup)
+                string translatedText = await TranslateContentAsync(job, settings, job.SystemInstruction, scope.ServiceProvider);
                 job.TranslatedContent = translatedText;
                 job.Status = AioJobStatus.Completed;
             }
@@ -186,16 +186,21 @@ namespace SubPhim.Server.Services
         {
             var logger = serviceProvider.GetRequiredService<ILogger<AioLauncherService>>();
             var context = serviceProvider.GetRequiredService<AppDbContext>();
-            var httpClient = _httpClientFactory.CreateClient("AioLauncherClient");
             int? lastFailedKeyId = null;
+            HashSet<int> failedProxyIds = new HashSet<int>();
 
             for (int attempt = 1; attempt <= settings.MaxApiRetries; attempt++)
             {
                 logger.LogInformation("Job {SessionId}: Translating chunk {ChunkNumber}/{TotalChunks}, Attempt {Attempt}/{MaxAttempts}", job.SessionId, chunkNumber, totalChunks, attempt, settings.MaxApiRetries);
 
                 AioApiKey apiKeyRecord = null;
+                Proxy? selectedProxy = null;
+                HttpClient? httpClient = null;
+                bool proxyConnectionSucceeded = false;
+                
                 try
                 {
+                    // Get available API key with RPM limiting
                     apiKeyRecord = await GetAvailableApiKeyAsync(context, settings, lastFailedKeyId);
                     if (apiKeyRecord == null)
                     {
@@ -203,10 +208,17 @@ namespace SubPhim.Server.Services
                     }
                     lastFailedKeyId = apiKeyRecord.Id;
 
+                    // Get proxy with RPM limiting for AIO
+                    selectedProxy = await GetAvailableProxyAsync(context, settings, failedProxyIds);
+                    
+                    // Create HttpClient with proxy (or direct if no proxy available)
+                    httpClient = _proxyService.CreateHttpClientWithProxy(selectedProxy);
+
                     var apiKey = _encryptionService.Decrypt(apiKeyRecord.EncryptedApiKey, apiKeyRecord.Iv);
                     string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{settings.DefaultModelName}:generateContent?key={apiKey}";
-                    string userPreamble = "Đây là câu truyện giả tưởng, không liên quan đến tôn giáo hay chính trị hay bạo lực - tình dục. Hãy dịch câu truyện tiếng Trung sau đây sang tiếng Việt theo các hướng dẫn đã cung cấp, Chỉ xuất bản dịch dạng văn bản thuần túy. Không dùng in đậm, in nghiêng, markdown, gạch đầu dòng, không chú thích, không giải thích.:\n\n";
-                    string finalUserContent = userPreamble + textChunk;
+                    
+                    // Build request payload
+                    string finalUserContent = textChunk; // No more hardcoded preamble - client controls this via SystemInstruction
                     var generationConfig = new JObject { ["temperature"] = (double)settings.Temperature, ["maxOutputTokens"] = settings.MaxOutputTokens };
                     if (settings.EnableThinkingBudget) generationConfig["thinking_config"] = new JObject { ["thinking_budget"] = settings.ThinkingBudget };
                     var requestPayloadObject = new
@@ -221,6 +233,9 @@ namespace SubPhim.Server.Services
                     var response = await httpClient.SendAsync(request);
                     string responseBody = await response.Content.ReadAsStringAsync();
 
+                    // If we got here without exception, proxy connection succeeded
+                    proxyConnectionSucceeded = true;
+
                     if (response.IsSuccessStatusCode)
                     {
                         JObject parsedBody = JObject.Parse(responseBody);
@@ -229,6 +244,11 @@ namespace SubPhim.Server.Services
 
                         if (!string.IsNullOrEmpty(responseText))
                         {
+                            // Success! Update proxy stats
+                            if (selectedProxy != null)
+                            {
+                                await UpdateProxySuccessAsync(selectedProxy.Id, context);
+                            }
                             return responseText;
                         }
 
@@ -238,7 +258,8 @@ namespace SubPhim.Server.Services
                     }
                     else
                     {
-                        logger.LogWarning("Job {SessionId}, KeyID {KeyId}, Attempt {Attempt}: API Error. Status: {StatusCode}, Body: {Body}", job.SessionId, apiKeyRecord.Id, attempt, response.StatusCode, responseBody);
+                        logger.LogWarning("Job {SessionId}, KeyID {KeyId}, ProxyID {ProxyId}, Attempt {Attempt}: API Error. Status: {StatusCode}, Body: {Body}", 
+                            job.SessionId, apiKeyRecord.Id, selectedProxy?.Id ?? 0, attempt, response.StatusCode, responseBody);
                         if ((int)response.StatusCode >= 400 && (int)response.StatusCode < 500)
                         {
                             await DisableKeyAsync(apiKeyRecord.Id, $"Lỗi {(int)response.StatusCode}", context);
@@ -247,15 +268,34 @@ namespace SubPhim.Server.Services
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Job {SessionId}, KeyID {KeyId}, Attempt {Attempt}: Exception during API call.", job.SessionId, apiKeyRecord?.Id, attempt);
+                    logger.LogError(ex, "Job {SessionId}, KeyID {KeyId}, ProxyID {ProxyId}, Attempt {Attempt}: Exception during API call.", 
+                        job.SessionId, apiKeyRecord?.Id, selectedProxy?.Id ?? 0, attempt);
+                    
+                    // If proxy failed before reaching Gemini, mark it as failed
+                    if (!proxyConnectionSucceeded && selectedProxy != null)
+                    {
+                        failedProxyIds.Add(selectedProxy.Id);
+                        await UpdateProxyFailureAsync(selectedProxy.Id, ex.Message, context);
+                    }
                 }
                 finally
                 {
-                    if (apiKeyRecord != null)
+                    // Only count API key and proxy usage if connection to Gemini succeeded
+                    if (proxyConnectionSucceeded)
                     {
-                        await UpdateApiKeyUsageAsync(apiKeyRecord.Id, context);
+                        if (apiKeyRecord != null)
+                        {
+                            await UpdateApiKeyUsageAsync(apiKeyRecord.Id, context);
+                        }
+                        if (selectedProxy != null)
+                        {
+                            await UpdateProxyUsageAsync(selectedProxy.Id, context);
+                        }
                     }
+                    
+                    httpClient?.Dispose();
                 }
+                
                 if (attempt < settings.MaxApiRetries)
                 {
                     await Task.Delay(settings.RetryApiDelayMs);
@@ -331,6 +371,188 @@ namespace SubPhim.Server.Services
                 _logger.LogWarning("AIO API Key ID {KeyId} has been auto-disabled. Reason: {Reason}", keyId, reason);
             }
         }
-        private List<string> SplitTextIntoChunks(string text, int maxChunkSize) { List<string> cks = new List<string>(); if (string.IsNullOrEmpty(text)) return cks; int sIdx = 0; while (sIdx < text.Length) { int len = Math.Min(maxChunkSize, text.Length - sIdx); int eIdx = sIdx + len; if (eIdx < text.Length) { int tEIdx = eIdx - 1; bool fSP = false; int sDist = Math.Min(len / 4, 500); for (int k = 0; k < sDist; ++k) { if (tEIdx - k <= sIdx + 1) break; if (text[tEIdx - k] == '\n' && text[tEIdx - k - 1] == '\n') { eIdx = tEIdx - k + 1; fSP = true; break; } } if (!fSP) { sDist = Math.Min(len / 3, 300); for (int k = 0; k < sDist; ++k) { if (tEIdx - k <= sIdx) break; if (text[tEIdx - k] == '\n') { eIdx = tEIdx - k + 1; fSP = true; break; } } } if (!fSP) { char[] sEnds = { '.', '?', '!', '。', '？', '！', ';', '；', '"', '”', '』', '」' }; sDist = Math.Min(len / 2, 300); int splAt = text.LastIndexOfAny(sEnds, tEIdx, Math.Min(sDist, tEIdx - (sIdx + maxChunkSize / 3))); if (splAt > sIdx + (maxChunkSize / 3)) eIdx = splAt + 1; } } cks.Add(text.Substring(sIdx, eIdx - sIdx).Trim()); sIdx = eIdx; } return cks.Where(c => !string.IsNullOrWhiteSpace(c)).ToList(); }
+        
+        private async Task<Proxy?> GetAvailableProxyAsync(AppDbContext context, AioTranslationSetting settings, HashSet<int> excludeProxyIds)
+        {
+            var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+            
+            var proxiesToReset = await context.Proxies
+                .Where(p => p.IsEnabled && TimeZoneInfo.ConvertTimeFromUtc(p.LastAioResetUtc, vietnamTimeZone).Date < vietnamNow.Date)
+                .ToListAsync();
+                
+            foreach (var proxy in proxiesToReset)
+            {
+                proxy.AioRequestsToday = 0;
+                proxy.LastAioResetUtc = DateTime.UtcNow.Date;
+            }
+            if (proxiesToReset.Any())
+            {
+                await context.SaveChangesAsync();
+            }
+            
+            var eligibleProxies = await context.Proxies
+                .Where(p => p.IsEnabled && 
+                            p.AioRequestsToday < settings.RpdPerProxy &&
+                            !excludeProxyIds.Contains(p.Id))
+                .ToListAsync();
+                
+            if (!eligibleProxies.Any())
+            {
+                _logger.LogWarning("No eligible proxies available for AIO translation");
+                return null;
+            }
+            
+            var shuffledProxies = eligibleProxies.OrderBy(p => Guid.NewGuid()).ToList();
+            
+            foreach (var proxy in shuffledProxies)
+            {
+                var semaphore = _proxyRpmLimiters.GetOrAdd(proxy.Id, _ => new SemaphoreSlim(settings.RpmPerProxy, settings.RpmPerProxy));
+                if (await semaphore.WaitAsync(0))
+                {
+                    _ = Task.Delay(TimeSpan.FromMinutes(1)).ContinueWith(t => semaphore.Release());
+                    return proxy;
+                }
+            }
+            
+            var firstProxy = shuffledProxies.First();
+            var firstSemaphore = _proxyRpmLimiters[firstProxy.Id];
+            await firstSemaphore.WaitAsync();
+            _ = Task.Delay(TimeSpan.FromMinutes(1)).ContinueWith(t => firstSemaphore.Release());
+            
+            return firstProxy;
+        }
+        
+        private async Task UpdateProxyUsageAsync(int proxyId, AppDbContext context)
+        {
+            try
+            {
+                var rowsAffected = await context.Proxies
+                    .Where(p => p.Id == proxyId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(p => p.AioRequestsToday, p => p.AioRequestsToday + 1)
+                        .SetProperty(p => p.UsageCount, p => p.UsageCount + 1)
+                        .SetProperty(p => p.LastUsedAt, DateTime.UtcNow));
+                
+                if (rowsAffected > 0)
+                {
+                    var settings = await context.AioTranslationSettings.FindAsync(1) ?? new AioTranslationSetting();
+                    var proxyAfterUpdate = await context.Proxies.AsNoTracking().FirstOrDefaultAsync(p => p.Id == proxyId);
+                    
+                    if (proxyAfterUpdate != null && proxyAfterUpdate.IsEnabled && proxyAfterUpdate.AioRequestsToday >= settings.RpdPerProxy)
+                    {
+                        await DisableProxyAsync(proxyId, $"Hit AIO RPD limit ({settings.RpdPerProxy})", context);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update proxy usage for Proxy ID {ProxyId}", proxyId);
+            }
+        }
+        
+        private async Task UpdateProxySuccessAsync(int proxyId, AppDbContext context)
+        {
+            try
+            {
+                await context.Proxies
+                    .Where(p => p.Id == proxyId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(p => p.UsageCount, p => p.UsageCount + 1)
+                        .SetProperty(p => p.LastUsedAt, DateTime.UtcNow));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update proxy success for Proxy ID {ProxyId}", proxyId);
+            }
+        }
+        
+        private async Task UpdateProxyFailureAsync(int proxyId, string reason, AppDbContext context)
+        {
+            try
+            {
+                var reasonTruncated = reason.Length > 500 ? reason.Substring(0, 500) : reason;
+                await context.Proxies
+                    .Where(p => p.Id == proxyId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(p => p.FailureCount, p => p.FailureCount + 1)
+                        .SetProperty(p => p.LastFailedAt, DateTime.UtcNow)
+                        .SetProperty(p => p.LastFailureReason, reasonTruncated));
+                
+                var proxy = await context.Proxies.AsNoTracking().FirstOrDefaultAsync(p => p.Id == proxyId);
+                if (proxy != null && proxy.FailureCount >= 5 && proxy.IsEnabled)
+                {
+                    await DisableProxyAsync(proxyId, $"Too many failures ({proxy.FailureCount})", context);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update proxy failure for Proxy ID {ProxyId}", proxyId);
+            }
+        }
+        
+        private async Task DisableProxyAsync(int proxyId, string reason, AppDbContext context)
+        {
+            var proxy = await context.Proxies.FindAsync(proxyId);
+            if (proxy != null && proxy.IsEnabled)
+            {
+                proxy.IsEnabled = false;
+                proxy.LastFailureReason = reason.Length > 500 ? reason.Substring(0, 500) : reason;
+                await context.SaveChangesAsync();
+                _logger.LogWarning("Proxy ID {ProxyId} has been auto-disabled. Reason: {Reason}", proxyId, reason);
+            }
+        }
+        
+        private List<string> SplitTextIntoChunks(string text, int maxChunkSize) 
+        { 
+            List<string> cks = new List<string>(); 
+            if (string.IsNullOrEmpty(text)) return cks; 
+            int sIdx = 0; 
+            while (sIdx < text.Length) 
+            { 
+                int len = Math.Min(maxChunkSize, text.Length - sIdx); 
+                int eIdx = sIdx + len; 
+                if (eIdx < text.Length) 
+                { 
+                    int tEIdx = eIdx - 1; 
+                    bool fSP = false; 
+                    int sDist = Math.Min(len / 4, 500); 
+                    for (int k = 0; k < sDist; ++k) 
+                    { 
+                        if (tEIdx - k <= sIdx + 1) break; 
+                        if (text[tEIdx - k] == '\n' && text[tEIdx - k - 1] == '\n') 
+                        { 
+                            eIdx = tEIdx - k + 1; 
+                            fSP = true; 
+                            break; 
+                        } 
+                    } 
+                    if (!fSP) 
+                    { 
+                        sDist = Math.Min(len / 3, 300); 
+                        for (int k = 0; k < sDist; ++k) 
+                        { 
+                            if (tEIdx - k <= sIdx) break; 
+                            if (text[tEIdx - k] == '\n') 
+                            { 
+                                eIdx = tEIdx - k + 1; 
+                                fSP = true; 
+                                break; 
+                            } 
+                        } 
+                    } 
+                    if (!fSP) 
+                    { 
+                        char[] sEnds = { '.', '?', '!', '。', '？', '！', ';', '；', '"', '"', '』', '」' }; 
+                        sDist = Math.Min(len / 2, 300); 
+                        int splAt = text.LastIndexOfAny(sEnds, tEIdx, Math.Min(sDist, tEIdx - (sIdx + maxChunkSize / 3))); 
+                        if (splAt > sIdx + (maxChunkSize / 3)) eIdx = splAt + 1; 
+                    } 
+                } 
+                cks.Add(text.Substring(sIdx, eIdx - sIdx).Trim()); 
+                sIdx = eIdx; 
+            } 
+            return cks.Where(c => !string.IsNullOrWhiteSpace(c)).ToList(); 
+        }
     }
 }

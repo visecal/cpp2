@@ -399,6 +399,13 @@ namespace SubPhim.Server.Data
         public int RpmPerKey { get; set; } = 10;
         [Display(Name = "Request/Ngày/Key (RPD)")]
         public int RpdPerKey { get; set; } = 100;
+        
+        [Display(Name = "Request/Phút/Proxy")]
+        public int RpmPerProxy { get; set; } = 60;
+        
+        [Display(Name = "Request/Ngày/Proxy (RPD)")]
+        public int RpdPerProxy { get; set; } = 1500;
+        
         [Display(Name = "Số lần thử lại API nếu lỗi")]
         public int MaxApiRetries { get; set; } = 3;
 
@@ -477,7 +484,10 @@ namespace SubPhim.Server.Data
         [Column(TypeName = "TEXT")]
         public string? TranslatedContent { get; set; }
 
-        public string Genre { get; set; }
+        [Column(TypeName = "TEXT")]
+        [Display(Name = "System Instruction")]
+        public string SystemInstruction { get; set; }
+        
         public string TargetLanguage { get; set; }
         public string? ErrorMessage { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -753,6 +763,12 @@ namespace SubPhim.Server.Data
         [StringLength(500)]
         [Display(Name = "Lý do lỗi cuối")]
         public string? LastFailureReason { get; set; }
+        
+        [Display(Name = "Request hôm nay (AIO)")]
+        public int AioRequestsToday { get; set; } = 0;
+        
+        [Display(Name = "Lần cuối reset AIO (UTC)")]
+        public DateTime LastAioResetUtc { get; set; } = DateTime.UtcNow;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }

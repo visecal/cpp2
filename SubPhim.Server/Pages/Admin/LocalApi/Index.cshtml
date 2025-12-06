@@ -32,10 +32,6 @@
                     @Html.AntiForgeryToken()
                     <div class="row">
                         <div class="col-md-3 mb-3">
-                            <label asp-for="GlobalSettings.Rpm" class="form-label">Request/Phút (RPM)</label>
-                            <input asp-for="GlobalSettings.Rpm" class="form-control" />
-                        </div>
-                        <div class="col-md-3 mb-3">
                             <label asp-for="GlobalSettings.BatchSize" class="form-label">Số dòng/Request (Batch Size)</label>
                             <input asp-for="GlobalSettings.BatchSize" class="form-control" />
                         </div>
@@ -48,16 +44,16 @@
                             <input asp-for="GlobalSettings.RetryDelayMs" class="form-control" />
                         </div>
                         <div class="col-md-3 mb-3">
+                            <label asp-for="GlobalSettings.DelayBetweenBatchesMs" class="form-label">Delay giữa các batch (ms)</label>
+                            <input asp-for="GlobalSettings.DelayBetweenBatchesMs" class="form-control" />
+                        </div>
+                        <div class="col-md-3 mb-3">
                             <label asp-for="GlobalSettings.Temperature" class="form-label">Temperature (0-2)</label>
                             <input type="number" step="0.1" asp-for="GlobalSettings.Temperature" class="form-control" />
                         </div>
                         <div class="col-md-3 mb-3">
                             <label asp-for="GlobalSettings.MaxOutputTokens" class="form-label">Max Output Tokens</label>
                             <input asp-for="GlobalSettings.MaxOutputTokens" class="form-control" />
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label asp-for="GlobalSettings.DelayBetweenBatchesMs" class="form-label">Delay giữa các batch (ms)</label>
-                            <input asp-for="GlobalSettings.DelayBetweenBatchesMs" class="form-control" />
                         </div>
                         <div class="col-md-3 mb-3">
                             <label asp-for="GlobalSettings.ThinkingBudget" class="form-label">IQ AI (Thinking Budget)</label>
@@ -68,48 +64,59 @@
                                 <input asp-for="GlobalSettings.ThinkingBudget" class="form-control" />
                             </div>
                         </div>
-                    </div>
-                    
-                    <hr class="my-3" />
-                    <h6 class="text-primary mb-3"><i class="bi bi-speedometer2 me-1"></i> Giới hạn tốc độ toàn server</h6>
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label asp-for="GlobalSettings.GlobalMaxRequests" class="form-label">Số Request tối đa</label>
-                            <input asp-for="GlobalSettings.GlobalMaxRequests" class="form-control" />
-                            <small class="text-muted">Số request tối đa được xử lý đồng thời trên toàn server</small>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label asp-for="GlobalSettings.GlobalWindowMinutes" class="form-label">Thời gian cửa sổ (phút)</label>
-                            <input asp-for="GlobalSettings.GlobalWindowMinutes" class="form-control" />
-                            <small class="text-muted">Khi request hoàn thành, slot sẽ được giải phóng cho request mới</small>
-                        </div>
-                        <div class="col-md-4 mb-3 d-flex align-items-center">
-                            <div class="alert alert-info mb-0 py-2 w-100">
-                                <small>
-                                    <strong>Mặc định:</strong> 20 request / 2 phút<br/>
-                                    <i class="bi bi-info-circle me-1"></i>Áp dụng cho TẤT CẢ job từ mọi user
-                                </small>
-                            </div>
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="GlobalSettings.ProfessionalModel" class="form-label">Model Chuyên Nghiệp (Pro)</label>
+                            <input asp-for="GlobalSettings.ProfessionalModel" class="form-control" />
+                            <small class="text-muted">Ví dụ: gemini-2.5-pro</small>
                         </div>
                     </div>
                     
                     <hr class="my-3" />
-                    <h6 class="text-success mb-3"><i class="bi bi-router me-1"></i> Giới hạn tốc độ Proxy</h6>
+                    <h6 class="text-primary mb-3"><i class="bi bi-gem me-1"></i> Cài đặt Model Pro (Chuyên nghiệp)</h6>
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label asp-for="GlobalSettings.RpmPerProxy" class="form-label">Request/Phút/Proxy (RPM)</label>
-                            <input asp-for="GlobalSettings.RpmPerProxy" class="form-control" />
-                            <small class="text-muted">Số request tối đa mỗi proxy có thể xử lý trong 1 phút</small>
+                            <label asp-for="GlobalSettings.ProRpm" class="form-label">Request/Phút (RPM)</label>
+                            <input asp-for="GlobalSettings.ProRpm" class="form-control" />
+                            <small class="text-muted">Số request/phút cho model Pro</small>
                         </div>
-                        <div class="col-md-8 mb-3 d-flex align-items-center">
-                            <div class="alert alert-success mb-0 py-2 w-100">
-                                <small>
-                                    <strong>Mặc định:</strong> 10 request/phút/proxy<br/>
-                                    <i class="bi bi-info-circle me-1"></i>Mỗi proxy chỉ nhận tối đa X request/phút. Nếu đạt giới hạn, hệ thống sẽ chuyển sang proxy khác.<br/>
-                                    <i class="bi bi-exclamation-triangle text-warning me-1"></i>Chỉ tính request khi kết nối thành công đến API Gemini, lỗi kết nối proxy không tính.
-                                </small>
-                            </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.ProRpdPerKey" class="form-label">Request/Ngày/Key (RPD)</label>
+                            <input asp-for="GlobalSettings.ProRpdPerKey" class="form-control" />
+                            <small class="text-muted">Giới hạn request/ngày mỗi API key cho Pro</small>
                         </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.ProRpmPerProxy" class="form-label">Request/Phút/Proxy</label>
+                            <input asp-for="GlobalSettings.ProRpmPerProxy" class="form-control" />
+                            <small class="text-muted">Số request/phút mỗi proxy cho Pro</small>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-3" />
+                    <h6 class="text-success mb-3"><i class="bi bi-lightning-charge me-1"></i> Cài đặt Model Flash (Nhanh)</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.FlashRpm" class="form-label">Request/Phút (RPM)</label>
+                            <input asp-for="GlobalSettings.FlashRpm" class="form-control" />
+                            <small class="text-muted">Số request/phút cho model Flash</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.FlashRpdPerKey" class="form-label">Request/Ngày/Key (RPD)</label>
+                            <input asp-for="GlobalSettings.FlashRpdPerKey" class="form-control" />
+                            <small class="text-muted">Giới hạn request/ngày mỗi API key cho Flash</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.FlashRpmPerProxy" class="form-label">Request/Phút/Proxy</label>
+                            <input asp-for="GlobalSettings.FlashRpmPerProxy" class="form-control" />
+                            <small class="text-muted">Số request/phút mỗi proxy cho Flash</small>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <small>
+                            <i class="bi bi-info-circle me-1"></i><strong>Lưu ý:</strong> Giới hạn tốc độ toàn server đã bị loại bỏ. 
+                            Mỗi loại model (Pro/Flash) có giới hạn riêng cho RPM, RPD/key và RPM/proxy. 
+                            Proxy có thể dùng chung miễn là không vi phạm giới hạn proxy/phút của từng loại.
+                        </small>
                     </div>
                     
                     <button type="submit" class="btn btn-info">Lưu Cài Đặt Chung</button>
@@ -159,7 +166,8 @@
                                     <th class="text-center" style="width: 5%;"><input class="form-check-input" type="checkbox" id="selectAllPaid"></th>
                                     <th>API Key (ẩn)</th>
                                     <th class="text-center">Tokens Đã Dùng</th>
-                                    <th class="text-center">Requests / Ngày</th>
+                                    <th class="text-center">Req Pro/Ngày</th>
+                                    <th class="text-center">Req Flash/Ngày</th>
                                     <th class="text-center">Trạng thái</th>
                                     <th class="text-center">Thao tác</th>
                                 </tr>
@@ -174,7 +182,8 @@
                                             <td class="text-center"><input class="form-check-input chk-paid" type="checkbox" name="selectedKeyIds" value="@key.Id"></td>
                                             <td><code>@keyViewModel.DecryptedApiKey.Substring(0, Math.Min(keyViewModel.DecryptedApiKey.Length, 15))...</code></td>
                                             <td class="text-center">@key.TotalTokensUsed.ToString("N0")</td>
-                                            <td class="text-center">@key.RequestsToday</td>
+                                            <td class="text-center"><span class="badge bg-primary">@key.ProRequestsToday</span></td>
+                                            <td class="text-center"><span class="badge bg-success">@key.FlashRequestsToday</span></td>
                                             <td class="text-center">
                                                 <button type="submit" asp-page-handler="ToggleEnabled" asp-route-id="@key.Id" class="btn btn-sm @(key.IsEnabled ? "btn-success" : "btn-secondary")">@(key.IsEnabled ? "ON" : "OFF")</button>
                                             </td>
@@ -186,7 +195,7 @@
                                 }
                                 else
                                 {
-                                    <tr><td colspan="6" class="text-center p-3">Chưa có API Key trả phí nào.</td></tr>
+                                    <tr><td colspan="7" class="text-center p-3">Chưa có API Key trả phí nào.</td></tr>
                                 }
                             </tbody>
                         </table>
@@ -214,10 +223,25 @@
                     <h6>Thêm Model Trả Phí Mới</h6>
                     <form method="post" asp-page-handler="AddPaidModel">
                         @Html.AntiForgeryToken()
-                        <div class="input-group">
-                            <input name="newModelInput.ModelName" class="form-control" />
-                            <button type="submit" class="btn btn-success">Thêm</button>
+                        <div class="mb-2">
+                            <input name="newModelInput.ModelName" class="form-control" placeholder="Tên model (vd: gemini-2.5-pro)" />
                         </div>
+                        <div class="mb-2">
+                            <label class="form-label">Loại Model:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="newModelInput.ModelType" value="2" id="radioPaidPro" checked>
+                                <label class="form-check-label" for="radioPaidPro">
+                                    <i class="bi bi-gem text-primary"></i> Pro (Chuyên nghiệp)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="newModelInput.ModelType" value="1" id="radioPaidFlash">
+                                <label class="form-check-label" for="radioPaidFlash">
+                                    <i class="bi bi-lightning-charge text-success"></i> Flash (Nhanh)
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Thêm</button>
                     </form>
                 </div>
             </div>
@@ -264,7 +288,8 @@
                                     <th class="text-center" style="width: 5%;"><input class="form-check-input" type="checkbox" id="selectAllFree"></th>
                                     <th>API Key (ẩn)</th>
                                     <th class="text-center">Tokens Đã Dùng</th>
-                                    <th class="text-center">Requests / Ngày</th>
+                                    <th class="text-center">Req Pro/Ngày</th>
+                                    <th class="text-center">Req Flash/Ngày</th>
                                     <th class="text-center">Trạng thái</th>
                                     <th class="text-center">Thao tác</th>
                                 </tr>
@@ -279,7 +304,8 @@
                                             <td class="text-center"><input class="form-check-input chk-free" type="checkbox" name="selectedKeyIds" value="@key.Id"></td>
                                             <td><code>@keyViewModel.DecryptedApiKey.Substring(0, Math.Min(keyViewModel.DecryptedApiKey.Length, 15))...</code></td>
                                             <td class="text-center">@key.TotalTokensUsed.ToString("N0")</td>
-                                            <td class="text-center">@key.RequestsToday</td>
+                                            <td class="text-center"><span class="badge bg-primary">@key.ProRequestsToday</span></td>
+                                            <td class="text-center"><span class="badge bg-success">@key.FlashRequestsToday</span></td>
                                             <td class="text-center">
                                                 <button type="submit" asp-page-handler="ToggleEnabled" asp-route-id="@key.Id" class="btn btn-sm @(key.IsEnabled ? "btn-success" : "btn-secondary")">@(key.IsEnabled ? "ON" : "OFF")</button>
                                             </td>
@@ -291,7 +317,7 @@
                                 }
                                 else
                                 {
-                                    <tr><td colspan="6" class="text-center p-3">Chưa có API Key miễn phí nào.</td></tr>
+                                    <tr><td colspan="7" class="text-center p-3">Chưa có API Key miễn phí nào.</td></tr>
                                 }
                             </tbody>
                         </table>
@@ -318,10 +344,25 @@
                     <h6>Thêm Model Miễn Phí Mới</h6>
                     <form method="post" asp-page-handler="AddFreeModel">
                         @Html.AntiForgeryToken()
-                        <div class="input-group">
-                            <input name="newModelInput.ModelName" class="form-control" />
-                            <button type="submit" class="btn btn-success">Thêm</button>
+                        <div class="mb-2">
+                            <input name="newModelInput.ModelName" class="form-control" placeholder="Tên model (vd: gemini-2.5-flash)" />
                         </div>
+                        <div class="mb-2">
+                            <label class="form-label">Loại Model:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="newModelInput.ModelType" value="2" id="radioFreePro">
+                                <label class="form-check-label" for="radioFreePro">
+                                    <i class="bi bi-gem text-primary"></i> Pro (Chuyên nghiệp)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="newModelInput.ModelType" value="1" id="radioFreeFlash" checked>
+                                <label class="form-check-label" for="radioFreeFlash">
+                                    <i class="bi bi-lightning-charge text-success"></i> Flash (Nhanh)
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Thêm</button>
                     </form>
                 </div>
             </div>

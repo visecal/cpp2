@@ -53,6 +53,8 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
         {
             [Required(ErrorMessage = "Tên model không được để trống.")]
             public string ModelName { get; set; }
+            
+            public GeminiLocalModelType? ModelType { get; set; }
         }
 
         public class GlobalSettingsInputModel
@@ -321,7 +323,13 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 return RedirectToPage();
             }
             var isFirstModelInPool = !await _context.AvailableApiModels.AnyAsync(m => m.PoolType == pool);
-            _context.AvailableApiModels.Add(new AvailableApiModel { ModelName = modelName, IsActive = isFirstModelInPool, PoolType = pool });
+            _context.AvailableApiModels.Add(new AvailableApiModel 
+            { 
+                ModelName = modelName, 
+                IsActive = isFirstModelInPool, 
+                PoolType = pool,
+                ModelType = newModelInput.ModelType // Save the model type (Pro/Flash)
+            });
             await _context.SaveChangesAsync();
             SuccessMessage = $"Đã thêm model '{modelName}' vào nhóm {pool}.";
             return RedirectToPage();

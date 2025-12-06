@@ -16,6 +16,10 @@ namespace SubPhim.Server.Services
         private readonly IEncryptionService _encryptionService;
         private readonly ProxyService _proxyService;
 
+        // Constants
+        private const int MaxFailureReasonLength = 500;
+        private const int MaxFailureCountBeforeDisable = 5;
+        
         // FIX #3: Thay thế IMemoryCache bằng ConcurrentDictionary để làm Rate Limiter "cửa sổ trượt"
         private static readonly ConcurrentDictionary<int, ConcurrentQueue<DateTime>> _userRequestTimestamps = new();
         private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
@@ -471,7 +475,7 @@ namespace SubPhim.Server.Services
         {
             try
             {
-                var reasonTruncated = reason.Length > 500 ? reason.Substring(0, 500) : reason;
+                var reasonTruncated = reason.Length > MaxFailureReasonLength ? reason.Substring(0, MaxFailureReasonLength) : reason;
                 await context.Proxies
                     .Where(p => p.Id == proxyId)
                     .ExecuteUpdateAsync(s => s
@@ -480,7 +484,7 @@ namespace SubPhim.Server.Services
                         .SetProperty(p => p.LastFailureReason, reasonTruncated));
                 
                 var proxy = await context.Proxies.AsNoTracking().FirstOrDefaultAsync(p => p.Id == proxyId);
-                if (proxy != null && proxy.FailureCount >= 5 && proxy.IsEnabled)
+                if (proxy != null && proxy.FailureCount >= MaxFailureCountBeforeDisable && proxy.IsEnabled)
                 {
                     await DisableProxyAsync(proxyId, $"Too many failures ({proxy.FailureCount})", context);
                 }
@@ -497,7 +501,7 @@ namespace SubPhim.Server.Services
             if (proxy != null && proxy.IsEnabled)
             {
                 proxy.IsEnabled = false;
-                proxy.LastFailureReason = reason.Length > 500 ? reason.Substring(0, 500) : reason;
+                proxy.LastFailureReason = reason.Length > MaxFailureReasonLength ? reason.Substring(0, MaxFailureReasonLength) : reason;
                 await context.SaveChangesAsync();
                 _logger.LogWarning("Proxy ID {ProxyId} has been auto-disabled. Reason: {Reason}", proxyId, reason);
             }

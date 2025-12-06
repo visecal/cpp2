@@ -688,11 +688,14 @@ namespace SubPhim.Server.Services
             GeminiLocalModelType modelType, int rpdLimit, CancellationToken token)
         {
             // Lọc keys chưa thử, không trong cooldown, và chưa vượt RPD limit
+            // Optimize: Check model type once outside the lambda
+            bool isProModel = modelType == GeminiLocalModelType.Pro;
+            
             var eligibleKeys = availableKeys
                 .Where(k => !excludeKeyIds.Contains(k.Id) && !_cooldownService.IsInCooldown(k.Id))
                 .Where(k => {
                     // Check RPD limit based on model type
-                    int currentRpd = modelType == GeminiLocalModelType.Pro ? k.ProRequestsToday : k.FlashRequestsToday;
+                    int currentRpd = isProModel ? k.ProRequestsToday : k.FlashRequestsToday;
                     return currentRpd < rpdLimit;
                 })
                 .ToList();
@@ -1163,7 +1166,7 @@ namespace SubPhim.Server.Services
             await context.SaveChangesAsync();
         }
 
-        private async Task UpdateUsageInDb(int apiKeyId, int tokensUsed, GeminiLocalModelType modelType = GeminiLocalModelType.Pro)
+        private async Task UpdateUsageInDb(int apiKeyId, int tokensUsed, GeminiLocalModelType modelType)
         {
             try
             {

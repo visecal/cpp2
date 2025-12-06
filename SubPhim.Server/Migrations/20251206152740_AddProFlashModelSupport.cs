@@ -40,14 +40,14 @@ namespace SubPhim.Server.Migrations
                 type: "TEXT",
                 maxLength: 100,
                 nullable: false,
-                defaultValue: "");
+                defaultValue: "gemini-2.5-pro");
 
             migrationBuilder.AddColumn<int>(
                 name: "ModelType",
                 table: "AvailableApiModels",
                 type: "INTEGER",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 1); // Default to Pro (GeminiLocalModelType.Pro = 1)
         }
 
         /// <inheritdoc />

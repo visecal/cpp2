@@ -17,7 +17,6 @@ namespace SubPhim.Server.Services
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ApiKeyCooldownService _cooldownService;
         private readonly JobCancellationService _cancellationService;
-        private readonly GlobalRequestRateLimiterService _globalRateLimiter;
         private readonly ProxyService _proxyService;
         private readonly ProxyRateLimiterService _proxyRateLimiter;
 
@@ -144,7 +143,6 @@ namespace SubPhim.Server.Services
             IHttpClientFactory httpClientFactory,
             ApiKeyCooldownService cooldownService,
             JobCancellationService cancellationService,
-            GlobalRequestRateLimiterService globalRateLimiter,
             ProxyService proxyService,
             ProxyRateLimiterService proxyRateLimiter)
         {
@@ -153,7 +151,6 @@ namespace SubPhim.Server.Services
             _httpClientFactory = httpClientFactory;
             _cooldownService = cooldownService;
             _cancellationService = cancellationService;
-            _globalRateLimiter = globalRateLimiter;
             _proxyService = proxyService;
             _proxyRateLimiter = proxyRateLimiter;
         }
@@ -320,10 +317,8 @@ namespace SubPhim.Server.Services
 
                 var processingTasks = new List<Task>();
                 
-                // Log global rate limiter status
-                var (maxReqs, windowMins, availSlots, activeReqs) = _globalRateLimiter.GetCurrentStatus();
-                _logger.LogInformation("Job {SessionId}: Processing {BatchCount} batches. Global rate limit: {MaxReqs}/{WindowMins}min (Available: {AvailSlots})",
-                    sessionId, batches.Count, maxReqs, windowMins, availSlots);
+                _logger.LogInformation("Job {SessionId}: Processing {BatchCount} batches",
+                    sessionId, batches.Count);
 
                 for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                 {
@@ -349,26 +344,24 @@ namespace SubPhim.Server.Services
                     // Capture batch index for closure - cần thiết vì batchIndex được thay đổi trong loop
                     int currentBatchIndex = batchIndex;
                     
-                    // === MỚI: Áp dụng Global Rate Limiter trước khi xử lý batch ===
+                    // === Process batch ===
                     processingTasks.Add(Task.Run(async () =>
                     {
-                        string? rateLimitSlotId = null;
                         try
                         {
-                            // === GLOBAL RATE LIMIT: Đợi slot khả dụng trước khi gửi API request ===
-                            rateLimitSlotId = await _globalRateLimiter.AcquireSlotAsync(
-                                $"{sessionId}_batch{currentBatchIndex}", cancellationToken);
-                            
                             // === SỬA ĐỔI: Truyền thêm enabledKeys và rpmPerKey để hỗ trợ round-robin và per-key RPM ===
                             var (translatedBatch, tokensUsed, usedKeyId) = await TranslateBatchAsync(
                                 batch, job, settings, activeModel.ModelName, job.SystemInstruction, 
-                                poolToUse, encryptionService, enabledKeys, rpmPerKey, cancellationToken);
+                                poolToUse, encryptionService, enabledKeys, rpmPerKey, 
+                                activeModel.ModelType, 
+                                activeModel.ModelType == GeminiLocalModelType.Pro ? settings.ProRpdPerKey : settings.FlashRpdPerKey,
+                                cancellationToken);
                             
                             await SaveResultsToDb(sessionId, translatedBatch);
                             
                             if (usedKeyId.HasValue)
                             {
-                                await UpdateUsageInDb(usedKeyId.Value, tokensUsed);
+                                await UpdateUsageInDb(usedKeyId.Value, tokensUsed, activeModel.ModelType);
                                 
                                 // Reset cooldown nếu batch thành công
                                 await _cooldownService.ResetCooldownAsync(usedKeyId.Value);
@@ -392,14 +385,6 @@ namespace SubPhim.Server.Services
                                 ErrorDetail = ex.Message
                             }).ToList();
                             await SaveResultsToDb(sessionId, errorResults);
-                        }
-                        finally
-                        {
-                            // === GLOBAL RATE LIMIT: Giải phóng slot sau khi hoàn thành ===
-                            if (rateLimitSlotId != null)
-                            {
-                                _globalRateLimiter.ReleaseSlot(rateLimitSlotId);
-                            }
                         }
                     }, cancellationToken));
                 }
@@ -520,7 +505,8 @@ namespace SubPhim.Server.Services
         private async Task<(List<TranslatedSrtLineDb> results, int tokensUsed, int? usedKeyId)> TranslateBatchAsync(
             List<OriginalSrtLineDb> batch, TranslationJobDb job, LocalApiSetting settings,
             string modelName, string systemInstruction, ApiPoolType poolType, 
-            IEncryptionService encryptionService, List<ManagedApiKey> availableKeys, int rpmPerKey, CancellationToken token)
+            IEncryptionService encryptionService, List<ManagedApiKey> availableKeys, int rpmPerKey, 
+            GeminiLocalModelType modelType, int rpdLimit, CancellationToken token)
         {
             var payloadBuilder = new StringBuilder();
             foreach (var line in batch)
@@ -560,8 +546,9 @@ namespace SubPhim.Server.Services
                 
                 try
                 {
-                    // === MỚI: Chọn key bằng round-robin và chờ per-key RPM limiter ===
-                    selectedKey = await GetAvailableKeyWithRpmLimitAsync(availableKeys, poolType, triedKeyIds, rpmPerKey, token);
+                    // === MỚI: Chọn key bằng round-robin và chờ per-key RPM limiter với kiểm tra RPD ===
+                    selectedKey = await GetAvailableKeyWithRpmLimitAsync(availableKeys, poolType, triedKeyIds, rpmPerKey, 
+                        modelType, rpdLimit, token);
                     
                     if (selectedKey == null)
                     {
@@ -694,17 +681,28 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// Chọn key bằng round-robin và đợi per-key RPM limiter
+        /// Chọn key bằng round-robin và đợi per-key RPM limiter với kiểm tra RPD
         /// </summary>
         private async Task<ManagedApiKey> GetAvailableKeyWithRpmLimitAsync(
-            List<ManagedApiKey> availableKeys, ApiPoolType poolType, HashSet<int> excludeKeyIds, int rpmPerKey, CancellationToken token)
+            List<ManagedApiKey> availableKeys, ApiPoolType poolType, HashSet<int> excludeKeyIds, int rpmPerKey, 
+            GeminiLocalModelType modelType, int rpdLimit, CancellationToken token)
         {
-            // Lọc keys chưa thử và không trong cooldown
+            // Lọc keys chưa thử, không trong cooldown, và chưa vượt RPD limit
             var eligibleKeys = availableKeys
                 .Where(k => !excludeKeyIds.Contains(k.Id) && !_cooldownService.IsInCooldown(k.Id))
+                .Where(k => {
+                    // Check RPD limit based on model type
+                    int currentRpd = modelType == GeminiLocalModelType.Pro ? k.ProRequestsToday : k.FlashRequestsToday;
+                    return currentRpd < rpdLimit;
+                })
                 .ToList();
             
-            if (!eligibleKeys.Any()) return null;
+            if (!eligibleKeys.Any()) 
+            {
+                _logger.LogWarning("No eligible keys available for {ModelType}. All keys may have exceeded their RPD limit of {RpdLimit}", 
+                    modelType, rpdLimit);
+                return null;
+            }
             
             // === ROUND-ROBIN SELECTION: Đảm bảo phân bổ đều ===
             ManagedApiKey selectedKey = GetNextKeyRoundRobin(eligibleKeys, poolType);
@@ -1165,7 +1163,7 @@ namespace SubPhim.Server.Services
             await context.SaveChangesAsync();
         }
 
-        private async Task UpdateUsageInDb(int apiKeyId, int tokensUsed)
+        private async Task UpdateUsageInDb(int apiKeyId, int tokensUsed, GeminiLocalModelType modelType = GeminiLocalModelType.Pro)
         {
             try
             {
@@ -1184,9 +1182,22 @@ namespace SubPhim.Server.Services
                 {
                     _logger.LogInformation("Resetting daily request count for API Key ID {ApiKeyId}", apiKeyId);
                     apiKey.RequestsToday = 0;
+                    apiKey.ProRequestsToday = 0;
+                    apiKey.FlashRequestsToday = 0;
                     apiKey.LastRequestCountResetUtc = DateTime.UtcNow.Date;
                 }
                 apiKey.RequestsToday++;
+                
+                // Update Pro or Flash counter based on model type
+                if (modelType == GeminiLocalModelType.Pro)
+                {
+                    apiKey.ProRequestsToday++;
+                }
+                else if (modelType == GeminiLocalModelType.Flash)
+                {
+                    apiKey.FlashRequestsToday++;
+                }
+                
                 if (tokensUsed > 0)
                 {
                     apiKey.TotalTokensUsed += tokensUsed;

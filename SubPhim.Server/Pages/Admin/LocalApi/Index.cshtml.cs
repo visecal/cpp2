@@ -53,6 +53,8 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
         {
             [Required(ErrorMessage = "Tên model không được để trống.")]
             public string ModelName { get; set; }
+            
+            public GeminiLocalModelType ModelType { get; set; } = GeminiLocalModelType.Pro;
         }
 
         public class GlobalSettingsInputModel
@@ -67,9 +69,12 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
             public bool EnableThinkingBudget { get; set; }
             [Range(0, 16384)] public int ThinkingBudget { get; set; }
             
-            // Global Rate Limiting Settings
-            [Required][Range(1, 1000)] public int GlobalMaxRequests { get; set; }
-            [Required][Range(1, 60)] public int GlobalWindowMinutes { get; set; }
+            // Model Settings
+            [Required][StringLength(100)] public string ProModelName { get; set; }
+            
+            // RPD (Requests Per Day) Settings
+            [Required][Range(1, 10000)] public int ProRpdPerKey { get; set; }
+            [Required][Range(1, 10000)] public int FlashRpdPerKey { get; set; }
             
             // Proxy Rate Limiting Settings
             [Required][Range(1, 1000)] public int RpmPerProxy { get; set; }
@@ -91,8 +96,9 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 MaxOutputTokens = settingsFromDb.MaxOutputTokens,
                 EnableThinkingBudget = settingsFromDb.EnableThinkingBudget,
                 ThinkingBudget = settingsFromDb.ThinkingBudget,
-                GlobalMaxRequests = settingsFromDb.GlobalMaxRequests,
-                GlobalWindowMinutes = settingsFromDb.GlobalWindowMinutes,
+                ProModelName = settingsFromDb.ProModelName,
+                ProRpdPerKey = settingsFromDb.ProRpdPerKey,
+                FlashRpdPerKey = settingsFromDb.FlashRpdPerKey,
                 RpmPerProxy = settingsFromDb.RpmPerProxy
             };
         }
@@ -193,8 +199,9 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 settingsInDb.MaxOutputTokens = GlobalSettings.MaxOutputTokens;
                 settingsInDb.EnableThinkingBudget = GlobalSettings.EnableThinkingBudget;
                 settingsInDb.ThinkingBudget = GlobalSettings.ThinkingBudget;
-                settingsInDb.GlobalMaxRequests = GlobalSettings.GlobalMaxRequests;
-                settingsInDb.GlobalWindowMinutes = GlobalSettings.GlobalWindowMinutes;
+                settingsInDb.ProModelName = GlobalSettings.ProModelName;
+                settingsInDb.ProRpdPerKey = GlobalSettings.ProRpdPerKey;
+                settingsInDb.FlashRpdPerKey = GlobalSettings.FlashRpdPerKey;
                 settingsInDb.RpmPerProxy = GlobalSettings.RpmPerProxy;
                 await _context.SaveChangesAsync();
                 SuccessMessage = "Đã lưu thành công cài đặt chung.";
@@ -312,7 +319,13 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 return RedirectToPage();
             }
             var isFirstModelInPool = !await _context.AvailableApiModels.AnyAsync(m => m.PoolType == pool);
-            _context.AvailableApiModels.Add(new AvailableApiModel { ModelName = modelName, IsActive = isFirstModelInPool, PoolType = pool });
+            _context.AvailableApiModels.Add(new AvailableApiModel 
+            { 
+                ModelName = modelName, 
+                IsActive = isFirstModelInPool, 
+                PoolType = pool,
+                ModelType = newModelInput.ModelType 
+            });
             await _context.SaveChangesAsync();
             SuccessMessage = $"Đã thêm model '{modelName}' vào nhóm {pool}.";
             return RedirectToPage();

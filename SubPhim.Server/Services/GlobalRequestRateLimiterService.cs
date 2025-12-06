@@ -48,62 +48,13 @@ namespace SubPhim.Server.Services
         /// <summary>
         /// Cập nhật cài đặt từ database nếu có thay đổi.
         /// Sử dụng cơ chế cache để giảm tải database.
+        /// NOTE: This service is deprecated and no longer used. Settings are kept for backward compatibility.
         /// </summary>
         public async Task RefreshSettingsAsync(bool forceRefresh = false)
         {
-            // Kiểm tra cache - chỉ refresh nếu đã quá interval hoặc force
-            if (!forceRefresh && DateTime.UtcNow - _lastSettingsRefresh < _settingsRefreshInterval)
-            {
-                return;
-            }
-
-            try
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var settings = await context.LocalApiSettings.FindAsync(1);
-
-                _lastSettingsRefresh = DateTime.UtcNow;
-
-                if (settings == null)
-                {
-                    _logger.LogWarning("LocalApiSettings not found in database, using defaults");
-                    return;
-                }
-
-                int newMaxRequests = settings.GlobalMaxRequests > 0 ? settings.GlobalMaxRequests : 20;
-                int newWindowMinutes = settings.GlobalWindowMinutes > 0 ? settings.GlobalWindowMinutes : 2;
-
-                lock (_configLock)
-                {
-                    bool needsNewSemaphore = newMaxRequests != _currentMaxRequests;
-                    
-                    if (needsNewSemaphore || newWindowMinutes != _currentWindowMinutes)
-                    {
-                        _logger.LogInformation(
-                            "Updating GlobalRequestRateLimiter: {OldMax}/{OldWindow}min -> {NewMax}/{NewWindow}min",
-                            _currentMaxRequests, _currentWindowMinutes, newMaxRequests, newWindowMinutes);
-
-                        // Cập nhật window minutes trước
-                        _currentWindowMinutes = newWindowMinutes;
-
-                        // Tạo semaphore mới nếu capacity thay đổi
-                        // Sử dụng volatile và chỉ swap reference - không dispose ngay để tránh race condition
-                        // với các thread đang chờ WaitAsync() hoặc gọi Release()
-                        if (needsNewSemaphore)
-                        {
-                            _currentMaxRequests = newMaxRequests;
-                            // Tạo semaphore mới, để cho GC thu dọn cái cũ
-                            // Việc này an toàn hơn so với dispose vì các thread đang chờ sẽ không bị exception
-                            _semaphore = new SemaphoreSlim(newMaxRequests, newMaxRequests);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error refreshing GlobalRequestRateLimiter settings");
-            }
+            // This service is no longer used - global rate limiting has been removed
+            // Keeping the method for backward compatibility but doing nothing
+            await Task.CompletedTask;
         }
 
         /// <summary>

@@ -56,6 +56,12 @@ namespace SubPhim.Server.Data
         Paid = 1, // Dành cho các gói trả phí
         Free = 2  // Dành cho gói Free
     }
+    
+    public enum GeminiLocalModelType
+    {
+        Pro = 1,   // gemini-2.5-pro models
+        Flash = 2  // gemini-2.5-flash models
+    }
     public enum SubscriptionTier { Free, Daily, Monthly, Yearly, Lifetime }
 
     public class User
@@ -237,6 +243,12 @@ namespace SubPhim.Server.Data
 
         [Display(Name = "Số Request Hôm Nay")]
         public int RequestsToday { get; set; } = 0;
+        
+        [Display(Name = "Số Request Pro Hôm Nay")]
+        public int ProRequestsToday { get; set; } = 0;
+        
+        [Display(Name = "Số Request Flash Hôm Nay")]
+        public int FlashRequestsToday { get; set; } = 0;
 
         [Display(Name = "Lần cuối reset bộ đếm Request (UTC)")]
         public DateTime LastRequestCountResetUtc { get; set; } = DateTime.UtcNow;
@@ -506,6 +518,8 @@ namespace SubPhim.Server.Data
         public bool IsActive { get; set; }
         [Display(Name = "Nhóm API")]
         public ApiPoolType PoolType { get; set; } = ApiPoolType.Paid;
+        [Display(Name = "Loại Model (Pro/Flash)")]
+        public GeminiLocalModelType ModelType { get; set; } = GeminiLocalModelType.Pro;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
     public class LocalApiSetting
@@ -544,12 +558,17 @@ namespace SubPhim.Server.Data
         [Display(Name = "Thinking Budget (IQ AI)")]
         public int ThinkingBudget { get; set; } = 8192;
 
-        // --- GLOBAL RATE LIMIT SETTINGS ---
-        [Display(Name = "Giới hạn Request toàn server")]
-        public int GlobalMaxRequests { get; set; } = 20;
+        // --- MODEL SETTINGS ---
+        [Display(Name = "Model Pro mặc định")]
+        [StringLength(100)]
+        public string ProModelName { get; set; } = "gemini-2.5-pro";
 
-        [Display(Name = "Cửa sổ thời gian (phút)")]
-        public int GlobalWindowMinutes { get; set; } = 2;
+        // --- RPD (Requests Per Day) SETTINGS PER KEY ---
+        [Display(Name = "Request/Ngày cho Pro Models (RPD)")]
+        public int ProRpdPerKey { get; set; } = 250;
+        
+        [Display(Name = "Request/Ngày cho Flash Models (RPD)")]
+        public int FlashRpdPerKey { get; set; } = 250;
 
         // --- PROXY RATE LIMIT SETTINGS ---
         [Display(Name = "Request/Phút/Proxy (RPM)")]

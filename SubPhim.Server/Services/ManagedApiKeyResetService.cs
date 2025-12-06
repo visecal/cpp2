@@ -21,7 +21,7 @@ namespace SubPhim.Server.Services
         {
             _logger.LogInformation("ManagedApiKeyResetService started");
             
-            // Ch? 1 phút sau khi kh?i ??ng
+            // Ch? 1 phï¿½t sau khi kh?i ??ng
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
 
             while (!stoppingToken.IsCancellationRequested)
@@ -31,7 +31,7 @@ namespace SubPhim.Server.Services
                     using var scope = _serviceProvider.CreateScope();
                     var cooldownService = scope.ServiceProvider.GetRequiredService<ApiKeyCooldownService>();
                     
-                    // X? lý expired cooldowns
+                    // X? lï¿½ expired cooldowns
                     await cooldownService.ProcessExpiredCooldownsAsync();
                     
                     // Reset daily counters n?u c?n
@@ -42,7 +42,7 @@ namespace SubPhim.Server.Services
                     _logger.LogError(ex, "Error in ManagedApiKeyResetService execution loop");
                 }
 
-                // Ch?y m?i 30 giây ?? check cooldown expirations
+                // Ch?y m?i 30 giï¿½y ?? check cooldown expirations
                 await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
             }
             
@@ -56,7 +56,7 @@ namespace SubPhim.Server.Services
             var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
 
             var keysToReset = await context.ManagedApiKeys
-                .Where(k => k.RequestsToday > 0)
+                .Where(k => k.RequestsToday > 0 || k.ProRequestsToday > 0 || k.FlashRequestsToday > 0)
                 .ToListAsync();
 
             int resetCount = 0;
@@ -67,6 +67,8 @@ namespace SubPhim.Server.Services
                 if (lastResetInVietnam.Date < vietnamNow.Date)
                 {
                     key.RequestsToday = 0;
+                    key.ProRequestsToday = 0;
+                    key.FlashRequestsToday = 0;
                     key.LastRequestCountResetUtc = DateTime.UtcNow.Date;
                     resetCount++;
                 }
@@ -75,7 +77,7 @@ namespace SubPhim.Server.Services
             if (resetCount > 0)
             {
                 await context.SaveChangesAsync();
-                _logger.LogInformation("Reset daily request count for {Count} managed API keys", resetCount);
+                _logger.LogInformation("Reset daily request count (including Pro/Flash) for {Count} managed API keys", resetCount);
             }
         }
     }

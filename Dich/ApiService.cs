@@ -19,9 +19,9 @@ namespace subphimv1.Services
 {
     public class AioTranslationRequest
     {
-        public string Genre { get; set; }
-        public string TargetLanguage { get; set; }
+        public string SystemInstruction { get; set; }
         public string Content { get; set; }
+        public string TargetLanguage { get; set; } = "Vietnamese";
     }
     public class AioCreateJobResponse
     {
@@ -1127,7 +1127,7 @@ namespace subphimv1.Services
             return await ExecuteWithRetryAsync(apiCall, errorFactory);
         }
     
-    public static async Task<(bool success, AioCreateJobResponse response, string error)> StartAioTranslationJobAsync(string genre, string targetLanguage, string content)
+    public static async Task<(bool success, AioCreateJobResponse response, string error)> StartAioTranslationJobAsync(string systemInstruction, string content, string targetLanguage = "Vietnamese")
         {
             if (string.IsNullOrEmpty(_jwtToken))
             {
@@ -1138,9 +1138,9 @@ namespace subphimv1.Services
             {
                 var requestPayload = new AioTranslationRequest
                 {
-                    Genre = genre,
-                    TargetLanguage = targetLanguage,
-                    Content = content
+                    SystemInstruction = systemInstruction,
+                    Content = content,
+                    TargetLanguage = targetLanguage
                 };
                 var jsonPayload = JsonSerializer.Serialize(requestPayload);
                 var httpContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");

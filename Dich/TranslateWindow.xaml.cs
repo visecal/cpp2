@@ -1613,20 +1613,15 @@ namespace subphimv1
         {
             Dispatcher.Invoke(() => lblStatus.Text = $"Đang gửi yêu cầu cho '{fileNameForLog}'...");
             string finalLanguage = targetLanguage ?? ((cmbLanguage.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "Tiếng Việt");
-            string finalGenre = selectedGenre ?? _selectedGenre;
-            string userPrompt = CurrentAppSettings.UserPrompt;
-            string finalContentToSend = content;
-            if (!string.IsNullOrWhiteSpace(userPrompt))
-            {
-
-                finalContentToSend = $"{userPrompt}\n\n---\n\nDịch văn bản sau:\n\n{content}";
-
-                Debug.WriteLine($"[TranslateWindow.TranslateSingleContentWithAio] Combined content for AIO: {finalContentToSend.Substring(0, Math.Min(finalContentToSend.Length, 200))}...");
-            }
+            
+            // Get the effective Gemini prompts (systemInstruction and userPrompt)
+            GetEffectiveGeminiPrompts(content, out string systemInstruction, out string userPrompt);
+            
+            // Send systemInstruction and the content (userPrompt) to server
             var (success, response, error) = await ApiService.StartAioTranslationJobAsync(
-                finalGenre,
-                finalLanguage,
-                finalContentToSend 
+                systemInstruction,
+                userPrompt,  // This includes the preamble + actual content
+                finalLanguage
             );
 
             if (!success)
@@ -2084,9 +2079,12 @@ namespace subphimv1
             {
                 return $"Lỗi: Không đủ ký tự dịch. Yêu cầu: {content.Length:N0}, còn lại: {remainingChars:N0}.";
             }
-            string genre = (cmbGenre.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "Huyền Huyễn Tiên Hiệp";
             string language = (cmbLanguage.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "Tiếng Việt";
-            var (startSuccess, startResponse, startError) = await ApiService.StartAioTranslationJobAsync(genre, language, content);
+            
+            // Get the effective Gemini prompts (systemInstruction and userPrompt)
+            GetEffectiveGeminiPrompts(content, out string systemInstruction, out string userPrompt);
+            
+            var (startSuccess, startResponse, startError) = await ApiService.StartAioTranslationJobAsync(systemInstruction, userPrompt, language);
 
             if (!startSuccess)
             {

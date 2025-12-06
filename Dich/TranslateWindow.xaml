@@ -1,0 +1,910 @@
+﻿<Window x:Class="subphimv1.TranslateWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:subphimv1"
+        x:Name="mainWindow"
+        mc:Ignorable="d"
+        Title="AI Translator" Height="865" Width="1400"
+        MinHeight="700" MinWidth="1024" 
+        WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewMouseWheel="Window_PreviewMouseWheel"
+        WindowStyle="None" AllowsTransparency="True"
+        Background="{StaticResource WindowBackgroundColor}"
+        Foreground="{StaticResource TextColor}"
+        FontFamily="Segoe UI">
+    <Window.Resources>
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource AccentColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentHoverColor}"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentPressedColor}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="AnimatedStopButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#3E3F42"/>
+            <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder" 
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="19">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#4F5054"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ModernCheckBoxStyle" TargetType="{x:Type CheckBox}">
+            <Setter Property="SnapsToDevicePixels" Value="true"/>
+            <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type CheckBox}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border x:Name="CheckBoxBorder" 
+                                    Width="18" Height="18" 
+                                    CornerRadius="4" 
+                                    BorderThickness="1"
+                                    BorderBrush="{StaticResource BorderColor}"
+                                    Background="Transparent">
+                                <TextBlock x:Name="CheckMark" 
+                                           Text="&#xE73E;" 
+                                           FontFamily="Segoe MDL2 Assets, Segoe UI Symbol, Arial" 
+                                           FontSize="12"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center" 
+                                           VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckBoxBorder" Property="Background" Value="{StaticResource AccentColor}"/>
+                                <Setter TargetName="CheckBoxBorder" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CheckBoxBorder" Property="BorderBrush" Value="{StaticResource AccentHoverColor}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource ErrorColor}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E57373"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#B71C1C"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="NumericTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="60"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0"/>
+        </Style>
+        <Style x:Key="NumericTextBoxLargeStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="80"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0"/>
+        </Style>
+        <Style x:Key="ModernRunButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#00000000"/>
+            <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="19">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ApiKeyPasswordBoxStyle" TargetType="{x:Type PasswordBox}">
+            <Setter Property="MinWidth" Value="180"/>
+            <Setter Property="Margin" Value="0,0,5,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ApiKeyTextBoxStyle" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="MinWidth" Value="180"/>
+            <Setter Property="Margin" Value="0,0,5,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ToggleButtonApiKeyStyle" TargetType="{x:Type ToggleButton}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="ToolTip" Value="Hiện/Ẩn API Key"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Content" Value="&#xE7B3;"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                CornerRadius="4">
+                            <TextBlock x:Name="IconText"
+                                       Text="{TemplateBinding Content}"
+                                       FontFamily="Segoe MDL2 Assets, Segoe UI Symbol, Arial"
+                                       FontSize="16"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryColor}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="IconText" Property="Foreground" Value="{StaticResource AccentColor}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Content" Value="&#xE7B2;"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="TopIconButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+
+        <Style x:Key="BottomInputBarStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelBackgroundColor}"/>
+            <Setter Property="CornerRadius" Value="24"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="MinHeight" Value="48"/>
+            <Setter Property="MaxHeight" Value="150"/>
+        </Style>
+
+        <Style x:Key="BottomInputTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+
+        <Style x:Key="RunButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource AccentColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12, 0"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentHoverColor}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{StaticResource BorderColor}"/>
+                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryColor}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </Window.Resources>
+
+    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" x:Name="TitleBar" MouseDown="TitleBar_MouseDown" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0">
+                    <TextBlock Text="&#xE930;" FontFamily="Segoe MDL2 Assets, Segoe UI Symbol, Arial" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource AccentColor}"/>
+                    <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock x:Name="tbFreeRequests"
+                   Foreground="{StaticResource TextSecondaryColor}" 
+                   FontSize="12" 
+                   FontWeight="SemiBold"
+                   Margin="0,0,20,0"/>
+
+                    <TextBlock x:Name="tbAioChars"
+                   Foreground="{StaticResource TextSecondaryColor}" 
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   Margin="0,0,20,0"/>
+
+                    <TextBlock x:Name="tbInputCharCount"
+                   Text="Đã nhập: 0 ký tự"
+                   Foreground="{StaticResource AccentColor}" 
+                   FontSize="12"
+                   FontWeight="SemiBold"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource WindowButtonStyle}" Content="—" Click="MinimizeButton_Click" Width="50" FontSize="16"/>
+                    <Button Style="{StaticResource WindowButtonStyle}" Content="☐" Click="MaximizeButton_Click" Width="50" FontSize="14"/>
+                    <Button Style="{StaticResource WindowCloseButtonStyle}" Content="✕" Click="CloseButton_Click" Width="50" FontSize="14"/>
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1" Margin="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="4"/>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="350"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="{StaticResource PanelBackgroundColor}" CornerRadius="8">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="CÔNG CỤ" FontWeight="Bold" Foreground="{StaticResource TextSecondaryColor}" Margin="5,5,0,20"/>
+                        <Button x:Name="btnShowTranslationView" Margin="5,5,0,10" Content="Dịch Thuật" Click="ShowTranslationView_Click"/>
+                        <Button x:Name="btnShowBatchEditView" Margin="5,5,0,10" Content="Edit File Hàng Loạt" Click="ShowBatchEditView_Click"/>
+                        <Button x:Name="btnShowCrawlView" Content="Cào Truyện" Margin="5,5,0,10"  Click="ShowCrawlView_Click"/>
+                    </StackPanel>
+                </Border>
+                <GridSplitter Grid.Column="1" Width="6" Background="Transparent" HorizontalAlignment="Center"/>
+                <Grid Grid.Column="2">
+                    <Grid x:Name="TranslationView" Visibility="Visible">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid x:Name="gridPromptEditorPanel" Grid.Row="0" Visibility="Collapsed" Margin="0,0,0,10">
+                            <Border Background="{StaticResource PanelBackgroundColor}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="5">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Chỉnh sửa Prompt Hệ thống" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                            <Button x:Name="btnResetPrompt" Style="{StaticResource TopIconButtonStyle}" Content="&#xE7A7;" ToolTip="Đặt lại Prompt về mặc định" Click="BtnResetPrompt_Click" HorizontalAlignment="Right" Margin="20,0,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <TextBox x:Name="txtPromptEditor" Grid.Row="1" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Padding="10" BorderThickness="0" Background="Transparent" MinHeight="150" MaxHeight="300" VerticalContentAlignment="Top"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        <ScrollViewer x:Name="ChatScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="10">
+                            <ItemsControl x:Name="ChatHistoryItems" Width="721">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:ChatMessage}">
+                                        <Grid Margin="0,5">
+                                            <Grid.Style>
+                                                <Style TargetType="Grid">
+                                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsUserInput}" Value="True">
+                                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Grid.Style>
+                                            <Border CornerRadius="8" Padding="10">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{StaticResource PanelBackgroundColor}"/>
+                                                        <Setter Property="MaxWidth" Value="900"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsUserInput}" Value="True">
+                                                                <Setter Property="Background" Value="#2D2F34"/>
+                                                                <Setter Property="MaxWidth" Value="600"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <StackPanel>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" FontWeight="SemiBold" Margin="0,0,0,5">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Text" Value="AI Response"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsUserInput}" Value="True">
+                                                                            <Setter Property="Text" Value="User"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style></TextBlock>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                            <Button x:Name="btnCopy" ToolTip="Copy nội dung" Click="CopyButton_Click">
+                                                                <Button.Style>
+                                                                    <Style TargetType="Button" BasedOn="{StaticResource TopIconButtonStyle}">
+                                                                        <Setter Property="Width" Value="28"/>
+                                                                        <Setter Property="Height" Value="28"/>
+                                                                        <Setter Property="FontSize" Value="14"/>
+                                                                        <Setter Property="Content" Value="&#xE8C8;"/>
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsUserInput}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Button.Style>
+                                                            </Button>
+                                                            <Button x:Name="btnToggleExpand" ToolTip="Ẩn/Hiện nội dung" Click="ToggleExpand_Click">
+                                                                <Button.Style>
+                                                                    <Style TargetType="Button" BasedOn="{StaticResource TopIconButtonStyle}">
+                                                                        <Setter Property="Width" Value="28"/>
+                                                                        <Setter Property="Height" Value="28"/>
+                                                                        <Setter Property="FontSize" Value="14"/>
+                                                                        <Setter Property="Content" Value="&#xE70D;"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsExpanded}" Value="False">
+                                                                                <Setter Property="Content" Value="&#xE70E;"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Button.Style>
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding MessageContent}" TextWrapping="Wrap" FontSize="{Binding Path=ChatFontSize, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsExpanded}" Value="False">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style></TextBlock>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <Border Grid.Row="2" Style="{StaticResource BottomInputBarStyle}" Margin="50,20,64,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="5,0">
+                                    <Button x:Name="btnAddFile" Style="{StaticResource TopIconButtonStyle}" Content="&#xE710;" FontSize="18" Click="BtnAddFile_Click" ToolTip="Chọn file (.txt) để dịch hàng loạt"/>
+                                    <Button x:Name="btnTogglePromptEditor" Style="{StaticResource TopIconButtonStyle}" Content="&#xE70F;" Click="TogglePromptEditor_Click" ToolTip="Chỉnh sửa Prompt Hệ thống"/>
+                                </StackPanel>
+                                <TextBox x:Name="txtInput" Grid.Column="1" Style="{StaticResource BottomInputTextBoxStyle}" Tag="Nhập nội dung dịch trực tiếp hoặc chọn file..." TextChanged="TxtInput_TextChanged"/>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="5,0">
+                                    <Button x:Name="btnRun" Style="{StaticResource ModernRunButtonStyle}" Click="BtnRun_Click" MinWidth="120">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Run" FontWeight="SemiBold" Margin="15,0,8,0"/>
+                                            <TextBlock Text="Ctrl+Enter" Foreground="{StaticResource TextSecondaryColor}" FontSize="11" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="btnStop" Style="{StaticResource AnimatedStopButtonStyle}" Click="BtnStop_Click" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Grid Width="20" Height="20" Margin="10,0,8,0">
+                                                <Grid.RenderTransform>
+                                                    <RotateTransform CenterX="10" CenterY="10"/>
+                                                </Grid.RenderTransform>
+                                                <Ellipse Stroke="White" StrokeThickness="2" StrokeDashArray="4.5 2"/>
+                                                <Rectangle Width="8" Height="8" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <Grid.Triggers>
+                                                    <EventTrigger RoutedEvent="Loaded">
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1.2" RepeatBehavior="Forever"/>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </EventTrigger>
+                                                </Grid.Triggers>
+                                            </Grid>
+                                            <TextBlock Text="Stop" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <Grid x:Name="BatchEditView" Visibility="Collapsed" Margin="10">
+                        <StackPanel>
+                            <TextBlock Text="Công cụ Tìm kiếm &amp; Thay thế hàng loạt" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,20"/>
+                            <TextBlock Text="Ký tự/Chuỗi cần tìm:" Margin="0,0,0,5"/>
+                            <ComboBox x:Name="cmbFindText" IsEditable="True" Margin="0,0,0,15"/>
+                            <TextBlock Text="Hành động:" Margin="0,0,0,5"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                                <RadioButton x:Name="rbActionDelete" GroupName="BatchAction" Content="Xoá" IsChecked="True"/>
+                                <RadioButton x:Name="rbActionReplace" GroupName="BatchAction" Content="Thay thế" Margin="20,0,0,0"/>
+                            </StackPanel>
+                            <StackPanel Visibility="{Binding IsChecked, ElementName=rbActionReplace, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="Chuỗi thay thế:" Margin="0,0,0,5"/>
+                                <ComboBox x:Name="cmbReplaceText" IsEditable="True" Margin="0,0,0,15"/>
+                            </StackPanel>
+                            <TextBlock Text="Thư mục chứa tệp (.txt):" Margin="0,0,0,5"/>
+                            <Grid Margin="0,0,0,15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="Chọn Thư Mục..." Padding="10,5" Click="SelectBatchFolder_Click"/>
+                                <TextBlock x:Name="txtBatchFolderPath" Grid.Column="1" Text="Chưa chọn thư mục" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextSecondaryColor}" TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                            <CheckBox x:Name="chkCaseSensitive" Content="Phân biệt chữ hoa/thường" Style="{StaticResource ModernCheckBoxStyle}" Margin="0,0,0,20"/>
+                            <Button x:Name="btnBatchEditStart" Content="Bắt Đầu" HorizontalAlignment="Left" MinWidth="150" Height="40" Style="{StaticResource ModernRunButtonStyle}" Click="BatchEditStart_Click"/>
+                            <TextBlock Text="Nhật ký xử lý:" Margin="0,30,0,5" FontWeight="SemiBold"/>
+                            <Border Background="{StaticResource PanelBackgroundColor}" CornerRadius="4" MinHeight="200">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <TextBlock x:Name="txtBatchEditLog" Margin="10" TextWrapping="Wrap" />
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <GridSplitter Grid.Column="3" Width="5" Background="Transparent" HorizontalAlignment="Center"/>
+
+                <Border Grid.Column="4" Background="{StaticResource PanelBackgroundColor}" CornerRadius="8" Padding="15">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <TextBlock Text="API Dịch" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                            <ComboBox x:Name="cmbApiProvider" SelectionChanged="CmbApiProvider_SelectionChanged">
+                                <ComboBoxItem Content="AIOLauncher"/>
+                                <ComboBoxItem Content="ChutesAI"/>
+                                <ComboBoxItem Content="Gemini"/>
+                                <ComboBoxItem Content="OpenRouter"/>
+                            </ComboBox>
+                            <TextBlock Text="Thể Loại Dịch" FontWeight="SemiBold" Margin="0,15,0,5"/>
+                            <ComboBox x:Name="cmbGenre" SelectedIndex="0">
+                                <ComboBoxItem Content="Huyền Huyễn Tiên Hiệp"/>
+                                <ComboBoxItem Content="Đô Thị"/>
+                                <ComboBoxItem Content="Ngôn Tình"/>
+                            </ComboBox>
+                            <TextBlock Text="Ngôn ngữ đích" FontWeight="SemiBold" Margin="0,15,0,5"/>
+                            <ComboBox x:Name="cmbLanguage" SelectedIndex="0">
+                                <ComboBoxItem Content="Tiếng Việt"/>
+                                <ComboBoxItem Content="Tiếng Anh"/>
+                                <ComboBoxItem Content="Tiếng Trung (Giản thể)"/>
+                                <ComboBoxItem Content="Tiếng Trung (Phồn thể)"/>
+                                <ComboBoxItem Content="Tiếng Nhật"/>
+                                <ComboBoxItem Content="Tiếng Hàn"/>
+                                <ComboBoxItem Content="Tiếng Pháp"/>
+                                <ComboBoxItem Content="Tiếng Đức"/>
+                                <ComboBoxItem Content="Tiếng Tây Ban Nha"/>
+                                <ComboBoxItem Content="Tiếng Bồ Đào Nha"/>
+                                <ComboBoxItem Content="Tiếng Nga"/>
+                                <ComboBoxItem Content="Tiếng Ả Rập"/>
+                                <ComboBoxItem Content="Tiếng Hindi"/>
+                                <ComboBoxItem Content="Tiếng Indonesia"/>
+                                <ComboBoxItem Content="Tiếng Ý"/>
+                                <ComboBoxItem Content="Tiếng Hà Lan"/>
+                                <ComboBoxItem Content="Tiếng Ba Lan"/>
+                                <ComboBoxItem Content="Tiếng Thổ Nhĩ Kỳ"/>
+                                <ComboBoxItem Content="Tiếng Thái"/>
+                                <ComboBoxItem Content="Tiếng Mã Lai"/>
+                                <ComboBoxItem Content="Tiếng Do Thái"/>
+                                <ComboBoxItem Content="Tiếng Hy Lạp"/>
+                                <ComboBoxItem Content="Tiếng Thụy Điển"/>
+                                <ComboBoxItem Content="Tiếng Na Uy"/>
+                                <ComboBoxItem Content="Tiếng Đan Mạch"/>
+                                <ComboBoxItem Content="Tiếng Phần Lan"/>
+                                <ComboBoxItem Content="Tiếng Séc"/>
+                                <ComboBoxItem Content="Tiếng Hungary"/>
+                                <ComboBoxItem Content="Tiếng Romania"/>
+                                <ComboBoxItem Content="Tiếng Ukraina"/>
+                                <ComboBoxItem Content="Tiếng Bungari"/>
+                                <ComboBoxItem Content="Tiếng Croatia"/>
+                                <ComboBoxItem Content="Tiếng Serbia"/>
+                                <ComboBoxItem Content="Tiếng Slovak"/>
+                                <ComboBoxItem Content="Tiếng Slovenia"/>
+                                <ComboBoxItem Content="Tiếng Estonia"/>
+                                <ComboBoxItem Content="Tiếng Latvia"/>
+                                <ComboBoxItem Content="Tiếng Lithuania"/>
+                                <ComboBoxItem Content="Tiếng Iceland"/>
+                                <ComboBoxItem Content="Tiếng Ireland"/>
+                                <ComboBoxItem Content="Tiếng Afrikaans"/>
+                                <ComboBoxItem Content="Tiếng Albania"/>
+                                <ComboBoxItem Content="Tiếng Armenia"/>
+                                <ComboBoxItem Content="Tiếng Azerbaijan"/>
+                                <ComboBoxItem Content="Tiếng Basque"/>
+                                <ComboBoxItem Content="Tiếng Belarus"/>
+                                <ComboBoxItem Content="Tiếng Bosnia"/>
+                                <ComboBoxItem Content="Tiếng Catalan"/>
+                                <ComboBoxItem Content="Tiếng Filipino"/>
+                                <ComboBoxItem Content="Tiếng Galicia"/>
+                                <ComboBoxItem Content="Tiếng Georgia"/>
+                                <ComboBoxItem Content="Tiếng Gujarati"/>
+                                <ComboBoxItem Content="Tiếng Ba Tư (Farsi)"/>
+                                <ComboBoxItem Content="Tiếng Swahili"/>
+                                <ComboBoxItem Content="Tiếng Tamil"/>
+                                <ComboBoxItem Content="Tiếng Telugu"/>
+                                <ComboBoxItem Content="Tiếng Urdu"/>
+                                <ComboBoxItem Content="Tiếng Wales"/>
+                            </ComboBox>
+                            <Separator Margin="0,20"/>
+                            <GroupBox x:Name="gbAioLauncherSettings" Header="Cấu Hình AIOLauncher" Margin="0,10,0,5" Visibility="Visible">
+                                <StackPanel>
+                                    <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryColor}" Margin="0,0,0,10">
+            API dịch thuật được xử lý trên server. Cấu hình tốc độ và giới hạn ký tự của bạn trong phần tài khoản.
+                                    </TextBlock>
+                                    <StackPanel Margin="0,5,10,5">
+                                        <Label Content="Ngưỡng gửi trực tiếp (ký tự):"/>
+                                        <TextBox x:Name="txtAioLauncherDirectSendThreshold" Style="{StaticResource NumericTextBoxLargeStyle}"
+                     ToolTip="Nếu tổng số ký tự nhỏ hơn giá trị này, văn bản sẽ được gửi đi trong một lần duy nhất."/>
+                                    </StackPanel>
+                                    <StackPanel Margin="0,5,10,5">
+                                        <Label Content="Kích thước Chunk (ký tự):"/>
+                                        <TextBox x:Name="txtAioLauncherChunkSize" Style="{StaticResource NumericTextBoxLargeStyle}"
+                     ToolTip="Nếu văn bản lớn hơn ngưỡng, nó sẽ được chia thành các phần nhỏ có kích thước này."/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </GroupBox>
+                            <GroupBox x:Name="gbChutesAiSettings" Header="Cấu Hình API ChutesAI" Margin="0,10,0,5" Visibility="Collapsed">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,8">
+                                        <Label Content="API Key:" Width="70" VerticalAlignment="Center"/>
+                                        <Grid>
+                                            <TextBox x:Name="txtChutesApiKey" Style="{StaticResource ApiKeyTextBoxStyle}" Visibility="Collapsed"/>
+                                            <PasswordBox x:Name="pwdChutesApiKey" Style="{StaticResource ApiKeyPasswordBoxStyle}"/>
+                                        </Grid>
+                                        <ToggleButton x:Name="tglShowChutesApiKey" Style="{StaticResource ToggleButtonApiKeyStyle}"/>
+                                    </StackPanel>
+                                    <CheckBox x:Name="chkSaveChutesApiKey" Content="Lưu Key" Style="{StaticResource ModernCheckBoxStyle}" Margin="70,0,0,8"/>
+                                    <Label Content="Model API:" Margin="0,0,0,-5"/>
+                                    <Grid Margin="0,5,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="cmbChutesApiModel" Grid.Column="0" Margin="0,0,5,0"/>
+                                        <Button x:Name="btnAddChutesModel" Grid.Column="1" Content="+" ToolTip="Thêm Model  mới" Foreground="{StaticResource TextSecondaryColor}" Width="30" Height="30" Padding="0" Margin="0,0,5,0" Click="BtnAddChutesModel_Click"/>
+                                        <Button x:Name="btnRemoveChutesModel" Grid.Column="2" Content="-" ToolTip="Xóa Model đang chọn" Foreground="{StaticResource TextSecondaryColor}" Width="30" Height="30" Padding="0" Click="BtnRemoveChutesModel_Click"/>
+                                    </Grid>
+                                    <WrapPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Req/phút:"/>
+                                            <TextBox x:Name="txtChutesRateLimitPerMinute" Style="{StaticResource NumericTextBoxStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Retry API:"/>
+                                            <TextBox x:Name="txtChutesMaxApiRetries" Style="{StaticResource NumericTextBoxStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay API(ms):"/>
+                                            <TextBox x:Name="txtChutesApiRetryBaseDelayMs" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Retry Content:"/>
+                                            <TextBox x:Name="txtChutesMaxContentRetries" Style="{StaticResource NumericTextBoxStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay Content(ms):"/>
+                                            <TextBox x:Name="txtChutesContentRetryBaseDelayMs" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay File(ms):"/>
+                                            <TextBox x:Name="txtChutesDelayBetweenFiles" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay Chunk(ms):"/>
+                                            <TextBox x:Name="txtChutesDelayBetweenChunks" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Ngưỡng Chunk:"/>
+                                            <TextBox x:Name="txtChutesDirectSendThreshold" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Kích thước Chunk:"/>
+                                            <TextBox x:Name="txtChutesChunkSize" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </GroupBox>
+                            <GroupBox x:Name="gbGeminiSettings" Header="Cấu Hình Gemini" Margin="0,10,0,5" Visibility="Collapsed">
+                                <StackPanel>
+                                    <StackPanel Orientation="Vertical" Margin="0,5,0,8">
+                                        <Label Content="API Key:" ToolTip="Nếu bật Multi-key, nhập mỗi key trên một dòng."/>
+                                        <CheckBox x:Name="chkGeminiUseMultiKey" 
+          Style="{StaticResource ModernCheckBoxStyle}" 
+          Content="Sử dụng nhiều API Keys (Multi-Key)" 
+          Margin="0,8,0,8"
+          Checked="ChkGeminiUseMultiKey_Changed"
+          Unchecked="ChkGeminiUseMultiKey_Changed"
+          ToolTip="Bật để sử dụng nhiều Gemini API keys với load balancing và rate limiting"/>
+
+                                        <!-- Single Key Mode -->
+                                        <StackPanel x:Name="pnlGeminiSingleKey" Margin="0,5,0,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Label Content="API Key:" Width="70" VerticalAlignment="Center"/>
+                                                <Grid>
+                                                    <TextBox x:Name="txtGeminiApiKey" 
+                     Style="{StaticResource ApiKeyTextBoxStyle}" 
+                     Visibility="Collapsed" 
+                     TextChanged="TxtGeminiApiKey_TextChanged"/>
+                                                    <PasswordBox x:Name="pwdGeminiApiKey" 
+                         Style="{StaticResource ApiKeyPasswordBoxStyle}" 
+                         PasswordChanged="PwdGeminiApiKey_PasswordChanged"/>
+                                                </Grid>
+                                                <ToggleButton x:Name="tglShowGeminiApiKey" 
+                      Style="{StaticResource ToggleButtonApiKeyStyle}" 
+                      Checked="TglShowGeminiApiKey_Checked" 
+                      Unchecked="TglShowGeminiApiKey_Unchecked"/>
+                                            </StackPanel>
+                                            <CheckBox x:Name="chkSaveGeminiApiKey" 
+              Style="{StaticResource ModernCheckBoxStyle}" 
+              Content="Lưu Key" 
+              Margin="70,5,0,0"/>
+                                        </StackPanel>
+
+                                        <!-- Multi-Key Mode -->
+                                        <StackPanel x:Name="pnlGeminiMultiKey" Visibility="Collapsed" Margin="0,5,0,8">
+                                            <Label Content="API Keys (mỗi key 1 dòng):" Margin="0,0,0,5"/>
+                                            <TextBox x:Name="txtGeminiApiKeys"
+             Height="100"
+             AcceptsReturn="True"
+             VerticalScrollBarVisibility="Auto"
+             TextWrapping="Wrap"
+             FontFamily="Consolas"
+             ToolTip="Nhập mỗi API key trên một dòng. Ví dụ:&#x0a;AIzaSy...key1&#x0a;AIzaSy...key2&#x0a;AIzaSy...key3"/>
+                                            <CheckBox x:Name="chkSaveGeminiApiKeys" 
+              Style="{StaticResource ModernCheckBoxStyle}" 
+              Content="Lưu Keys" 
+              Margin="0,5,0,0"/>
+                                            <TextBlock Foreground="{StaticResource TextSecondaryColor}" 
+               FontSize="11" 
+               Margin="0,3,0,0"
+               TextWrapping="Wrap">
+        Mỗi key sẽ có giới hạn RPM và RPD riêng. Hệ thống tự động load balance và retry với key khác khi có lỗi.
+                                            </TextBlock>
+                                        </StackPanel>
+
+                                        <!-- ===== PHẦN MỚI: ADVANCED MULTI-KEY MODE ===== -->
+                                        <CheckBox x:Name="chkGeminiAdvancedMultiKeyMode" 
+          Style="{StaticResource ModernCheckBoxStyle}" 
+          Content="Chế độ dịch đa key nâng cao" 
+          Margin="0,10,0,5"
+          ToolTip="Bật chế độ dịch batch với quản lý đầy đủ: RPM/key, RPD/key, chunk isolation, auto retry, và key rotation"/>
+
+                                        <StackPanel x:Name="pnlGeminiAdvancedMultiKeySettings" 
+            Visibility="Collapsed" 
+            Margin="15,5,0,8"
+            Background="#2A2D2E">
+                                            <TextBlock Text="⚙️ Cấu hình nâng cao cho Multi-Key" 
+               FontWeight="SemiBold" 
+               Margin="5,5,5,3"/>
+                                            <StackPanel Margin="5,3,5,5">
+                                                <Label Content="RPD (Request/Day/Key):" FontSize="11"/>
+                                                <TextBox x:Name="txtGeminiRequestsPerDayPerKey" 
+                 Style="{StaticResource NumericTextBoxLargeStyle}"
+                 ToolTip="Giới hạn số request mỗi ngày cho MỖI key. Ví dụ: 1500 = mỗi key tối đa 1500 requests/ngày. Key đạt giới hạn sẽ bị tắt trong phiên."/>
+
+                                                <CheckBox x:Name="chkGeminiEnableChunkIsolation" 
+                  Style="{StaticResource ModernCheckBoxStyle}" 
+                  Content="Chunk Isolation (mỗi chunk = 1 key riêng)" 
+                  Margin="0,5,0,3"
+                  IsChecked="True"
+                  ToolTip="Đảm bảo mỗi chunk sử dụng 1 API key riêng biệt, tránh conflict"/>
+
+                                                <CheckBox x:Name="chkGeminiEnableAutoRetryWithNewKey" 
+                  Style="{StaticResource ModernCheckBoxStyle}" 
+                  Content="Auto Retry với key khác khi lỗi" 
+                  Margin="0,3,0,3"
+                  IsChecked="True"
+                  ToolTip="Tự động thử lại với API key khác khi gặp lỗi rate limit (429) hoặc quota exceeded"/>
+
+                                                <TextBlock 
+                   FontSize="10" 
+                   Margin="0,5,0,5"
+                   TextWrapping="Wrap">
+            ✓ Mỗi key: RPM limit + RPD limit
+            ✓ Auto load balance
+            ✓ Chunk isolation
+            ✓ Smart retry với key rotation
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Label Content="Model API:" Margin="0,0,0,-5"/>
+                                    <Grid Margin="0,5,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="cmbGeminiApiModel" Grid.Column="0" Margin="0,0,5,0"/>
+                                        <Button x:Name="btnAddGeminiModel" Grid.Column="1" Content="+" Foreground="{StaticResource TextSecondaryColor}" Width="30" Height="30" Padding="0" Margin="0,0,5,0" Click="BtnAddGeminiModel_Click"/>
+                                        <Button x:Name="btnRemoveGeminiModel" Grid.Column="2" Content="-" Foreground="{StaticResource TextSecondaryColor}" Width="30" Height="30" Padding="0" Click="BtnRemoveGeminiModel_Click"/>
+                                    </Grid>
+                                    <WrapPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Temperature:"/>
+                                            <TextBox x:Name="txtGeminiTemperature" Style="{StaticResource NumericTextBoxStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Max Tokens:"/>
+                                            <TextBox x:Name="txtGeminiMaxOutputTokens" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5" Orientation="Vertical">
+                                            <CheckBox x:Name="chkGeminiEnableThinkingBudget" Style="{StaticResource ModernCheckBoxStyle}" Content="Bật Thinking Budget"/>
+                                            <TextBox x:Name="txtGeminiThinkingBudget" Style="{StaticResource NumericTextBoxLargeStyle}" IsEnabled="{Binding IsChecked, ElementName=chkGeminiEnableThinkingBudget}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Req/phút/key:"/>
+                                            <TextBox x:Name="txtGeminiRateLimitPerMinute" Style="{StaticResource NumericTextBoxStyle}"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Retry API:"/>
+                                            <TextBox x:Name="txtGeminiMaxApiRetries" Style="{StaticResource NumericTextBoxStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay API(ms):"/>
+                                            <TextBox x:Name="txtGeminiApiRetryBaseDelayMs" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay File(ms):"/>
+                                            <TextBox x:Name="txtGeminiDelayBetweenFiles" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay Chunk(ms):"/>
+                                            <TextBox x:Name="txtGeminiDelayBetweenChunks" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Ngưỡng Chunk:"/>
+                                            <TextBox x:Name="txtGeminiDirectSendThreshold" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Kích thước Chunk:"/>
+                                            <TextBox x:Name="txtGeminiChunkSize" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                                            <CheckBox x:Name="chkGeminiEnableRequestLimit" Style="{StaticResource ModernCheckBoxStyle}" Content="Giới hạn Request:"/>
+                                            <TextBox x:Name="txtGeminiRequestLimit" Style="{StaticResource NumericTextBoxLargeStyle}" IsEnabled="{Binding IsChecked, ElementName=chkGeminiEnableRequestLimit}" ToolTip="Dừng dịch khi đạt số request này (0 để không giới hạn nếu checkbox bật). Mặc định 500."/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                                            <CheckBox x:Name="chkGeminiEnableRpmLimit" Style="{StaticResource ModernCheckBoxStyle}" Content="Giới hạn Chương/phút:"/>
+                                            <TextBox x:Name="txtGeminiRpmLimit" Style="{StaticResource NumericTextBoxLargeStyle}" IsEnabled="{Binding IsChecked, ElementName=chkGeminiEnableRpmLimit}" ToolTip="Giới hạn số chương (request) gửi đi mỗi phút. Hữu ích cho key trả phí."/>
+                                        </StackPanel>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </GroupBox>
+                            <GroupBox x:Name="gbOpenRouterSettings" Header="Cấu Hình OpenRouter" Margin="0,10,0,5" Visibility="Visible">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,8">
+                                        <Label Content="API Key:" Width="70" VerticalAlignment="Center"/>
+                                        <Grid>
+                                            <TextBox x:Name="txtOpenRouterApiKey" Style="{StaticResource ApiKeyTextBoxStyle}" Visibility="Collapsed" TextChanged="TxtOpenRouterApiKey_TextChanged"/>
+                                            <PasswordBox x:Name="pwdOpenRouterApiKey" Style="{StaticResource ApiKeyPasswordBoxStyle}" PasswordChanged="PwdOpenRouterApiKey_PasswordChanged"/>
+                                        </Grid>
+                                        <ToggleButton x:Name="tglShowOpenRouterApiKey" Style="{StaticResource ToggleButtonApiKeyStyle}" Checked="TglShowOpenRouterApiKey_Checked" Unchecked="TglShowOpenRouterApiKey_Unchecked"/>
+                                    </StackPanel>
+                                    <CheckBox x:Name="chkSaveOpenRouterApiKey" Style="{StaticResource ModernCheckBoxStyle}" Content="Lưu Key" Margin="70,0,0,8"/>
+                                    <Label Content="Model API:" Margin="0,0,0,-5"/>
+                                    <Grid Margin="0,5,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="cmbOpenRouterModel" Grid.Column="0" IsEditable="True" Margin="0,0,5,0"/>
+                                        <Button x:Name="btnAddOpenRouterModel" Grid.Column="1" Content="+" Foreground="{StaticResource TextSecondaryColor}" Width="30" Height="30" Padding="0" Margin="0,0,5,0" Click="BtnAddOpenRouterModel_Click"/>
+                                        <Button x:Name="btnRemoveOpenRouterModel" Grid.Column="2" Content="-" Foreground="{StaticResource TextSecondaryColor}" Width="30" Height="30" Padding="0" Click="BtnRemoveOpenRouterModel_Click"/>
+                                    </Grid>
+                                    <Label Content="HTTP Referer:" Margin="0,5,0,-5" ToolTip="Tùy chọn. URL trang web của bạn."/>
+                                    <TextBox x:Name="txtOpenRouterReferer" Margin="0,5,0,8"/>
+                                    <Label Content="X-Title:" Margin="0,0,0,-5" ToolTip="Tùy chọn. Tên trang web của bạn."/>
+                                    <TextBox x:Name="txtOpenRouterTitle" Margin="0,5,0,8"/>
+                                    <WrapPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Req/phút:"/>
+                                            <TextBox x:Name="txtOpenRouterRateLimitPerMinute" Style="{StaticResource NumericTextBoxStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Retry API:"/>
+                                            <TextBox x:Name="txtOpenRouterMaxApiRetries" Style="{StaticResource NumericTextBoxStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay API(ms):"/>
+                                            <TextBox x:Name="txtOpenRouterApiRetryBaseDelayMs" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Retry Content:"/>
+                                            <TextBox x:Name="txtOpenRouterMaxContentRetries" Style="{StaticResource NumericTextBoxStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay Content(ms):"/>
+                                            <TextBox x:Name="txtOpenRouterContentRetryBaseDelayMs" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay File(ms):"/>
+                                            <TextBox x:Name="txtOpenRouterDelayBetweenFiles" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Delay Chunk(ms):"/>
+                                            <TextBox x:Name="txtOpenRouterDelayBetweenChunks" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Ngưỡng Chunk:"/>
+                                            <TextBox x:Name="txtOpenRouterDirectSendThreshold" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,5,10,5">
+                                            <Label Content="Kích thước Chunk:"/>
+                                            <TextBox x:Name="txtOpenRouterChunkSize" Style="{StaticResource NumericTextBoxLargeStyle}"/>
+                                        </StackPanel>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </GroupBox>
+                            <TextBlock x:Name="lblStatus" Text="Sẵn sàng" FontWeight="SemiBold" Foreground="{StaticResource AccentColor}" Margin="0,20,0,0" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="lblUserUsageInfo" 
+                                       Text="{Binding Path=DataContext.UsageInfoString, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       Foreground="{StaticResource TextSecondaryColor}" FontSize="12" Margin="0,2,0,0"
+                                       ToolTip="Thông tin giới hạn sử dụng của bạn."/>
+                            <TextBlock x:Name="lblInputCharCount" 
+                                       Text="Đã nhập: 0 ký tự"
+                                       Foreground="{StaticResource TextSecondaryColor}" FontSize="12" Margin="0,2,0,0"/>
+
+                            <TextBlock x:Name="lblFilePath" Text="Chưa chọn file" Foreground="{StaticResource TextSecondaryColor}" FontSize="12" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SubPhim.Server.Data;
 using SubPhim.Server.Models;
 using SubPhim.Server.Services;
 using System.Security.Claims;
@@ -24,7 +25,14 @@ public class LauncherAioController : ControllerBase
     }
 
     // Sửa đổi record này
-    public record StartTranslationRequest(string Genre, string TargetLanguage, List<SrtLine> Lines, string SystemInstruction, bool AcceptPartial = false);
+    public record StartTranslationRequest(
+        string Genre, 
+        string TargetLanguage, 
+        List<SrtLine> Lines, 
+        string SystemInstruction, 
+        bool AcceptPartial = false,
+        int ModelType = 2  // 1 = Flash, 2 = Pro (default Pro for backward compatibility)
+    );
 
     public class StartTranslationResponse
     {
@@ -53,11 +61,14 @@ public class LauncherAioController : ControllerBase
         {
             if (!int.TryParse(User.FindFirstValue("id"), out int userId)) return Unauthorized();
 
-            _logger.LogInformation("Received translation job from User ID {UserId} with {LineCount} lines. AcceptPartial={AcceptPartial}",
-                userId, request.Lines.Count, request.AcceptPartial);
+            _logger.LogInformation("Received translation job from User ID {UserId} with {LineCount} lines. AcceptPartial={AcceptPartial}, ModelType={ModelType}",
+                userId, request.Lines.Count, request.AcceptPartial, request.ModelType);
+
+            // Convert ModelType to GeminiLocalModelType enum
+            var modelType = request.ModelType == 1 ? GeminiLocalModelType.Flash : GeminiLocalModelType.Pro;
 
             // Cập nhật lời gọi service với tham số mới
-            var result = await _orchestrator.CreateJobAsync(userId, request.Genre, request.TargetLanguage, request.Lines, request.SystemInstruction, request.AcceptPartial);
+            var result = await _orchestrator.CreateJobAsync(userId, request.Genre, request.TargetLanguage, request.Lines, request.SystemInstruction, request.AcceptPartial, modelType);
 
             // Dựa vào kết quả từ service để trả về các mã trạng thái khác nhau
             switch (result.Status)

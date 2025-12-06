@@ -158,7 +158,7 @@ namespace SubPhim.Server.Services
             _proxyRateLimiter = proxyRateLimiter;
         }
 
-        public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial)
+        public async Task<CreateJobResult> CreateJobAsync(int userId, string genre, string targetLanguage, List<SrtLine> allLines, string systemInstruction, bool acceptPartial, GeminiLocalModelType modelType = GeminiLocalModelType.Pro)
         {
             _logger.LogInformation("GATEKEEPER: Job creation request for User ID {UserId}. AcceptPartial={AcceptPartial}", userId, acceptPartial);
 
@@ -185,7 +185,7 @@ namespace SubPhim.Server.Services
             {
                 user.LocalSrtLinesUsedToday += requestedLines;
                 var sessionId = await CreateJobInDb(user, genre, targetLanguage, systemInstruction, allLines, context);
-                _ = ProcessJob(sessionId, user.Id, user.Tier);
+                _ = ProcessJob(sessionId, user.Id, user.Tier, modelType);
                 return new CreateJobResult("Accepted", "OK", sessionId);
             }
 
@@ -196,7 +196,7 @@ namespace SubPhim.Server.Services
                     var partialLines = allLines.Take(remainingLines).ToList();
                     user.LocalSrtLinesUsedToday += partialLines.Count;
                     var sessionId = await CreateJobInDb(user, genre, targetLanguage, systemInstruction, partialLines, context);
-                    _ = ProcessJob(sessionId, user.Id, user.Tier);
+                    _ = ProcessJob(sessionId, user.Id, user.Tier, modelType);
                     return new CreateJobResult("Accepted", "OK", sessionId);
                 }
                 else
@@ -254,9 +254,10 @@ namespace SubPhim.Server.Services
             return (isFinished, job.ErrorMessage);
         }
 
-        private async Task ProcessJob(string sessionId, int userId, SubscriptionTier userTier)
+        private async Task ProcessJob(string sessionId, int userId, SubscriptionTier userTier, GeminiLocalModelType modelType)
         {
-            _logger.LogInformation("Starting HIGH-SPEED processing for job {SessionId} using {Tier} tier API pool", sessionId, userTier);
+            _logger.LogInformation("Starting HIGH-SPEED processing for job {SessionId} using {Tier} tier API pool with {ModelType} model type", 
+                sessionId, userTier, modelType);
             
             // === SỬA ĐỔI: Sử dụng JobCancellationService thay vì tạo CTS mới ===
             var cancellationToken = _cancellationService.RegisterJob(sessionId, userId, timeoutMinutes: 15);
@@ -280,8 +281,19 @@ namespace SubPhim.Server.Services
                 await context.SaveChangesAsync(cancellationToken);
 
                 var settings = await context.LocalApiSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == 1, cancellationToken) ?? new LocalApiSetting();
-                var activeModel = await context.AvailableApiModels.AsNoTracking().FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cancellationToken);
-                if (activeModel == null) throw new Exception($"Không có model nào đang hoạt động cho nhóm '{poolToUse}'.");
+                
+                // === MỚI: Select active model based on ModelType ===
+                var activeModel = await context.AvailableApiModels.AsNoTracking()
+                    .FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse && m.ModelType == modelType, cancellationToken);
+                
+                if (activeModel == null) 
+                {
+                    _logger.LogWarning("No active model found for pool {Pool} and type {ModelType}, falling back to any active model", poolToUse, modelType);
+                    activeModel = await context.AvailableApiModels.AsNoTracking()
+                        .FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cancellationToken);
+                }
+                
+                if (activeModel == null) throw new Exception($"Không có model nào đang hoạt động cho nhóm '{poolToUse}' và loại '{modelType}'.");
 
                 // === SỬA ĐỔI: Load tất cả keys enabled và filter cooldown ===
                 var enabledKeys = await context.ManagedApiKeys.AsNoTracking()
@@ -294,8 +306,13 @@ namespace SubPhim.Server.Services
                 if (!enabledKeys.Any()) throw new Exception($"Không có API key nào đang hoạt động cho nhóm '{poolToUse}' (có thể tất cả đang trong cooldown).");
                 // === KẾT THÚC SỬA ĐỔI ===
 
-                // === MỚI: Lấy RPM từ Admin/LocalApi settings thay vì hardcode ===
-                int rpmPerKey = settings.Rpm; // RPM được cài đặt trên Admin panel
+                // === MỚI: Lấy RPM/RPD dựa trên model type ===
+                int rpmPerKey = modelType == GeminiLocalModelType.Pro ? settings.ProRpm : settings.FlashRpm;
+                int rpdPerKey = modelType == GeminiLocalModelType.Pro ? settings.ProRpdPerKey : settings.FlashRpdPerKey;
+                int rpmPerProxy = modelType == GeminiLocalModelType.Pro ? settings.ProRpmPerProxy : settings.FlashRpmPerProxy;
+                
+                _logger.LogInformation("Job {SessionId}: Using {ModelType} settings - RPM/Key: {Rpm}, RPD/Key: {Rpd}, RPM/Proxy: {RpmProxy}", 
+                    sessionId, modelType, rpmPerKey, rpdPerKey, rpmPerProxy);
                 
                 // Đảm bảo mỗi key có SemaphoreSlim riêng để tuân thủ RPM
                 foreach (var key in enabledKeys)
@@ -304,7 +321,7 @@ namespace SubPhim.Server.Services
                     EnsureKeyRpmLimiter(key.Id, rpmPerKey);
                 }
                 
-                _logger.LogInformation("Job {SessionId}: Using {KeyCount} API keys, each with {Rpm} RPM (from Admin settings)", 
+                _logger.LogInformation("Job {SessionId}: Using {KeyCount} API keys, each with {Rpm} RPM", 
                     sessionId, enabledKeys.Count, rpmPerKey);
 
                 var allLines = await context.OriginalSrtLines.AsNoTracking()

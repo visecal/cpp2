@@ -48,7 +48,8 @@ namespace SubPhim.Server.Data
         ChutesAI = 1,
         Gemini = 2,
         OpenRouter = 4,
-        SmartCut = 8
+        SmartCut = 8,
+        Capcutvoice = 16
     }
     [Flags]
     public enum ApiPoolType
@@ -75,6 +76,10 @@ namespace SubPhim.Server.Data
         public string PasswordHash { get; set; }
         public SubscriptionTier Tier { get; set; }
         public DateTime? SubscriptionExpiry { get; set; }
+        
+        [Display(Name = "Gói Năm Pro")]
+        public bool IsYearlyPro { get; set; } = false; // false = thường, true = pro
+        
         [Display(Name = "Ghi đè giới hạn Request/Ngày")]
         public int DailyRequestLimitOverride { get; set; } = -1;
 
@@ -387,6 +392,10 @@ namespace SubPhim.Server.Data
         // === VIP Translation Limits ===
         [Display(Name = "Giới hạn dịch VIP SRT/Ngày")]
         public int DailyVipSrtLimit { get; set; } = 0;
+        
+        // === Yearly Tier Marking ===
+        [Display(Name = "Áp dụng cho Gói Năm Pro")]
+        public bool IsYearlyProSettings { get; set; } = false;
     }
     public class AioTranslationSetting
     {

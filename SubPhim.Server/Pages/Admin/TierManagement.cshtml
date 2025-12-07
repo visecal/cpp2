@@ -43,6 +43,22 @@
                 <div id="@collapseId" class="accordion-collapse collapse" aria-labelledby="@headerId" data-bs-parent="#tierAccordion">
                     <div class="accordion-body">
 
+                        @if (tier == SubscriptionTier.Yearly)
+                        {
+                            <div class="alert alert-info mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="Configs[@tier].IsYearlyProSettings" 
+                                           id="isYearlyPro-@tier" @(config.IsYearlyProSettings ? "checked" : "")>
+                                    <label class="form-check-label fw-bold" for="isYearlyPro-@tier">
+                                        <i class="bi bi-star-fill text-warning me-2"></i>Cấu hình này cho Gói Năm PRO
+                                    </label>
+                                    <div class="form-text">
+                                        Bật tùy chọn này nếu đây là cấu hình cho gói năm Pro. Nếu không, đây sẽ là cấu hình cho gói năm thường.
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
                         <h5><i class="bi bi-camera-video me-2"></i>Giới hạn xử lý Video</h5>
                         <div class="row mb-3">
                             <div class="col-md-6">

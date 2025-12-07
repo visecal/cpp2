@@ -29,7 +29,13 @@
                 @foreach (var user in Model)
                 {
                     <tr id="user-row-@user.Id" class="@(user.IsBlocked ? "table-danger" : "")">
-                        <td><a asp-page="./Details" asp-route-id="@user.Id" class="fw-bold">@user.Uid</a></td>
+                        <td>
+                            <a asp-page="./Details" asp-route-id="@user.Id" class="fw-bold">@user.Uid</a>
+                            @if ((user.Tier == "Yearly" || user.Tier == "Lifetime") && user.IsYearlyPro)
+                            {
+                                <span class="badge bg-warning text-dark ms-1">PRO</span>
+                            }
+                        </td>
                         <td>
                             <a asp-page="./Details" asp-route-id="@user.Id">@user.Username</a>
                             @if (user.IsBlocked)
@@ -56,7 +62,9 @@
                                     data-granted-features="@user.GrantedFeatures" data-allowed-apis="@user.AllowedApiAccess"
                                     data-daily-video-limit="@user.DailyVideoLimit" data-daily-request-limit="@user.DailyRequestLimitOverride"
                                     data-daily-srt-limit="@user.DailySrtLineLimit" data-daily-local-srt-limit="@user.DailyLocalSrtLimit"
-                                    data-aio-char-limit="@user.AioCharacterLimit" data-aio-rpm="@user.AioRpm">
+                                    data-aio-char-limit="@user.AioCharacterLimit" data-aio-rpm="@user.AioRpm"
+                                    data-tts-char-limit="@user.TtsCharacterLimit" data-vip-srt-limit="@user.DailyVipSrtLimit"
+                                    data-is-yearly-pro="@user.IsYearlyPro.ToString().ToLower()">
                                 <i class="bi bi-key-fill"></i> Sửa quyền
                             </button>
                             <!-- === KẾT THÚC SỬA ĐỔI === -->
@@ -83,7 +91,13 @@
                         </h5>
                         <span class="badge bg-secondary">@user.Tier</span>
                     </div>
-                    <p class="card-text text-muted small">UID: @user.Uid</p>
+                    <p class="card-text text-muted small">
+                        UID: @user.Uid
+                        @if ((user.Tier == "Yearly" || user.Tier == "Lifetime") && user.IsYearlyPro)
+                        {
+                            <span class="badge bg-warning text-dark ms-1">PRO</span>
+                        }
+                    </p>
                     <div class="row g-2 small">
                         <div class="col-6"><strong>Hạn:</strong> @DisplayHelper.GetSubscriptionStatus(Enum.Parse<SubscriptionTier>(user.Tier), user.SubscriptionExpiry)</div>
                         <div class="col-6"><strong>Đăng nhập cuối:</strong> @(user.LastLogin?.ToVietNamTimeString("g") ?? "Chưa có")</div>
@@ -111,7 +125,9 @@
                             data-granted-features="@user.GrantedFeatures" data-allowed-apis="@user.AllowedApiAccess"
                             data-daily-video-limit="@user.DailyVideoLimit" data-daily-request-limit="@user.DailyRequestLimitOverride"
                             data-daily-srt-limit="@user.DailySrtLineLimit" data-daily-local-srt-limit="@user.DailyLocalSrtLimit"
-                            data-aio-char-limit="@user.AioCharacterLimit" data-aio-rpm="@user.AioRpm">
+                            data-aio-char-limit="@user.AioCharacterLimit" data-aio-rpm="@user.AioRpm"
+                            data-tts-char-limit="@user.TtsCharacterLimit" data-vip-srt-limit="@user.DailyVipSrtLimit"
+                            data-is-yearly-pro="@user.IsYearlyPro.ToString().ToLower()">
                         <i class="bi bi-key-fill"></i> Sửa quyền
                     </button>
                     <!-- === KẾT THÚC SỬA ĐỔI === -->

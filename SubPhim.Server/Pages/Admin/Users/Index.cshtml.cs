@@ -63,6 +63,8 @@ namespace SubPhim.Server.Pages.Admin.Users
                 // === BẮT ĐẦU THÊM MỚI ===
                 settings.AioCharacterLimit,
                 settings.AioRequestsPerMinute,
+                settings.TtsCharacterLimit,
+                settings.DailyVipSrtLimit,
                 // === KẾT THÚC THÊM MỚI ===
                 AllowedApis = apis,
                 GrantedFeatures = features
@@ -143,6 +145,7 @@ namespace SubPhim.Server.Pages.Admin.Users
                     Tier = u.Tier.ToString(),
                     SubscriptionExpiry = u.SubscriptionExpiry,
                     IsBlocked = u.IsBlocked,
+                    IsYearlyPro = u.IsYearlyPro,
                     VideosProcessedToday = u.VideosProcessedToday,
                     DailyVideoLimit = u.DailyVideoLimit,
                     DailyRequestCount = u.DailyRequestCount,
@@ -158,7 +161,8 @@ namespace SubPhim.Server.Pages.Admin.Users
                     // === BẮT ĐẦU THÊM MỚI ===
                     AioCharactersUsedToday = u.AioCharactersUsedToday,
                     AioCharacterLimit = aioCharLimit,
-                    AioRpm = aioRpm
+                    AioRpm = aioRpm,
+                    DailyVipSrtLimit = u.DailyVipSrtLimit
                     // === KẾT THÚC THÊM MỚI ===
                 };
             }).ToList();
@@ -297,6 +301,9 @@ namespace SubPhim.Server.Pages.Admin.Users
             // === BẮT ĐẦU THÊM MỚI ===
             userInDb.AioCharacterLimitOverride = request.AioCharacterLimitOverride;
             userInDb.AioRpmOverride = request.AioRpmOverride;
+            userInDb.TtsCharacterLimit = request.TtsCharacterLimit;
+            userInDb.DailyVipSrtLimit = request.DailyVipSrtLimit;
+            userInDb.IsYearlyPro = request.IsYearlyPro;
             // === KẾT THÚC THÊM MỚI ===
 
             await _context.SaveChangesAsync();
@@ -317,6 +324,10 @@ namespace SubPhim.Server.Pages.Admin.Users
         // === BẮT ĐẦU THÊM MỚI ===
         public long AioCharacterLimitOverride { get; set; }
         public int AioRpmOverride { get; set; }
+        public long TtsCharacterLimit { get; set; }
+        public int DailyVipSrtLimit { get; set; }
+        public bool IsYearlyPro { get; set; }
+        // === KẾT THÚC THÊM MỚI ===
         // === KẾT THÚC THÊM MỚI ===
     }
 
@@ -329,6 +340,7 @@ namespace SubPhim.Server.Pages.Admin.Users
         public string Tier { get; set; }
         public DateTime? SubscriptionExpiry { get; set; }
         public bool IsBlocked { get; set; }
+        public bool IsYearlyPro { get; set; }
         public DateTime? LastLogin { get; set; }
         public int VideosProcessedToday { get; set; }
         public int DailyVideoLimit { get; set; }
@@ -346,6 +358,7 @@ namespace SubPhim.Server.Pages.Admin.Users
         public long AioCharactersUsedToday { get; set; }
         public long AioCharacterLimit { get; set; }
         public int AioRpm { get; set; }
+        public int DailyVipSrtLimit { get; set; }
         // === KẾT THÚC THÊM MỚI ===
     }
 }

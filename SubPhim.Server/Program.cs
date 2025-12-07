@@ -36,6 +36,8 @@ builder.Services.AddSingleton<GlobalRequestRateLimiterService>(); // Singleton �
 builder.Services.AddSingleton<ProxyService>(); // Singleton để quản lý và luân phiên proxy
 builder.Services.AddSingleton<ProxyRateLimiterService>(); // Singleton để quản lý RPM per proxy
 builder.Services.AddHostedService<ManagedApiKeyResetService>(); // Background service
+builder.Services.AddHostedService<VipTranslationResetService>(); // VIP Translation daily reset
+builder.Services.AddScoped<IVipTranslationService, VipTranslationService>(); // VIP Translation service
 // === KẾT THÚC THÊM ===
 builder.Services.AddHostedService<AioTtsBatchProcessorService>();
 builder.Services.AddHttpClient();

@@ -137,6 +137,19 @@ namespace SubPhim.Server.Data
         public int AioRpmOverride { get; set; } = -1;
         [Display(Name = "Lần cuối reset thiết bị (UTC)")]
         public DateTime? LastDeviceResetUtc { get; set; }
+
+        // === VIP TRANSLATION FIELDS ===
+        [Display(Name = "Giới hạn dịch VIP/Ngày")]
+        public int DailyVipTranslationLimit { get; set; } = 0;
+
+        [Display(Name = "Số dòng VIP đã dịch/Ngày")]
+        public int VipTranslationLinesUsedToday { get; set; } = 0;
+
+        [Display(Name = "Lần cuối reset bộ đếm VIP (UTC)")]
+        public DateTime LastVipTranslationResetUtc { get; set; } = DateTime.UtcNow;
+
+        [Display(Name = "Ghi đè Giới hạn Dịch VIP/Ngày")]
+        public int DailyVipTranslationLimitOverride { get; set; } = -1;
     }
     public class TtsApiKey
     {
@@ -373,6 +386,10 @@ namespace SubPhim.Server.Data
         [Display(Name = "Giới hạn Request AIO/Phút")]
         public int AioRequestsPerMinute { get; set; }
         // === KẾT THÚC THAY ĐỔI ===
+
+        // === VIP TRANSLATION SETTINGS ===
+        [Display(Name = "Giới hạn dịch VIP/Ngày")]
+        public int DailyVipTranslationLimit { get; set; } = 0;
     }
     public class AioTranslationSetting
     {
@@ -773,4 +790,132 @@ namespace SubPhim.Server.Data
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
+    // === VIP TRANSLATION MODELS ===
+    public class VipApiKey
+    {
+        public int Id { get; set; }
+
+        [Required]
+        public string EncryptedApiKey { get; set; }
+        
+        [Required]
+        public string Iv { get; set; }
+        
+        [Display(Name = "Đang hoạt động")]
+        public bool IsEnabled { get; set; } = true;
+
+        [Display(Name = "Tổng Tokens Đã Dùng")]
+        public long TotalTokensUsed { get; set; } = 0;
+
+        [Display(Name = "Số Request Hôm Nay")]
+        public int RequestsToday { get; set; } = 0;
+
+        [Display(Name = "Lần cuối reset bộ đếm Request (UTC)")]
+        public DateTime LastRequestCountResetUtc { get; set; } = DateTime.UtcNow;
+
+        [Display(Name = "Tạm thời vô hiệu đến (UTC)")]
+        public DateTime? TemporaryCooldownUntil { get; set; }
+
+        [Display(Name = "Lý do bị vô hiệu hóa")]
+        [StringLength(300)]
+        public string? DisabledReason { get; set; }
+
+        [Display(Name = "Số lần gặp lỗi 429 liên tiếp")]
+        public int Consecutive429Count { get; set; } = 0;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    public class VipTranslationSetting
+    {
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
+        public int Id { get; set; } = 1;
+
+        [Display(Name = "Request/Phút (RPM)")]
+        public int Rpm { get; set; } = 100;
+
+        [Display(Name = "Số dòng/Request (Batch Size)")]
+        public int BatchSize { get; set; } = 40;
+
+        [Display(Name = "Số lần thử lại nếu lỗi")]
+        public int MaxRetries { get; set; } = 3;
+
+        [Display(Name = "Delay giữa các lần thử lại (ms)")]
+        public int RetryDelayMs { get; set; } = 5000;
+
+        [Display(Name = "Delay giữa các batch (ms)")]
+        public int DelayBetweenBatchesMs { get; set; } = 1000;
+
+        [Display(Name = "Temperature (0-2)")]
+        [Column(TypeName = "decimal(3, 2)")]
+        public decimal Temperature { get; set; } = 0.7m;
+
+        [Display(Name = "Max Output Tokens")]
+        public int MaxOutputTokens { get; set; } = 8192;
+
+        [Display(Name = "Bật Thinking Budget (IQ AI)")]
+        public bool EnableThinkingBudget { get; set; } = true;
+
+        [Display(Name = "Thinking Budget (IQ AI)")]
+        public int ThinkingBudget { get; set; } = 8192;
+
+        [Display(Name = "Request/Phút/Proxy (RPM)")]
+        public int RpmPerProxy { get; set; } = 10;
+    }
+
+    public class VipTranslationJob
+    {
+        [Key]
+        public string SessionId { get; set; }
+        
+        public int UserId { get; set; }
+        
+        public string SystemInstruction { get; set; }
+        
+        public JobStatus Status { get; set; }
+        
+        public DateTime CreatedAt { get; set; }
+        
+        public DateTime? CompletedAt { get; set; }
+        
+        public string? ErrorMessage { get; set; }
+        
+        public int TotalLines { get; set; }
+        
+        public int ProcessedLines { get; set; }
+        
+        public ICollection<VipOriginalSrtLine> OriginalLines { get; set; }
+        
+        public ICollection<VipTranslatedSrtLine> TranslatedLines { get; set; }
+    }
+
+    public class VipOriginalSrtLine
+    {
+        public int Id { get; set; }
+        
+        public string SessionId { get; set; }
+        
+        public int LineNumber { get; set; }
+        
+        public string TimeCode { get; set; }
+        
+        public string OriginalText { get; set; }
+        
+        public VipTranslationJob Job { get; set; }
+    }
+
+    public class VipTranslatedSrtLine
+    {
+        public int Id { get; set; }
+        
+        public string SessionId { get; set; }
+        
+        public int LineNumber { get; set; }
+        
+        public string TimeCode { get; set; }
+        
+        public string TranslatedText { get; set; }
+        
+        public VipTranslationJob Job { get; set; }
+    }
 }

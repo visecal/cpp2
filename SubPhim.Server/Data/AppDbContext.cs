@@ -29,6 +29,13 @@ namespace SubPhim.Server.Data
         public DbSet<UpdateInfo> UpdateInfos { get; set; }
         public DbSet<SaOcrServiceAccount> SaOcrServiceAccounts { get; set; }
         public DbSet<Proxy> Proxies { get; set; }
+        
+        // VIP Translation DbSets
+        public DbSet<VipApiKey> VipApiKeys { get; set; }
+        public DbSet<VipTranslationSetting> VipTranslationSettings { get; set; }
+        public DbSet<VipTranslationJob> VipTranslationJobs { get; set; }
+        public DbSet<VipOriginalSrtLine> VipOriginalSrtLines { get; set; }
+        public DbSet<VipTranslatedSrtLine> VipTranslatedSrtLines { get; set; }
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -73,6 +80,19 @@ namespace SubPhim.Server.Data
             modelBuilder.Entity<SaOcrServiceAccount>()
                .HasIndex(sa => sa.ClientEmail)
                .IsUnique();
+
+            // VIP Translation Job relationships
+            modelBuilder.Entity<VipTranslationJob>()
+                .HasMany(j => j.OriginalLines)
+                .WithOne(l => l.Job)
+                .HasForeignKey(l => l.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<VipTranslationJob>()
+                .HasMany(j => j.TranslatedLines)
+                .WithOne(l => l.Job)
+                .HasForeignKey(l => l.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Cấu hình GoogleTtsModelConfig với dữ liệu mặc định
             modelBuilder.Entity<GoogleTtsModelConfig>()

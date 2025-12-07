@@ -41,6 +41,7 @@ namespace SubPhim.Server.Pages.Admin
             public long AioCharacterLimit { get; set; }
             public int AioRequestsPerMinute { get; set; }
             public int DailyVipSrtLimit { get; set; }
+            public bool IsYearlyProSettings { get; set; }
             // === KẾT THÚC THÊM MỚI ===
         }
 
@@ -65,7 +66,8 @@ namespace SubPhim.Server.Pages.Admin
                         // === BẮT ĐẦU THÊM MỚI ===
                         AioCharacterLimit = setting.AioCharacterLimit,
                         AioRequestsPerMinute = setting.AioRequestsPerMinute,
-                        DailyVipSrtLimit = setting.DailyVipSrtLimit
+                        DailyVipSrtLimit = setting.DailyVipSrtLimit,
+                        IsYearlyProSettings = setting.IsYearlyProSettings
                         // === KẾT THÚC THÊM MỚI ===
                     });
                 }
@@ -96,6 +98,7 @@ namespace SubPhim.Server.Pages.Admin
                         settingInDb.AioCharacterLimit = formConfig.AioCharacterLimit;
                         settingInDb.AioRequestsPerMinute = formConfig.AioRequestsPerMinute;
                         settingInDb.DailyVipSrtLimit = formConfig.DailyVipSrtLimit;
+                        settingInDb.IsYearlyProSettings = formConfig.IsYearlyProSettings;
                         // === KẾT THÚC THÊM MỚI ===
                     }
                 }

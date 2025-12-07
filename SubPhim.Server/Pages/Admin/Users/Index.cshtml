@@ -119,7 +119,7 @@
                     <div class="col-md-6">
                         <h5 class="mt-4"><i class="bi bi-sliders"></i> Giới hạn Sử dụng (Nhập -1 để dùng mặc định theo gói)</h5>
                     </div>
-                    <div class="col-md-6 mb-2">
+                    <div class="col-md-4 mb-2">
                         <label for="modalTier" class="form-label fw-bold">Thay đổi Gói</label>
                         <select id="modalTier" class="form-select form-select-sm">
                             @foreach (var tier in Enum.GetValues<SubscriptionTier>())
@@ -127,6 +127,14 @@
                                 <option value="@tier">@tier.ToString()</option>
                             }
                         </select>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="modalIsYearlyPro">
+                            <label class="form-check-label" for="modalIsYearlyPro">
+                                <small>Gói Năm Pro</small>
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div class="row p-2 rounded bg-light mb-3">
@@ -153,6 +161,14 @@
                     <div class="col-md-4 mb-2">
                         <label for="modalAioRpm" class="form-label">AIO RPM</label>
                         <input type="number" class="form-control" id="modalAioRpm">
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label for="modalTtsCharLimit" class="form-label">Ký tự TTS (AioLauncherTts)</label>
+                        <input type="number" class="form-control" id="modalTtsCharLimit">
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label for="modalVipSrtLimit" class="form-label">Dòng VIP SRT / Ngày</label>
+                        <input type="number" class="form-control" id="modalVipSrtLimit">
                     </div>
                 </div>
 
@@ -213,6 +229,8 @@
                     // === BẮT ĐẦU THÊM MỚI ===
                     document.getElementById('modalAioCharLimit').value = data.aioCharacterLimit;
                     document.getElementById('modalAioRpm').value = data.aioRequestsPerMinute;
+                    document.getElementById('modalTtsCharLimit').value = data.ttsCharacterLimit;
+                    document.getElementById('modalVipSrtLimit').value = data.dailyVipSrtLimit;
                     // === KẾT THÚC THÊM MỚI ===
                     document.querySelectorAll('#permissionsModal input[id^="api-check-"]').forEach(checkbox => {
                         checkbox.checked = data.allowedApis.includes(checkbox.value);
@@ -250,6 +268,9 @@
                 // === BẮT ĐẦU THÊM MỚI ===
                 const aioCharLimit = button.getAttribute('data-aio-char-limit');
                 const aioRpm = button.getAttribute('data-aio-rpm');
+                const ttsCharLimit = button.getAttribute('data-tts-char-limit');
+                const vipSrtLimit = button.getAttribute('data-vip-srt-limit');
+                const isYearlyPro = button.getAttribute('data-is-yearly-pro') === 'true';
                 // === KẾT THÚC THÊM MỚI ===
 
                 document.getElementById('modalUserId').value = userId;
@@ -264,6 +285,9 @@
                 // === BẮT ĐẦU THÊM MỚI ===
                 document.getElementById('modalAioCharLimit').value = aioCharLimit;
                 document.getElementById('modalAioRpm').value = aioRpm;
+                document.getElementById('modalTtsCharLimit').value = ttsCharLimit;
+                document.getElementById('modalVipSrtLimit').value = vipSrtLimit;
+                document.getElementById('modalIsYearlyPro').checked = isYearlyPro;
                 // === KẾT THÚC THÊM MỚI ===
 
                 document.querySelectorAll('#permissionsModal input[id^="api-check-"]').forEach(checkbox => {
@@ -290,6 +314,9 @@
                 // === BẮT ĐẦU THÊM MỚI ===
                 formData.append('aioCharacterLimitOverride', document.getElementById('modalAioCharLimit').value);
                 formData.append('aioRpmOverride', document.getElementById('modalAioRpm').value);
+                formData.append('ttsCharacterLimit', document.getElementById('modalTtsCharLimit').value);
+                formData.append('dailyVipSrtLimit', document.getElementById('modalVipSrtLimit').value);
+                formData.append('isYearlyPro', document.getElementById('modalIsYearlyPro').checked);
                 // === KẾT THÚC THÊM MỚI ===
 
                 const selectedApis = Array.from(document.querySelectorAll('#permissionsModal input[id^="api-check-"]:checked')).map(cb => cb.value);

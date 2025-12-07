@@ -50,14 +50,14 @@ namespace SubPhim.Server.Pages.Admin
             var defaultSettings = await _context.TierDefaultSettings.ToListAsync();
 
             // For most tiers, there will be one setting. For Yearly, there might be two (Pro and Standard)
-            // We'll load the LAST one in the list for each tier (or the Pro one if it exists)
+            // We load settings prioritizing Pro settings for Yearly tier if they exist
             foreach (var setting in defaultSettings)
             {
-                // For Yearly tier, prioritize loading Pro settings if they exist
+                // For Yearly tier, we want to load Pro settings if available, otherwise load Standard settings
                 if (setting.Tier == SubscriptionTier.Yearly)
                 {
-                    // If we already have Yearly settings loaded and this one is Pro, replace it
-                    // If we don't have Yearly settings yet, or this one is Pro, use it
+                    // If no Yearly config loaded yet, add this one
+                    // If Yearly config exists but this one is Pro, replace with Pro settings
                     if (!Configs.ContainsKey(setting.Tier) || setting.IsYearlyProSettings)
                     {
                         if (Configs.ContainsKey(setting.Tier))
@@ -83,6 +83,7 @@ namespace SubPhim.Server.Pages.Admin
                 }
                 else if (!Configs.ContainsKey(setting.Tier))
                 {
+                    // For non-Yearly tiers, just add if not already present
                     Configs.Add(setting.Tier, new TierConfigModel
                     {
                         VideoDurationMinutes = setting.VideoDurationMinutes,

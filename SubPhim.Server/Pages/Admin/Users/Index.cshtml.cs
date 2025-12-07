@@ -36,25 +36,27 @@ namespace SubPhim.Server.Pages.Admin.Users
         [HttpGet]
         public async Task<IActionResult> OnGetTierDefaultsAsync(SubscriptionTier tier, bool? isPro = null)
         {
-            // For Yearly/Lifetime tiers, fetch the appropriate settings based on isPro parameter
+            // For Yearly tier, fetch the appropriate settings based on isPro parameter
             TierDefaultSetting? settings = null;
             
-            if ((tier == SubscriptionTier.Yearly || tier == SubscriptionTier.Lifetime) && isPro.HasValue)
+            if (tier == SubscriptionTier.Yearly && isPro.HasValue)
             {
-                // Fetch settings based on IsYearlyProSettings flag
+                // Fetch settings matching the IsYearlyProSettings flag
                 settings = await _context.TierDefaultSettings.AsNoTracking()
                     .Where(s => s.Tier == tier && s.IsYearlyProSettings == isPro.Value)
                     .FirstOrDefaultAsync();
                 
-                // If not found, fall back to any settings for this tier
-                if (settings == null)
+                // If not found (e.g., admin hasn't created Pro settings yet), fall back to Standard settings (non-Pro)
+                if (settings == null && isPro.Value)
                 {
                     settings = await _context.TierDefaultSettings.AsNoTracking()
-                        .FirstOrDefaultAsync(s => s.Tier == tier);
+                        .Where(s => s.Tier == tier && !s.IsYearlyProSettings)
+                        .FirstOrDefaultAsync();
                 }
             }
             else
             {
+                // For non-Yearly tiers or when isPro is not specified, just get any setting for that tier
                 settings = await _context.TierDefaultSettings.AsNoTracking()
                     .FirstOrDefaultAsync(s => s.Tier == tier);
             }

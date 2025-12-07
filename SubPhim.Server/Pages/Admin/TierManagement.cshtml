@@ -89,6 +89,15 @@
                                 <input type="number" name="Configs[@tier].AioRequestsPerMinute" value="@config.AioRequestsPerMinute" class="form-control" />
                             </div>
                         </div>
+
+                        <h5 class="mt-4"><i class="bi bi-stars me-2"></i>Giới hạn Dịch VIP (Gemini API)</h5>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Số dòng dịch VIP / ngày</label>
+                                <input type="number" name="Configs[@tier].DailyVipTranslationLimit" value="@config.DailyVipTranslationLimit" class="form-control" />
+                                <div class="form-text">Free = 0, Monthly = 3000, Yearly = 15000. Reset lúc 12:00 AM theo giờ VN.</div>
+                            </div>
+                        </div>
                         <!-- === KẾT THÚC THÊM MỚI === -->
 
                         <h5 class="mt-4"><i class="bi bi-key me-2"></i>Quyền truy cập API</h5>

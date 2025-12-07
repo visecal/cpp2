@@ -52,6 +52,9 @@ namespace SubPhim.Server.Pages.Admin
 
             [Display(Name = "Giới hạn Request AIO / Phút")]
             public int AioRequestsPerMinute { get; set; }
+            
+            [Display(Name = "Giới hạn Dịch VIP SRT / Ngày")]
+            public int DailyVipSrtLimit { get; set; }
             // === KẾT THÚC THÊM MỚI ===
         }
 
@@ -81,7 +84,8 @@ namespace SubPhim.Server.Pages.Admin
                 TtsCharacterLimit = freeSettings.TtsCharacterLimit,
                 // === BẮT ĐẦU THÊM MỚI ===
                 AioCharacterLimit = freeSettings.AioCharacterLimit,
-                AioRequestsPerMinute = freeSettings.AioRequestsPerMinute
+                AioRequestsPerMinute = freeSettings.AioRequestsPerMinute,
+                DailyVipSrtLimit = freeSettings.DailyVipSrtLimit
                 // === KẾT THÚC THÊM MỚI ===
             };
 
@@ -114,6 +118,7 @@ namespace SubPhim.Server.Pages.Admin
                 // === BẮT ĐẦU THÊM MỚI ===
                 freeSettingsInDb.AioCharacterLimit = FreeTierSettings.AioCharacterLimit;
                 freeSettingsInDb.AioRequestsPerMinute = FreeTierSettings.AioRequestsPerMinute;
+                freeSettingsInDb.DailyVipSrtLimit = FreeTierSettings.DailyVipSrtLimit;
                 // === KẾT THÚC THÊM MỚI ===
 
                 await _context.SaveChangesAsync();

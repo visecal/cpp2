@@ -40,6 +40,7 @@ namespace SubPhim.Server.Pages.Admin
             // === BẮT ĐẦU THÊM MỚI ===
             public long AioCharacterLimit { get; set; }
             public int AioRequestsPerMinute { get; set; }
+            public int DailyVipSrtLimit { get; set; }
             // === KẾT THÚC THÊM MỚI ===
         }
 
@@ -63,7 +64,8 @@ namespace SubPhim.Server.Pages.Admin
                         DailyLocalSrtLimit = setting.DailyLocalSrtLimit,
                         // === BẮT ĐẦU THÊM MỚI ===
                         AioCharacterLimit = setting.AioCharacterLimit,
-                        AioRequestsPerMinute = setting.AioRequestsPerMinute
+                        AioRequestsPerMinute = setting.AioRequestsPerMinute,
+                        DailyVipSrtLimit = setting.DailyVipSrtLimit
                         // === KẾT THÚC THÊM MỚI ===
                     });
                 }
@@ -93,6 +95,7 @@ namespace SubPhim.Server.Pages.Admin
                         // === BẮT ĐẦU THÊM MỚI ===
                         settingInDb.AioCharacterLimit = formConfig.AioCharacterLimit;
                         settingInDb.AioRequestsPerMinute = formConfig.AioRequestsPerMinute;
+                        settingInDb.DailyVipSrtLimit = formConfig.DailyVipSrtLimit;
                         // === KẾT THÚC THÊM MỚI ===
                     }
                 }
@@ -137,6 +140,7 @@ namespace SubPhim.Server.Pages.Admin
                     user.DailySrtLineLimit = configToApply.DailySrtLineLimit;
                     user.TtsCharacterLimit = configToApply.TtsCharacterLimit;
                     user.DailyLocalSrtLimit = configToApply.DailyLocalSrtLimit;
+                    user.DailyVipSrtLimit = configToApply.DailyVipSrtLimit;
 
                     user.AioCharacterLimitOverride = -1;
                     user.AioRpmOverride = -1;

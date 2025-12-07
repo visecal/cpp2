@@ -68,6 +68,18 @@
                             <input type="number" asp-for="FreeTierSettings.AioRequestsPerMinute" class="form-control" />
                         </div>
                     </div>
+                    
+                    <hr />
+                    <h6 class="text-muted">Giới hạn Dịch Phụ Đề VIP</h6>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label asp-for="FreeTierSettings.DailyVipSrtLimit" class="form-label"></label>
+                            <input type="number" asp-for="FreeTierSettings.DailyVipSrtLimit" class="form-control" />
+                            <div class="form-text">
+                                <strong>Khuyến nghị:</strong> Free = 0, Monthly = 3000, Yearly = 15000 dòng/ngày
+                            </div>
+                        </div>
+                    </div>
                     <!-- === KẾT THÚC THÊM MỚI === -->
                 </div>
             </div>

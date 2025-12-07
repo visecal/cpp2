@@ -55,6 +55,12 @@ namespace SubPhim.Server.Data
                 .WithOne(d => d.User)
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+            
+            // Configure TierDefaultSetting with composite unique index
+            modelBuilder.Entity<TierDefaultSetting>()
+                .HasIndex(t => new { t.Tier, t.IsYearlyProSettings })
+                .IsUnique();
+            
             modelBuilder.Entity<AioTranslationSetting>()
                 .HasData(new AioTranslationSetting { Id = 1 });
             modelBuilder.Entity<AioTtsServiceAccount>()

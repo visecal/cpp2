@@ -368,6 +368,8 @@ namespace SubPhim.Server.Data
     public class TierDefaultSetting
     {
         [Key]
+        public int Id { get; set; }
+        
         public SubscriptionTier Tier { get; set; }
 
         public int VideoDurationMinutes { get; set; }

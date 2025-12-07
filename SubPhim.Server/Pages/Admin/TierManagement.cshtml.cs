@@ -49,9 +49,39 @@ namespace SubPhim.Server.Pages.Admin
         {
             var defaultSettings = await _context.TierDefaultSettings.ToListAsync();
 
+            // For most tiers, there will be one setting. For Yearly, there might be two (Pro and Standard)
+            // We'll load the LAST one in the list for each tier (or the Pro one if it exists)
             foreach (var setting in defaultSettings)
             {
-                if (!Configs.ContainsKey(setting.Tier))
+                // For Yearly tier, prioritize loading Pro settings if they exist
+                if (setting.Tier == SubscriptionTier.Yearly)
+                {
+                    // If we already have Yearly settings loaded and this one is Pro, replace it
+                    // If we don't have Yearly settings yet, or this one is Pro, use it
+                    if (!Configs.ContainsKey(setting.Tier) || setting.IsYearlyProSettings)
+                    {
+                        if (Configs.ContainsKey(setting.Tier))
+                        {
+                            Configs.Remove(setting.Tier);
+                        }
+                        Configs.Add(setting.Tier, new TierConfigModel
+                        {
+                            VideoDurationMinutes = setting.VideoDurationMinutes,
+                            DailyVideoCount = setting.DailyVideoCount,
+                            DailyTranslationRequests = setting.DailyTranslationRequests,
+                            AllowedApis = setting.AllowedApis,
+                            GrantedFeatures = setting.GrantedFeatures,
+                            DailySrtLineLimit = setting.DailySrtLineLimit,
+                            TtsCharacterLimit = setting.TtsCharacterLimit,
+                            DailyLocalSrtLimit = setting.DailyLocalSrtLimit,
+                            AioCharacterLimit = setting.AioCharacterLimit,
+                            AioRequestsPerMinute = setting.AioRequestsPerMinute,
+                            DailyVipSrtLimit = setting.DailyVipSrtLimit,
+                            IsYearlyProSettings = setting.IsYearlyProSettings
+                        });
+                    }
+                }
+                else if (!Configs.ContainsKey(setting.Tier))
                 {
                     Configs.Add(setting.Tier, new TierConfigModel
                     {
@@ -63,12 +93,10 @@ namespace SubPhim.Server.Pages.Admin
                         DailySrtLineLimit = setting.DailySrtLineLimit,
                         TtsCharacterLimit = setting.TtsCharacterLimit,
                         DailyLocalSrtLimit = setting.DailyLocalSrtLimit,
-                        // === BẮT ĐẦU THÊM MỚI ===
                         AioCharacterLimit = setting.AioCharacterLimit,
                         AioRequestsPerMinute = setting.AioRequestsPerMinute,
                         DailyVipSrtLimit = setting.DailyVipSrtLimit,
                         IsYearlyProSettings = setting.IsYearlyProSettings
-                        // === KẾT THÚC THÊM MỚI ===
                     });
                 }
             }
@@ -83,7 +111,11 @@ namespace SubPhim.Server.Pages.Admin
                     var tier = configEntry.Key;
                     var formConfig = configEntry.Value;
 
-                    var settingInDb = await _context.TierDefaultSettings.FindAsync(tier);
+                    // Find existing setting by tier and IsYearlyProSettings
+                    var settingInDb = await _context.TierDefaultSettings
+                        .Where(s => s.Tier == tier && s.IsYearlyProSettings == formConfig.IsYearlyProSettings)
+                        .FirstOrDefaultAsync();
+                    
                     if (settingInDb != null)
                     {
                         settingInDb.VideoDurationMinutes = formConfig.VideoDurationMinutes;
@@ -94,12 +126,30 @@ namespace SubPhim.Server.Pages.Admin
                         settingInDb.DailySrtLineLimit = formConfig.DailySrtLineLimit;
                         settingInDb.TtsCharacterLimit = formConfig.TtsCharacterLimit;
                         settingInDb.DailyLocalSrtLimit = formConfig.DailyLocalSrtLimit;
-                        // === BẮT ĐẦU THÊM MỚI ===
                         settingInDb.AioCharacterLimit = formConfig.AioCharacterLimit;
                         settingInDb.AioRequestsPerMinute = formConfig.AioRequestsPerMinute;
                         settingInDb.DailyVipSrtLimit = formConfig.DailyVipSrtLimit;
                         settingInDb.IsYearlyProSettings = formConfig.IsYearlyProSettings;
-                        // === KẾT THÚC THÊM MỚI ===
+                    }
+                    else
+                    {
+                        // Create new setting if it doesn't exist
+                        _context.TierDefaultSettings.Add(new TierDefaultSetting
+                        {
+                            Tier = tier,
+                            VideoDurationMinutes = formConfig.VideoDurationMinutes,
+                            DailyVideoCount = formConfig.DailyVideoCount,
+                            DailyTranslationRequests = formConfig.DailyTranslationRequests,
+                            AllowedApis = formConfig.AllowedApis,
+                            GrantedFeatures = formConfig.GrantedFeatures,
+                            DailySrtLineLimit = formConfig.DailySrtLineLimit,
+                            TtsCharacterLimit = formConfig.TtsCharacterLimit,
+                            DailyLocalSrtLimit = formConfig.DailyLocalSrtLimit,
+                            AioCharacterLimit = formConfig.AioCharacterLimit,
+                            AioRequestsPerMinute = formConfig.AioRequestsPerMinute,
+                            DailyVipSrtLimit = formConfig.DailyVipSrtLimit,
+                            IsYearlyProSettings = formConfig.IsYearlyProSettings
+                        });
                     }
                 }
                 await _context.SaveChangesAsync();

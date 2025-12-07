@@ -328,7 +328,6 @@ namespace SubPhim.Server.Pages.Admin.Users
         public int DailyVipSrtLimit { get; set; }
         public bool IsYearlyPro { get; set; }
         // === KẾT THÚC THÊM MỚI ===
-        // === KẾT THÚC THÊM MỚI ===
     }
 
     public class UserViewModel

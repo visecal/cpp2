@@ -1,0 +1,200 @@
+@page
+@model SubPhim.Server.Pages.Admin.VipTranslation.IndexModel
+@{
+    ViewData["Title"] = "Quản lý Dịch phụ đề VIP";
+    Layout = "~/Pages/Shared/_AdminLayout.cshtml";
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+}
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger" role="alert">@TempData["ErrorMessage"]</div>
+}
+
+<h1>@ViewData["Title"]</h1>
+<p class="text-muted">Quản lý API Key Gemini cho dịch VIP (không phân biệt Free/Paid, dùng chung proxy)</p>
+<hr />
+
+<div class="row">
+    <!-- CỘT CÀI ĐẶT CHUNG -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header"><strong>Cài đặt chung</strong></div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="UpdateSettings">
+                    @Html.AntiForgeryToken()
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="Settings.Rpm" class="form-label">Request/Phút (RPM)</label>
+                            <input asp-for="Settings.Rpm" class="form-control" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="Settings.BatchSize" class="form-label">Số dòng/Request (Batch Size)</label>
+                            <input asp-for="Settings.BatchSize" class="form-control" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="Settings.MaxRetries" class="form-label">Số lần thử lại nếu lỗi</label>
+                            <input asp-for="Settings.MaxRetries" class="form-control" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="Settings.RetryDelayMs" class="form-label">Delay giữa các lần thử lại (ms)</label>
+                            <input asp-for="Settings.RetryDelayMs" class="form-control" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="Settings.Temperature" class="form-label">Temperature (0-2)</label>
+                            <input type="number" step="0.1" asp-for="Settings.Temperature" class="form-control" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="Settings.MaxOutputTokens" class="form-label">Max Output Tokens</label>
+                            <input asp-for="Settings.MaxOutputTokens" class="form-control" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="Settings.DelayBetweenBatchesMs" class="form-label">Delay giữa các batch (ms)</label>
+                            <input asp-for="Settings.DelayBetweenBatchesMs" class="form-control" />
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="Settings.ThinkingBudget" class="form-label">IQ AI (Thinking Budget)</label>
+                            <div class="input-group">
+                                <div class="input-group-text">
+                                    <input class="form-check-input mt-0" type="checkbox" asp-for="Settings.EnableThinkingBudget">
+                                </div>
+                                <input asp-for="Settings.ThinkingBudget" class="form-control" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-3" />
+                    <h6 class="text-success mb-3"><i class="bi bi-router me-1"></i> Giới hạn tốc độ Proxy</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Settings.RpmPerProxy" class="form-label">Request/Phút/Proxy (RPM)</label>
+                            <input asp-for="Settings.RpmPerProxy" class="form-control" />
+                            <small class="text-muted">Số request tối đa mỗi proxy có thể xử lý trong 1 phút</small>
+                        </div>
+                        <div class="col-md-8 mb-3 d-flex align-items-center">
+                            <div class="alert alert-info mb-0 py-2 w-100">
+                                <small>
+                                    <strong>Lưu ý:</strong> VIP Translation sử dụng chung Proxy với LocalApi<br/>
+                                    <i class="bi bi-info-circle me-1"></i>Quản lý proxy tại: <a href="/Admin/LocalApi/Proxy" class="alert-link">Admin/LocalApi/Proxy</a>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i>Lưu cài đặt
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- QUẢN LÝ API KEYS -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header"><strong>Quản lý API Keys</strong></div>
+            <div class="card-body">
+                <!-- THÊM KEY MỚI -->
+                <div class="mb-4">
+                    <h5>Thêm API Key mới</h5>
+                    <form method="post" asp-page-handler="CreateKey">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <textarea name="apiKeyInput.ApiKeys" class="form-control font-monospace" rows="3" placeholder="Nhập các API Key, mỗi dòng một key"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-plus-circle me-1"></i>Thêm Key
+                        </button>
+                    </form>
+                </div>
+
+                <!-- DANH SÁCH KEYS -->
+                <h5>Danh sách API Keys (@Model.ApiKeys.Count)</h5>
+                @if (Model.ApiKeys.Any())
+                {
+                    <form method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-2">
+                            <button type="submit" class="btn btn-sm btn-outline-danger me-2" asp-page-handler="DeleteSelectedKeys" onclick="return confirm('Bạn có chắc muốn XÓA các key đã chọn?');">
+                                <i class="bi bi-trash"></i> Xóa đã chọn
+                            </button>
+                            <button type="submit" class="btn btn-sm btn-outline-warning me-2" asp-page-handler="DisableSelectedKeys" onclick="return confirm('Bạn có chắc muốn TẮT các key đã chọn?');">
+                                <i class="bi bi-x-circle"></i> Tắt đã chọn
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th><input type="checkbox" id="selectAll" /></th>
+                                        <th>ID</th>
+                                        <th>API Key</th>
+                                        <th>Trạng thái</th>
+                                        <th>Request hôm nay</th>
+                                        <th>Tổng tokens</th>
+                                        <th>Lỗi 429</th>
+                                        <th>Hành động</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.ApiKeys)
+                                    {
+                                        <tr>
+                                            <td><input type="checkbox" name="selectedKeyIds" value="@item.KeyData.Id" /></td>
+                                            <td>@item.KeyData.Id</td>
+                                            <td><code class="text-truncate d-inline-block" style="max-width: 200px;">@item.DecryptedApiKey</code></td>
+                                            <td>
+                                                @if (item.KeyData.IsEnabled)
+                                                {
+                                                    <span class="badge bg-success">Bật</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Tắt</span>
+                                                }
+                                            </td>
+                                            <td>@item.KeyData.RequestsToday</td>
+                                            <td>@item.KeyData.TotalTokensUsed.ToString("N0")</td>
+                                            <td>@item.KeyData.Consecutive429Count</td>
+                                            <td>
+                                                <form method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary" asp-page-handler="ToggleEnabled" asp-route-id="@item.KeyData.Id">
+                                                        @if (item.KeyData.IsEnabled) { <text>Tắt</text> } else { <text>Bật</text> }
+                                                    </button>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" asp-page-handler="DeleteKey" asp-route-id="@item.KeyData.Id" onclick="return confirm('Xóa key này?');">
+                                                        Xóa
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <div class="alert alert-warning">Chưa có API key nào. Thêm key mới ở trên.</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('selectAll').addEventListener('change', function() {
+            var checkboxes = document.querySelectorAll('input[name="selectedKeyIds"]');
+            checkboxes.forEach(cb => cb.checked = this.checked);
+        });
+    </script>
+}

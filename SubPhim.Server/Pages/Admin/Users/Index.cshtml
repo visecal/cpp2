@@ -137,6 +137,19 @@
                         </div>
                     </div>
                 </div>
+                <div class="row mb-2" id="quickApplyProContainer" style="display: none;">
+                    <div class="col-12">
+                        <div class="alert alert-info p-2">
+                            <button type="button" class="btn btn-sm btn-warning me-2" id="applyProSettingsBtn">
+                                <i class="bi bi-star-fill"></i> Áp dụng cài đặt PRO
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="applyStandardSettingsBtn">
+                                <i class="bi bi-check-circle"></i> Áp dụng cài đặt Thường
+                            </button>
+                            <small class="ms-2 text-muted">Nhanh chóng áp dụng cài đặt từ Admin/TierManagement</small>
+                        </div>
+                    </div>
+                </div>
                 <div class="row p-2 rounded bg-light mb-3">
                     <div class="col-md-4 mb-2">
                         <label for="modalDailyVideoLimit" class="form-label">Video / Ngày</label>
@@ -214,9 +227,26 @@
 
             const antiforgeryToken = "@Xsrf.GetAndStoreTokens(HttpContext).RequestToken";
             const modalTierSelector = document.getElementById('modalTier');
-            async function applyTierDefaults(tier) {
+            const modalIsYearlyPro = document.getElementById('modalIsYearlyPro');
+            const quickApplyProContainer = document.getElementById('quickApplyProContainer');
+            
+            // Function to toggle Pro quick apply buttons based on tier selection
+            function toggleProQuickApply() {
+                const selectedTier = modalTierSelector.value;
+                if (selectedTier === 'Yearly' || selectedTier === 'Lifetime') {
+                    quickApplyProContainer.style.display = 'block';
+                } else {
+                    quickApplyProContainer.style.display = 'none';
+                }
+            }
+            
+            async function applyTierDefaults(tier, isPro = null) {
                 try {
-                    const response = await fetch(`/Admin/Users?handler=TierDefaults&tier=${tier}`);
+                    let url = `/Admin/Users?handler=TierDefaults&tier=${tier}`;
+                    if (isPro !== null) {
+                        url += `&isPro=${isPro}`;
+                    }
+                    const response = await fetch(url);
                     if (!response.ok) {
                         showAlert('warning', 'Không thể tải cài đặt mặc định cho gói này.');
                         return;
@@ -246,7 +276,37 @@
             }
 
             modalTierSelector.addEventListener('change', function (event) {
-                applyTierDefaults(event.target.value);
+                const selectedTier = event.target.value;
+                toggleProQuickApply();
+                // When tier changes, apply defaults based on current IsYearlyPro checkbox state
+                if (selectedTier === 'Yearly' || selectedTier === 'Lifetime') {
+                    const isPro = modalIsYearlyPro.checked;
+                    applyTierDefaults(selectedTier, isPro);
+                } else {
+                    applyTierDefaults(selectedTier);
+                }
+            });
+            
+            // Add event listener for IsYearlyPro checkbox
+            modalIsYearlyPro.addEventListener('change', function (event) {
+                const selectedTier = modalTierSelector.value;
+                if (selectedTier === 'Yearly' || selectedTier === 'Lifetime') {
+                    applyTierDefaults(selectedTier, event.target.checked);
+                }
+            });
+            
+            // Quick apply Pro settings button
+            document.getElementById('applyProSettingsBtn').addEventListener('click', function() {
+                const selectedTier = modalTierSelector.value;
+                modalIsYearlyPro.checked = true;
+                applyTierDefaults(selectedTier, true);
+            });
+            
+            // Quick apply Standard settings button
+            document.getElementById('applyStandardSettingsBtn').addEventListener('click', function() {
+                const selectedTier = modalTierSelector.value;
+                modalIsYearlyPro.checked = false;
+                applyTierDefaults(selectedTier, false);
             });
 
             function parseFlags(flagsString) {
@@ -289,6 +349,9 @@
                 document.getElementById('modalVipSrtLimit').value = vipSrtLimit;
                 document.getElementById('modalIsYearlyPro').checked = isYearlyPro;
                 // === KẾT THÚC THÊM MỚI ===
+                
+                // Show/hide Pro quick apply buttons based on tier
+                toggleProQuickApply();
 
                 document.querySelectorAll('#permissionsModal input[id^="api-check-"]').forEach(checkbox => {
                     checkbox.checked = allowedApis.includes(checkbox.value);

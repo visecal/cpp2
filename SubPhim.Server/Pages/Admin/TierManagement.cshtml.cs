@@ -123,13 +123,30 @@ namespace SubPhim.Server.Pages.Admin
 
             try
             {
-                var usersToUpdate = await _context.Users
-                    .Where(u => u.Tier == tier)
-                    .ToListAsync();
+                // Nếu đây là cấu hình PRO cho gói Yearly, chỉ áp dụng cho user có IsYearlyPro = true
+                // Ngược lại, áp dụng cho tất cả users trong tier (ngoại trừ PRO users nếu đây là cấu hình thường)
+                IQueryable<User> query = _context.Users.Where(u => u.Tier == tier);
+                
+                if (tier == SubscriptionTier.Yearly)
+                {
+                    if (configToApply.IsYearlyProSettings)
+                    {
+                        // Cấu hình PRO: chỉ áp dụng cho user đã được đánh dấu PRO
+                        query = query.Where(u => u.IsYearlyPro);
+                    }
+                    else
+                    {
+                        // Cấu hình thường: chỉ áp dụng cho user KHÔNG được đánh dấu PRO
+                        query = query.Where(u => !u.IsYearlyPro);
+                    }
+                }
+                
+                var usersToUpdate = await query.ToListAsync();
 
                 if (!usersToUpdate.Any())
                 {
-                    SuccessMessage = $"Không có người dùng nào thuộc nhóm '{tier}' để áp dụng.";
+                    string proSuffix = (tier == SubscriptionTier.Yearly && configToApply.IsYearlyProSettings) ? " PRO" : "";
+                    SuccessMessage = $"Không có người dùng nào thuộc nhóm '{tier}{proSuffix}' để áp dụng.";
                     return RedirectToPage();
                 }
 
@@ -150,7 +167,8 @@ namespace SubPhim.Server.Pages.Admin
                 }
 
                 var count = await _context.SaveChangesAsync();
-                SuccessMessage = $"Đã áp dụng thành công cấu hình mới cho {count} người dùng thuộc nhóm '{tier}'.";
+                string proLabel = (tier == SubscriptionTier.Yearly && configToApply.IsYearlyProSettings) ? " PRO" : "";
+                SuccessMessage = $"Đã áp dụng thành công cấu hình mới cho {count} người dùng thuộc nhóm '{tier}{proLabel}'.";
             }
             catch (Exception ex)
             {

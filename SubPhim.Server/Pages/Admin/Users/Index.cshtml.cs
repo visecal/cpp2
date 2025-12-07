@@ -34,10 +34,30 @@ namespace SubPhim.Server.Pages.Admin.Users
         public int MonthlyUserCount { get; set; }
         public int FreeUserCount { get; set; }
         [HttpGet]
-        public async Task<IActionResult> OnGetTierDefaultsAsync(SubscriptionTier tier)
+        public async Task<IActionResult> OnGetTierDefaultsAsync(SubscriptionTier tier, bool? isPro = null)
         {
-            var settings = await _context.TierDefaultSettings.AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Tier == tier);
+            // For Yearly/Lifetime tiers, fetch the appropriate settings based on isPro parameter
+            TierDefaultSetting? settings = null;
+            
+            if ((tier == SubscriptionTier.Yearly || tier == SubscriptionTier.Lifetime) && isPro.HasValue)
+            {
+                // Fetch settings based on IsYearlyProSettings flag
+                settings = await _context.TierDefaultSettings.AsNoTracking()
+                    .Where(s => s.Tier == tier && s.IsYearlyProSettings == isPro.Value)
+                    .FirstOrDefaultAsync();
+                
+                // If not found, fall back to any settings for this tier
+                if (settings == null)
+                {
+                    settings = await _context.TierDefaultSettings.AsNoTracking()
+                        .FirstOrDefaultAsync(s => s.Tier == tier);
+                }
+            }
+            else
+            {
+                settings = await _context.TierDefaultSettings.AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Tier == tier);
+            }
 
             if (settings == null)
             {

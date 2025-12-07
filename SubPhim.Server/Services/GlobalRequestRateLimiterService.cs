@@ -29,11 +29,11 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// NO-OP: Returns dummy values. Kept for backward compatibility.
+        /// NO-OP: Returns dummy values indicating unlimited availability. Kept for backward compatibility.
         /// </summary>
         public (int maxRequests, int windowMinutes, int availableSlots, int activeRequests) GetCurrentStatus()
         {
-            return (0, 0, 0, 0);
+            return (0, 0, int.MaxValue, 0);
         }
 
         /// <summary>
@@ -61,11 +61,11 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
-        /// NO-OP: Always returns 0. Kept for backward compatibility.
+        /// NO-OP: Always returns int.MaxValue to indicate unlimited availability. Kept for backward compatibility.
         /// </summary>
         public int GetAvailableSlots()
         {
-            return 0;
+            return int.MaxValue;
         }
     }
 }

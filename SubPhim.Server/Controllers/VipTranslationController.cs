@@ -48,7 +48,12 @@ namespace SubPhim.Server.Controllers
             }
             else
             {
-                return StatusCode(429, new { result.Message });
+                // Return appropriate status code based on error type
+                if (result.Message.Contains("Vượt quá giới hạn") || result.Message.Contains("quota"))
+                {
+                    return StatusCode(429, new { result.Message });
+                }
+                return BadRequest(new { result.Message });
             }
         }
 

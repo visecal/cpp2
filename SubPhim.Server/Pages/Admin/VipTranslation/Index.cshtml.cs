@@ -131,8 +131,15 @@ namespace SubPhim.Server.Pages.Admin.VipTranslation
             var keysFromDb = await _context.VipApiKeys.OrderByDescending(k => k.CreatedAt).ToListAsync();
             foreach (var key in keysFromDb)
             {
-                try { apiKeys.Add(new ApiKeyViewModel { KeyData = key, DecryptedApiKey = _encryptionService.Decrypt(key.EncryptedApiKey, key.Iv) }); }
-                catch { apiKeys.Add(new ApiKeyViewModel { KeyData = key, DecryptedApiKey = "!!! LỖI GIẢI MÃ !!!" }); }
+                try 
+                { 
+                    apiKeys.Add(new ApiKeyViewModel { KeyData = key, DecryptedApiKey = _encryptionService.Decrypt(key.EncryptedApiKey, key.Iv) }); 
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error decrypting API key {KeyId}", key.Id);
+                    apiKeys.Add(new ApiKeyViewModel { KeyData = key, DecryptedApiKey = "!!! LỖI GIẢI MÃ !!!" });
+                }
             }
             return apiKeys;
         }

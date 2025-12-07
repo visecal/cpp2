@@ -84,8 +84,12 @@ namespace SubPhim.Server.Services
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var nowUtc = DateTime.UtcNow;
+            var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            var nowVietnam = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, vietnamTimeZone);
+            var midnightVietnamUtc = TimeZoneInfo.ConvertTimeToUtc(nowVietnam.Date, vietnamTimeZone);
+
             var keysToReset = await context.VipApiKeys
-                .Where(k => k.LastRequestCountResetUtc.Date < nowUtc.Date)
+                .Where(k => k.LastRequestCountResetUtc < midnightVietnamUtc)
                 .ToListAsync();
 
             foreach (var key in keysToReset)

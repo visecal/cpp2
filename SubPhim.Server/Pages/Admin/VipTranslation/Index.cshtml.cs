@@ -12,6 +12,8 @@ namespace SubPhim.Server.Pages.Admin.VipTranslation
         private readonly AppDbContext _context;
         private readonly IEncryptionService _encryptionService;
         private readonly ILogger<IndexModel> _logger;
+        
+        private const int DEFAULT_SETTINGS_ID = 1;
 
         public IndexModel(AppDbContext context, IEncryptionService encryptionService, ILogger<IndexModel> logger)
         {
@@ -67,7 +69,7 @@ namespace SubPhim.Server.Pages.Admin.VipTranslation
         public async Task OnGetAsync()
         {
             await LoadDataAsync();
-            var settingsFromDb = await _context.VipTranslationSettings.FindAsync(1) ?? new VipTranslationSetting();
+            var settingsFromDb = await _context.VipTranslationSettings.FindAsync(DEFAULT_SETTINGS_ID) ?? new VipTranslationSetting();
             GlobalSettings = new GlobalSettingsInputModel
             {
                 Rpm = settingsFromDb.Rpm,
@@ -172,10 +174,10 @@ namespace SubPhim.Server.Pages.Admin.VipTranslation
             }
             try
             {
-                var settingsInDb = await _context.VipTranslationSettings.FindAsync(1);
+                var settingsInDb = await _context.VipTranslationSettings.FindAsync(DEFAULT_SETTINGS_ID);
                 if (settingsInDb == null)
                 {
-                    settingsInDb = new VipTranslationSetting { Id = 1 };
+                    settingsInDb = new VipTranslationSetting { Id = DEFAULT_SETTINGS_ID };
                     _context.VipTranslationSettings.Add(settingsInDb);
                 }
                 settingsInDb.Rpm = GlobalSettings.Rpm;

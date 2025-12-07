@@ -28,6 +28,7 @@ namespace SubPhim.Server.Services
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500;
         private const int MAX_PROXY_SEARCH_ATTEMPTS = 10;
         private const int MAX_SRT_LINE_LENGTH = 3000;
+        private const int DEFAULT_SETTINGS_ID = 1;
 
         public VipTranslationService(
             IServiceProvider serviceProvider,
@@ -62,7 +63,7 @@ namespace SubPhim.Server.Services
             if (lastResetInVietnam.Date < vietnamNow.Date)
             {
                 user.VipSrtLinesUsedToday = 0;
-                user.LastVipSrtResetUtc = DateTime.UtcNow.Date;
+                user.LastVipSrtResetUtc = DateTime.UtcNow; // Keep full DateTime
                 await context.SaveChangesAsync();
             }
 
@@ -140,10 +141,10 @@ namespace SubPhim.Server.Services
                 using var scope = _serviceProvider.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 
-                var settings = await context.VipTranslationSettings.FindAsync(1);
+                var settings = await context.VipTranslationSettings.FindAsync(DEFAULT_SETTINGS_ID);
                 if (settings == null)
                 {
-                    settings = new VipTranslationSetting { Id = 1 };
+                    settings = new VipTranslationSetting { Id = DEFAULT_SETTINGS_ID };
                     context.VipTranslationSettings.Add(settings);
                     await context.SaveChangesAsync();
                 }
@@ -334,12 +335,18 @@ namespace SubPhim.Server.Services
                             }
                         }
                     },
-                    generationConfig = new
-                    {
-                        temperature = settings.Temperature,
-                        maxOutputTokens = settings.MaxOutputTokens,
-                        thinkingConfig = settings.EnableThinkingBudget ? new { thinkingBudget = settings.ThinkingBudget } : null
-                    }
+                    generationConfig = settings.EnableThinkingBudget 
+                        ? new
+                        {
+                            temperature = settings.Temperature,
+                            maxOutputTokens = settings.MaxOutputTokens,
+                            thinkingConfig = new { thinkingBudget = settings.ThinkingBudget }
+                        }
+                        : new
+                        {
+                            temperature = settings.Temperature,
+                            maxOutputTokens = settings.MaxOutputTokens
+                        }
                 };
 
                 var json = JsonConvert.SerializeObject(requestBody);

@@ -51,6 +51,7 @@ builder.Services.AddHttpClient("AioLauncherClient", client =>
 });
 builder.Services.AddControllers();
 builder.Services.AddSingleton<TranslationOrchestratorService>();
+builder.Services.AddSingleton<VipTranslationService>();
 builder.Services.AddMemoryCache();
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {

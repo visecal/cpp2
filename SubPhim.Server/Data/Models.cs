@@ -137,6 +137,16 @@ namespace SubPhim.Server.Data
         public int AioRpmOverride { get; set; } = -1;
         [Display(Name = "Lần cuối reset thiết bị (UTC)")]
         public DateTime? LastDeviceResetUtc { get; set; }
+        
+        // === VIP Translation Fields ===
+        [Display(Name = "Giới hạn dịch VIP SRT/Ngày")]
+        public int DailyVipSrtLimit { get; set; } = 0; // Default: Free = 0, Monthly = 3000, Yearly = 15000
+        
+        [Display(Name = "Số dòng VIP SRT đã dùng/Ngày")]
+        public int VipSrtLinesUsedToday { get; set; } = 0;
+        
+        [Display(Name = "Lần cuối reset bộ đếm VIP SRT (UTC)")]
+        public DateTime LastVipSrtResetUtc { get; set; } = DateTime.UtcNow;
     }
     public class TtsApiKey
     {
@@ -373,6 +383,10 @@ namespace SubPhim.Server.Data
         [Display(Name = "Giới hạn Request AIO/Phút")]
         public int AioRequestsPerMinute { get; set; }
         // === KẾT THÚC THAY ĐỔI ===
+        
+        // === VIP Translation Limits ===
+        [Display(Name = "Giới hạn dịch VIP SRT/Ngày")]
+        public int DailyVipSrtLimit { get; set; } = 0;
     }
     public class AioTranslationSetting
     {
@@ -550,6 +564,95 @@ namespace SubPhim.Server.Data
 
         // --- KẾT THÚC THÊM CÁC TRƯỜNG MỚI ---
     }
+    
+    public class VipTranslationSetting
+    {
+        // Dùng Id cố định là 1 để luôn chỉ có 1 dòng setting
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
+        public int Id { get; set; } = 1;
+
+        [Display(Name = "Request/Phút (RPM)")]
+        public int Rpm { get; set; } = 100;
+
+        [Display(Name = "Số dòng/Request (Batch Size)")]
+        public int BatchSize { get; set; } = 40;
+
+        [Display(Name = "Số lần thử lại nếu lỗi")]
+        public int MaxRetries { get; set; } = 3;
+
+        [Display(Name = "Delay giữa các lần thử lại (ms)")]
+        public int RetryDelayMs { get; set; } = 5000;
+
+        [Display(Name = "Delay giữa các batch (ms)")]
+        public int DelayBetweenBatchesMs { get; set; } = 1000;
+
+        [Display(Name = "Temperature (0-2)")]
+        [Column(TypeName = "decimal(3, 2)")]
+        public decimal Temperature { get; set; } = 0.7m;
+
+        [Display(Name = "Max Output Tokens")]
+        public int MaxOutputTokens { get; set; } = 8192;
+
+        [Display(Name = "Bật Thinking Budget (IQ AI)")]
+        public bool EnableThinkingBudget { get; set; } = true;
+
+        [Display(Name = "Thinking Budget (IQ AI)")]
+        public int ThinkingBudget { get; set; } = 8192;
+
+        [Display(Name = "Request/Phút/Proxy (RPM)")]
+        public int RpmPerProxy { get; set; } = 10;
+    }
+    
+    public class VipApiKey
+    {
+        public int Id { get; set; }
+
+        [Required]
+        public string EncryptedApiKey { get; set; }
+        
+        [Required]
+        public string Iv { get; set; }
+        
+        [Display(Name = "Đang hoạt động")]
+        public bool IsEnabled { get; set; } = true;
+
+        [Display(Name = "Tổng Tokens Đã Dùng")]
+        public long TotalTokensUsed { get; set; } = 0;
+
+        [Display(Name = "Số Request Hôm Nay")]
+        public int RequestsToday { get; set; } = 0;
+
+        [Display(Name = "Lần cuối reset bộ đếm Request (UTC)")]
+        public DateTime LastRequestCountResetUtc { get; set; } = DateTime.UtcNow;
+
+        [Display(Name = "Tạm thời vô hiệu đến (UTC)")]
+        public DateTime? TemporaryCooldownUntil { get; set; }
+
+        [Display(Name = "Lý do bị vô hiệu hóa")]
+        [StringLength(300)]
+        public string? DisabledReason { get; set; }
+
+        [Display(Name = "Số lần gặp lỗi 429 liên tiếp")]
+        public int Consecutive429Count { get; set; } = 0;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+    
+    public class VipAvailableApiModel
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        [Display(Name = "Tên Model")]
+        public string ModelName { get; set; }
+
+        [Display(Name = "Đang được kích hoạt")]
+        public bool IsActive { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+    
     public class AioTtsServiceAccount
     {
         public int Id { get; set; }

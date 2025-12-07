@@ -29,6 +29,11 @@ namespace SubPhim.Server.Data
         public DbSet<UpdateInfo> UpdateInfos { get; set; }
         public DbSet<SaOcrServiceAccount> SaOcrServiceAccounts { get; set; }
         public DbSet<Proxy> Proxies { get; set; }
+        
+        // VIP Translation DbSets
+        public DbSet<VipTranslationSetting> VipTranslationSettings { get; set; }
+        public DbSet<VipApiKey> VipApiKeys { get; set; }
+        public DbSet<VipAvailableApiModel> VipAvailableApiModels { get; set; }
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
         protected override void OnModelCreating(ModelBuilder modelBuilder)

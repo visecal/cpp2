@@ -89,7 +89,9 @@ namespace SubPhim.Server.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to execute {OperationName} after {MaxRetries} retries", operationName, MaxDatabaseRetries);
+                    // Total attempts = retryCount + 1 (initial attempt)
+                    _logger.LogWarning(ex, "Failed to execute {OperationName} after {TotalAttempts} attempts ({Retries} retries)", 
+                        operationName, retryCount + 1, retryCount);
                     throw;
                 }
             }

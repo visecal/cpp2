@@ -78,6 +78,23 @@ namespace subphimv1.ViewModels
 
         public string LocalSrtLimitInfo => IsLoggedIn ? $"{LocalSrtLinesUsedToday:N0} / {DailyLocalSrtLineLimit:N0} dòng" : " N/A";
         public string AioCharacterInfo => IsLoggedIn ? $"{AioCharactersUsedToday:N0} / {(AioCharacterLimit <= 0 ? "N/A" : AioCharacterLimit.ToString("N0"))} ký tự" : "N/A";
+        
+        private int _vipSrtLinesUsedToday;
+        public int VipSrtLinesUsedToday
+        {
+            get => _vipSrtLinesUsedToday;
+            set { _vipSrtLinesUsedToday = value; OnPropertyChanged(); OnPropertyChanged(nameof(VipSrtLimitInfo)); }
+        }
+
+        private int _dailyVipSrtLimit;
+        public int DailyVipSrtLimit
+        {
+            get => _dailyVipSrtLimit;
+            set { _dailyVipSrtLimit = value; OnPropertyChanged(); OnPropertyChanged(nameof(VipSrtLimitInfo)); }
+        }
+
+        public string VipSrtLimitInfo => IsLoggedIn ? $"{VipSrtLinesUsedToday:N0} / {DailyVipSrtLimit:N0} dòng" : "N/A";
+        
         private long _ttsCharactersUsed;
         public long TtsCharactersUsed
         {
@@ -451,6 +468,8 @@ namespace subphimv1.ViewModels
             AioCharacterLimit = dto.AioCharacterLimit;
             LocalSrtLinesUsedToday = dto.LocalSrtLinesUsedToday;
             DailyLocalSrtLineLimit = dto.DailyLocalSrtLineLimit;
+            VipSrtLinesUsedToday = dto.VipSrtLinesUsedToday;
+            DailyVipSrtLimit = dto.DailyVipSrtLimit;
             var latestDevice = dto.Devices?.FirstOrDefault();
             DeviceCount = dto.Devices?.Count ?? 0;
             LastLoginIp = latestDevice?.LastLoginIp ?? string.Empty;

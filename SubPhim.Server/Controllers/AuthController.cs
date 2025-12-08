@@ -97,7 +97,9 @@ long TtsCharacterLimit,
     long AioCharactersUsedToday,
     long AioCharacterLimit,
          int LocalSrtLinesUsedToday,
-    int DailyLocalSrtLineLimit
+    int DailyLocalSrtLineLimit,
+    int VipSrtLinesUsedToday,
+    int DailyVipSrtLimit
 );
 
     public record ForgotPasswordRequest(string Email);
@@ -484,7 +486,9 @@ long TtsCharacterLimit,
                     user.AioCharactersUsedToday,
                     aioCharacterLimit,
             user.LocalSrtLinesUsedToday,
-            user.DailyLocalSrtLimit
+            user.DailyLocalSrtLimit,
+            user.VipSrtLinesUsedToday,
+            user.DailyVipSrtLimit
         );
 
         return Ok(userDto);
@@ -562,6 +566,17 @@ long TtsCharacterLimit,
             hasChanges = true;
             Debug.WriteLine($"[AuthController.RefreshProfile] Resetting LocalSrtLinesUsedToday for user '{user.Username}'.");
         }
+        
+        // 5. Reset bộ đếm Dịch VIP SRT
+        var lastVipSrtResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(user.LastVipSrtResetUtc, vietnamTimeZone);
+        if (lastVipSrtResetInVietnam.Date < vietnamNow.Date)
+        {
+            user.VipSrtLinesUsedToday = 0;
+            user.LastVipSrtResetUtc = DateTime.UtcNow.Date;
+            hasChanges = true;
+            Debug.WriteLine($"[AuthController.RefreshProfile] Resetting VipSrtLinesUsedToday for user '{user.Username}'.");
+        }
+        
         var lastTtsResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(user.LastTtsResetUtc, vietnamTimeZone);
         if (user.Tier == SubscriptionTier.Free && lastTtsResetInVietnam.Date < vietnamNow.Date)
         {
@@ -620,7 +635,9 @@ long TtsCharacterLimit,
             user.AioCharactersUsedToday,
              aioCharacterLimit,
     user.LocalSrtLinesUsedToday,
-    user.DailyLocalSrtLimit
+    user.DailyLocalSrtLimit,
+    user.VipSrtLinesUsedToday,
+    user.DailyVipSrtLimit
         );
         return Ok(userDto);
     }

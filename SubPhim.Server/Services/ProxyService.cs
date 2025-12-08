@@ -73,9 +73,7 @@ namespace SubPhim.Server.Services
                         operationName, retryCount, MaxDatabaseRetries, delayMs);
                     
                     await Task.Delay(delayMs);
-                    
-                    // Exponential backoff with jitter
-                    delayMs = Math.Min(delayMs * 2 + Random.Shared.Next(0, 100), MaxRetryDelayMs);
+                    delayMs = CalculateNextDelay(delayMs);
                 }
                 catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.Sqlite.SqliteException sqliteEx && 
                                                    sqliteEx.SqliteErrorCode == 5 && 
@@ -87,16 +85,22 @@ namespace SubPhim.Server.Services
                         operationName, retryCount, MaxDatabaseRetries, delayMs);
                     
                     await Task.Delay(delayMs);
-                    
-                    // Exponential backoff with jitter
-                    delayMs = Math.Min(delayMs * 2 + Random.Shared.Next(0, 100), MaxRetryDelayMs);
+                    delayMs = CalculateNextDelay(delayMs);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to execute {OperationName} after {Retry} retries", operationName, retryCount);
+                    _logger.LogWarning(ex, "Failed to execute {OperationName} after {MaxRetries} retries", operationName, MaxDatabaseRetries);
                     throw;
                 }
             }
+        }
+
+        /// <summary>
+        /// Calculate the next retry delay using exponential backoff with jitter.
+        /// </summary>
+        private static int CalculateNextDelay(int currentDelayMs)
+        {
+            return Math.Min(currentDelayMs * 2 + Random.Shared.Next(0, 100), MaxRetryDelayMs);
         }
 
         /// <summary>

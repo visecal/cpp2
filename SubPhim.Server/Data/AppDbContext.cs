@@ -34,6 +34,12 @@ namespace SubPhim.Server.Data
         public DbSet<VipTranslationSetting> VipTranslationSettings { get; set; }
         public DbSet<VipApiKey> VipApiKeys { get; set; }
         public DbSet<VipAvailableApiModel> VipAvailableApiModels { get; set; }
+        
+        // External API Key Management DbSets
+        public DbSet<ExternalApiKey> ExternalApiKeys { get; set; }
+        public DbSet<ExternalApiUsageLog> ExternalApiUsageLogs { get; set; }
+        public DbSet<ExternalApiCreditTransaction> ExternalApiCreditTransactions { get; set; }
+        public DbSet<ExternalApiSettings> ExternalApiSettings { get; set; }
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -219,6 +225,41 @@ namespace SubPhim.Server.Data
                         CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                     }
                 );
+            
+            // Configure External API Key entities
+            modelBuilder.Entity<ExternalApiKey>(entity =>
+            {
+                entity.HasIndex(e => e.KeyHash).IsUnique();
+                entity.HasIndex(e => e.IsEnabled);
+                entity.HasIndex(e => e.CreatedAt);
+            });
+
+            modelBuilder.Entity<ExternalApiUsageLog>(entity =>
+            {
+                entity.HasIndex(e => e.SessionId);
+                entity.HasIndex(e => e.ApiKeyId);
+                entity.HasIndex(e => e.StartedAt);
+                entity.HasIndex(e => e.Status);
+            });
+
+            modelBuilder.Entity<ExternalApiCreditTransaction>(entity =>
+            {
+                entity.HasIndex(e => e.ApiKeyId);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.Type);
+            });
+            
+            // Seed default External API Settings
+            modelBuilder.Entity<ExternalApiSettings>()
+                .HasData(new ExternalApiSettings 
+                { 
+                    Id = 1,
+                    CreditsPerCharacter = 5,
+                    VndPerCredit = 10,
+                    DefaultRpm = 100,
+                    DefaultInitialCredits = 0,
+                    UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                });
         }
     }
 }

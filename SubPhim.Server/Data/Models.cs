@@ -880,4 +880,231 @@ namespace SubPhim.Server.Data
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
+    // ==================== External API Key Management Entities ====================
+
+    /// <summary>
+    /// Entity for External API Keys - allows third-party clients to access VIP Translation API
+    /// </summary>
+    public class ExternalApiKey
+    {
+        public int Id { get; set; }
+        
+        // Identity & Security
+        [Required]
+        [StringLength(100)]
+        [Display(Name = "Key Hash")]
+        public string KeyHash { get; set; } = string.Empty; // SHA-256 hash of API key
+        
+        [Required]
+        [StringLength(10)]
+        [Display(Name = "Key Prefix")]
+        public string KeyPrefix { get; set; } = "AIO_"; // "AIO_" prefix for identification
+        
+        [Required]
+        [StringLength(10)]
+        [Display(Name = "Key Suffix")]
+        public string KeySuffix { get; set; } = string.Empty; // Last 4 characters for display
+        
+        [StringLength(200)]
+        [Display(Name = "Tên hiển thị")]
+        public string? DisplayName { get; set; }
+        
+        // Assignment Information
+        [StringLength(200)]
+        [Display(Name = "Gán cho")]
+        public string? AssignedTo { get; set; } // Customer/company name
+        
+        [StringLength(255)]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string? Email { get; set; }
+        
+        [StringLength(1000)]
+        [Display(Name = "Ghi chú")]
+        public string? Notes { get; set; }
+        
+        // Credit Management
+        [Display(Name = "Số dư Credit")]
+        public long CreditBalance { get; set; } = 0;
+        
+        [Display(Name = "Tổng Credit đã dùng")]
+        public long TotalCreditsUsed { get; set; } = 0;
+        
+        [Display(Name = "Tổng Credit đã nạp")]
+        public long TotalCreditsAdded { get; set; } = 0;
+        
+        // Rate Limiting
+        [Display(Name = "RPM Limit")]
+        public int RpmLimit { get; set; } = 100; // Requests per minute
+        
+        // Status
+        [Display(Name = "Đang hoạt động")]
+        public bool IsEnabled { get; set; } = true;
+        
+        [Display(Name = "Ngày tạo")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        
+        [Display(Name = "Lần dùng cuối")]
+        public DateTime? LastUsedAt { get; set; }
+        
+        [Display(Name = "Ngày hết hạn")]
+        public DateTime? ExpiresAt { get; set; } // Null = never expires
+        
+        // Navigation properties
+        public ICollection<ExternalApiUsageLog> UsageLogs { get; set; } = new List<ExternalApiUsageLog>();
+        public ICollection<ExternalApiCreditTransaction> CreditTransactions { get; set; } = new List<ExternalApiCreditTransaction>();
+    }
+
+    /// <summary>
+    /// Tracks usage/status of each API call
+    /// </summary>
+    public enum UsageStatus
+    {
+        Pending = 0,      // Job is running
+        Completed = 1,    // Completed successfully, credit charged
+        Failed = 2,       // Failed, credit refunded
+        Cancelled = 3,    // Cancelled by user, credit refunded
+        Refunded = 4      // Manually refunded
+    }
+
+    /// <summary>
+    /// Entity for External API Usage Logs - tracks each API call
+    /// </summary>
+    public class ExternalApiUsageLog
+    {
+        public long Id { get; set; }
+        
+        public int ApiKeyId { get; set; }
+        public ExternalApiKey ApiKey { get; set; } = null!;
+        
+        // Request Information
+        [Required]
+        [StringLength(100)]
+        [Display(Name = "Session ID")]
+        public string SessionId { get; set; } = string.Empty;
+        
+        [Required]
+        [StringLength(200)]
+        [Display(Name = "Endpoint")]
+        public string Endpoint { get; set; } = string.Empty;
+        
+        [StringLength(10)]
+        [Display(Name = "Ngôn ngữ đích")]
+        public string? TargetLanguage { get; set; }
+        
+        // Statistics
+        [Display(Name = "Số dòng input")]
+        public int InputLines { get; set; }
+        
+        [Display(Name = "Số ký tự output")]
+        public int OutputCharacters { get; set; }
+        
+        [Display(Name = "Credit đã tính")]
+        public long CreditsCharged { get; set; }
+        
+        // Status
+        [Display(Name = "Trạng thái")]
+        public UsageStatus Status { get; set; } = UsageStatus.Pending;
+        
+        [StringLength(1000)]
+        [Display(Name = "Thông báo lỗi")]
+        public string? ErrorMessage { get; set; }
+        
+        [Column(TypeName = "TEXT")]
+        [Display(Name = "Lỗi Gemini")]
+        public string? GeminiErrors { get; set; } // JSON array of Gemini errors
+        
+        // Timing
+        [Display(Name = "Thời gian bắt đầu")]
+        public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+        
+        [Display(Name = "Thời gian hoàn thành")]
+        public DateTime? CompletedAt { get; set; }
+        
+        [Display(Name = "Thời gian xử lý (ms)")]
+        public int? DurationMs { get; set; }
+        
+        // Metadata
+        [StringLength(50)]
+        [Display(Name = "Client IP")]
+        public string? ClientIp { get; set; }
+        
+        [StringLength(500)]
+        [Display(Name = "User Agent")]
+        public string? UserAgent { get; set; }
+    }
+
+    /// <summary>
+    /// Types of credit transactions
+    /// </summary>
+    public enum TransactionType
+    {
+        Deposit = 1,      // Credit added
+        Usage = 2,        // Credit used (deducted)
+        Refund = 3,       // Credit refunded due to error
+        Adjustment = 4,   // Manual adjustment
+        Bonus = 5         // Bonus/gift credit
+    }
+
+    /// <summary>
+    /// Entity for External API Credit Transactions - tracks all credit movements
+    /// </summary>
+    public class ExternalApiCreditTransaction
+    {
+        public long Id { get; set; }
+        
+        public int ApiKeyId { get; set; }
+        public ExternalApiKey ApiKey { get; set; } = null!;
+        
+        [Display(Name = "Loại giao dịch")]
+        public TransactionType Type { get; set; }
+        
+        [Display(Name = "Số lượng")]
+        public long Amount { get; set; } // Positive or negative
+        
+        [Display(Name = "Số dư sau giao dịch")]
+        public long BalanceAfter { get; set; }
+        
+        [Required]
+        [StringLength(500)]
+        [Display(Name = "Mô tả")]
+        public string Description { get; set; } = string.Empty;
+        
+        [Display(Name = "Usage Log ID liên quan")]
+        public long? RelatedUsageLogId { get; set; }
+        
+        [StringLength(100)]
+        [Display(Name = "Tạo bởi")]
+        public string? CreatedBy { get; set; } // Admin username if manual
+        
+        [Display(Name = "Ngày tạo")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Singleton entity for External API Settings
+    /// </summary>
+    public class ExternalApiSettings
+    {
+        public int Id { get; set; } = 1; // Singleton pattern
+        
+        // Credit Conversion Rates
+        [Display(Name = "Credit/Ký tự")]
+        public int CreditsPerCharacter { get; set; } = 5; // 5 credit = 1 character
+        
+        [Display(Name = "VND/Credit")]
+        [Column(TypeName = "decimal(18,4)")]
+        public decimal VndPerCredit { get; set; } = 10; // 10 VND = 1 credit (so 10,000 VND = 1,000 credit)
+        
+        // Defaults for new API keys
+        [Display(Name = "RPM mặc định")]
+        public int DefaultRpm { get; set; } = 100;
+        
+        [Display(Name = "Credit khởi tạo mặc định")]
+        public long DefaultInitialCredits { get; set; } = 0;
+        
+        [Display(Name = "Cập nhật lần cuối")]
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    }
+
 }

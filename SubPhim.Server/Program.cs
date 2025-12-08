@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection; 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -53,6 +54,11 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<TranslationOrchestratorService>();
 builder.Services.AddSingleton<VipTranslationService>();
 builder.Services.AddMemoryCache();
+
+// External API Key Management Services
+builder.Services.AddScoped<IExternalApiKeyService, ExternalApiKeyService>();
+builder.Services.AddScoped<IExternalApiCreditService, ExternalApiCreditService>();
+
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     var supportedCultures = new[] { new CultureInfo("en-US") };
@@ -99,6 +105,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = false
         };
     })
+    .AddScheme<AuthenticationSchemeOptions, SubPhim.Server.Authentication.ExternalApiKeyAuthenticationHandler>(
+        "ExternalApiKey", null)
     .AddCookie("AdminCookie", options =>
     {
         options.Cookie.Name = "SubPhim.AdminAuth";
@@ -113,6 +121,13 @@ builder.Services.AddAuthorization(options =>
         policy.AddAuthenticationSchemes("AdminCookie");
         policy.RequireClaim("Admin", "true");
     });
+    
+    // Policy for External API authentication
+    options.AddPolicy("ExternalApiPolicy", policy =>
+    {
+        policy.AddAuthenticationSchemes("ExternalApiKey");
+        policy.RequireClaim("api_key_id");
+    });
 });
 var app = builder.Build();
 app.UseMiddleware<RequestLoggingMiddleware>();
@@ -124,6 +139,9 @@ if (app.Environment.IsDevelopment())
 app.UseRouting();
 app.UseRequestLocalization();
 app.UseAuthentication();
+
+// Add External API rate limiting middleware (must be after authentication)
+app.UseMiddleware<SubPhim.Server.Middleware.ExternalApiRateLimitMiddleware>();
 
 app.UseAuthorization();
 

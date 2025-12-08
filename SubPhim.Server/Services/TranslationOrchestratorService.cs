@@ -799,9 +799,9 @@ namespace SubPhim.Server.Services
         /// </summary>
         private static void ScheduleSemaphoreRelease(SemaphoreSlim semaphore, TimeSpan delay)
         {
-            // Tạo timer với callback tự dispose - ngăn GC bằng cách giữ tham chiếu trong closure
-            Timer? timer = null;
-            timer = new Timer(_ =>
+            // Sử dụng object holder để tránh race condition với timer assignment
+            var timerHolder = new TimerHolder();
+            timerHolder.Timer = new Timer(_ =>
             {
                 try 
                 { 
@@ -818,10 +818,16 @@ namespace SubPhim.Server.Services
                 finally
                 {
                     // Dispose timer sau khi callback hoàn thành
-                    try { timer?.Dispose(); }
+                    try { timerHolder.Timer?.Dispose(); }
                     catch { /* Ignore dispose errors */ }
                 }
             }, null, delay, Timeout.InfiniteTimeSpan);
+        }
+        
+        // Helper class để giữ timer reference an toàn
+        private class TimerHolder
+        {
+            public Timer? Timer { get; set; }
         }
         
         // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết, random User-Agent, PROXY support và PROXY RPM LIMITING ===== 

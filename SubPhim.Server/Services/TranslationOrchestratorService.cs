@@ -34,6 +34,7 @@ namespace SubPhim.Server.Services
         private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
         private const int MAX_PROXY_SEARCH_ATTEMPTS = 10; // Số lần thử tìm proxy có RPM slot
+        private const int FINAL_KEY_WAIT_TIMEOUT_MS = 30000; // Thời gian chờ tối đa khi tất cả keys bận (30 giây)
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
         // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
@@ -666,10 +667,33 @@ namespace SubPhim.Server.Services
                     }
 
                 }
+                catch (OperationCanceledException)
+                {
+                    // Operation was cancelled - this is expected when timeout occurs or cancellation requested
+                    if (selectedKey != null)
+                    {
+                        _logger.LogInformation("Batch processing cancelled for job {JobId} at attempt {Attempt} with Key ID {KeyId}", 
+                            job.SessionId, attempt, selectedKey.Id);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Batch processing cancelled for job {JobId} at attempt {Attempt} (no key was selected - all keys may be busy or in cooldown)", 
+                            job.SessionId, attempt);
+                    }
+                    break; // Exit retry loop on cancellation
+                }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Exception during batch translation attempt {Attempt} with Key ID {KeyId}", 
-                        attempt, selectedKey?.Id);
+                    if (selectedKey != null)
+                    {
+                        _logger.LogError(ex, "Exception during batch translation attempt {Attempt} with Key ID {KeyId}", 
+                            attempt, selectedKey.Id);
+                    }
+                    else
+                    {
+                        _logger.LogError(ex, "Exception during batch translation attempt {Attempt} (no key was selected - all keys may be busy or in cooldown). Available keys: {KeyCount}, Tried keys: {TriedCount}", 
+                            attempt, availableKeys.Count, triedKeyIds.Count);
+                    }
                     
                     if (attempt >= settings.MaxRetries) break;
                     await Task.Delay(settings.RetryDelayMs * attempt, token);
@@ -704,7 +728,18 @@ namespace SubPhim.Server.Services
                 .Where(k => !excludeKeyIds.Contains(k.Id) && !_cooldownService.IsInCooldown(k.Id))
                 .ToList();
             
-            if (!eligibleKeys.Any()) return null;
+            if (!eligibleKeys.Any()) 
+            {
+                var totalKeys = availableKeys.Count;
+                var excludedKeys = excludeKeyIds.Count;
+                var cooldownKeys = availableKeys.Count(k => _cooldownService.IsInCooldown(k.Id));
+                
+                _logger.LogWarning(
+                    "No eligible keys available. Total: {Total}, Excluded: {Excluded}, In Cooldown: {Cooldown}, Pool: {PoolType}",
+                    totalKeys, excludedKeys, cooldownKeys, poolType);
+                    
+                return null;
+            }
             
             // === ROUND-ROBIN SELECTION: Đảm bảo phân bổ đều ===
             ManagedApiKey selectedKey = GetNextKeyRoundRobin(eligibleKeys, poolType);
@@ -742,12 +777,21 @@ namespace SubPhim.Server.Services
                 }
             }
             
-            // Nếu tất cả key đều đạt RPM limit, chờ key đầu tiên
-            _logger.LogInformation("Tất cả keys đều đạt giới hạn RPM, đợi key ID {KeyId}...", selectedKey.Id);
-            await semaphore.WaitAsync(token);
-            ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
+            // Nếu tất cả key đều đạt RPM limit, chờ key đầu tiên với timeout
+            _logger.LogInformation("Tất cả keys đều đạt giới hạn RPM, đợi key ID {KeyId} với timeout {TimeoutMs}ms...", 
+                selectedKey.Id, FINAL_KEY_WAIT_TIMEOUT_MS);
             
-            return selectedKey;
+            // Sử dụng timeout để tránh chờ vô hạn
+            if (await semaphore.WaitAsync(FINAL_KEY_WAIT_TIMEOUT_MS, token))
+            {
+                ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
+                return selectedKey;
+            }
+            
+            // Timeout - không có key nào khả dụng
+            _logger.LogWarning("Timeout khi đợi key khả dụng sau {TimeoutMs}ms. Tất cả {Count} keys đều bận.", 
+                FINAL_KEY_WAIT_TIMEOUT_MS, eligibleKeys.Count);
+            return null;
         }
         
         /// <summary>
@@ -755,12 +799,35 @@ namespace SubPhim.Server.Services
         /// </summary>
         private static void ScheduleSemaphoreRelease(SemaphoreSlim semaphore, TimeSpan delay)
         {
-            // Sử dụng Timer để release đáng tin cậy hơn fire-and-forget Task
-            var timer = new Timer(_ =>
+            // Sử dụng object holder để tránh race condition với timer assignment
+            var timerHolder = new TimerHolder();
+            timerHolder.Timer = new Timer(_ =>
             {
-                try { semaphore.Release(); }
-                catch (ObjectDisposedException) { /* Semaphore đã bị disposed, ignore */ }
+                try 
+                { 
+                    semaphore.Release(); 
+                }
+                catch (SemaphoreFullException) 
+                { 
+                    // Semaphore đã đầy, ignore
+                }
+                catch (ObjectDisposedException) 
+                { 
+                    // Semaphore đã bị disposed, ignore 
+                }
+                finally
+                {
+                    // Dispose timer sau khi callback hoàn thành
+                    try { timerHolder.Timer?.Dispose(); }
+                    catch { /* Ignore dispose errors */ }
+                }
             }, null, delay, Timeout.InfiniteTimeSpan);
+        }
+        
+        // Helper class để giữ timer reference an toàn
+        private class TimerHolder
+        {
+            public Timer? Timer { get; set; }
         }
         
         // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết, random User-Agent, PROXY support và PROXY RPM LIMITING ===== 

@@ -99,6 +99,7 @@ namespace SubPhim.Server.Services
 
         /// <summary>
         /// Calculate the next retry delay using exponential backoff with jitter.
+        /// Random.Shared is thread-safe (introduced in .NET 6) and designed for concurrent access.
         /// </summary>
         private static int CalculateNextDelay(int currentDelayMs)
         {
@@ -179,6 +180,8 @@ namespace SubPhim.Server.Services
         {
             try
             {
+                // Use a captured variable to return the count from the retry operation
+                // This is a standard closure pattern in C#
                 int reenabledCount = 0;
                 
                 await ExecuteWithRetryAsync(async () =>

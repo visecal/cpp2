@@ -41,7 +41,14 @@ namespace SubPhim.Server.Data
         public DbSet<ExternalApiCreditTransaction> ExternalApiCreditTransactions { get; set; }
         public DbSet<ExternalApiSettings> ExternalApiSettings { get; set; }
 
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) 
+        {
+            // Configure SQLite for better concurrency on every connection
+            Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+            Database.ExecuteSqlRaw("PRAGMA busy_timeout=5000;");
+            Database.ExecuteSqlRaw("PRAGMA synchronous=NORMAL;");
+        }
+        
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

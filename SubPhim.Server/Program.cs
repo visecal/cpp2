@@ -76,8 +76,31 @@ if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FLY_APP_NAME")))
 {
     dbConnectionString = "Data Source=/data/subphim.db";
 }
+
+// Configure SQLite for better concurrency handling
+// WAL mode allows concurrent reads and writes, significantly reducing lock contention
+var connectionStringBuilder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(dbConnectionString)
+{
+    Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadWriteCreate,
+    Cache = Microsoft.Data.Sqlite.SqliteCacheMode.Shared,
+    Pooling = true
+};
+dbConnectionString = connectionStringBuilder.ToString();
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(dbConnectionString));
+{
+    options.UseSqlite(dbConnectionString, sqliteOptions =>
+    {
+        // Set command timeout to handle longer operations
+        sqliteOptions.CommandTimeout(30);
+    });
+    
+    // Enable sensitive data logging in development for debugging
+    if (builder.Environment.IsDevelopment())
+    {
+        options.EnableSensitiveDataLogging();
+    }
+});
 
 if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FLY_APP_NAME")))
 {

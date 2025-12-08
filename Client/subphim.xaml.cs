@@ -2254,10 +2254,12 @@ QUY TẮC CHUNG:
             int totalBytes = Encoding.UTF8.GetByteCount(optimizedText);
             int characterCount = optimizedText.Length;
 
+            // Làm mới thông tin người dùng
+            await App.User.RefreshProfileAsync();
+
             // Kiểm tra character limit chỉ khi không sử dụng CapCut
             if (modelId != "CapCut")
             {
-                await App.User.RefreshProfileAsync();
                 long remainingChars = App.User.TtsCharacterLimit - App.User.TtsCharactersUsed;
 
                 if (characterCount > remainingChars)
@@ -2269,7 +2271,6 @@ QUY TẮC CHUNG:
             else
             {
                 // Kiểm tra quyền CapCut Voice khi sử dụng CapCut model
-                await App.User.RefreshProfileAsync();
                 if (!App.User.AllowedApiAccess.HasFlag(AllowedApis.Capcutvoice))
                 {
                     CustomMessageBox.Show("Bạn không có quyền sử dụng CapCut Voice. Vui lòng liên hệ admin để được cấp quyền.", "Không có quyền truy cập", MessageBoxButton.OK, MessageBoxImage.Error);

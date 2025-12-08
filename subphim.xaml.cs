@@ -2254,6 +2254,17 @@ QUY TẮC CHUNG:
             int totalBytes = Encoding.UTF8.GetByteCount(optimizedText);
             int characterCount = optimizedText.Length;
 
+            // Kiểm tra quyền CapCut Voice nếu chọn model CapCut
+            if (modelId == "CapCut")
+            {
+                await App.User.RefreshProfileAsync();
+                if (!App.User.AllowedApiAccess.HasFlag(AllowedApis.Capcutvoice))
+                {
+                    CustomMessageBox.Show("Gói của bạn không có quyền sử dụng CapCut Voice. Vui lòng liên hệ admin để nâng cấp quyền.", "Không có quyền truy cập", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
             // Kiểm tra character limit chỉ khi không sử dụng CapCut
             if (modelId != "CapCut")
             {

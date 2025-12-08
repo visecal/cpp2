@@ -11,7 +11,8 @@ namespace subphimv1.UserView
         ChutesAI = 1,
         Gemini = 2,
         OpenRouter = 4,
-        AIOLauncher = 8
+        AIOLauncher = 8,
+        Capcutvoice = 16
     }
 
     public class DeviceDto
@@ -44,5 +45,7 @@ namespace subphimv1.UserView
         public long TtsCharacterLimit { get; set; }
         public long AioCharactersUsedToday { get; set; }
         public long AioCharacterLimit { get; set; }
+        public int VipSrtLinesUsedToday { get; set; }
+        public int DailyVipSrtLimit { get; set; }
     }
 }

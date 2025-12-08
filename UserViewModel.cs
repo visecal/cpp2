@@ -62,6 +62,21 @@ namespace subphimv1.ViewModels
             get => _aioCharacterLimit;
             set { _aioCharacterLimit = value; OnPropertyChanged(); OnPropertyChanged(nameof(AioCharacterInfo)); OnPropertyChanged(nameof(UsageInfoString)); } // Thêm
         }
+        private int _vipSrtLinesUsedToday;
+        public int VipSrtLinesUsedToday
+        {
+            get => _vipSrtLinesUsedToday;
+            set { _vipSrtLinesUsedToday = value; OnPropertyChanged(); OnPropertyChanged(nameof(VipSrtLimitInfo)); }
+        }
+
+        private int _dailyVipSrtLimit;
+        public int DailyVipSrtLimit
+        {
+            get => _dailyVipSrtLimit;
+            set { _dailyVipSrtLimit = value; OnPropertyChanged(); OnPropertyChanged(nameof(VipSrtLimitInfo)); }
+        }
+
+        public string VipSrtLimitInfo => IsLoggedIn ? $"{VipSrtLinesUsedToday:N0} / {DailyVipSrtLimit:N0} dòng" : "N/A";
         private int _localSrtLinesUsedToday;
         public int LocalSrtLinesUsedToday
         {
@@ -449,6 +464,8 @@ namespace subphimv1.ViewModels
             TtsCharacterLimit = dto.TtsCharacterLimit;
             AioCharactersUsedToday = dto.AioCharactersUsedToday;
             AioCharacterLimit = dto.AioCharacterLimit;
+            VipSrtLinesUsedToday = dto.VipSrtLinesUsedToday;
+            DailyVipSrtLimit = dto.DailyVipSrtLimit;
             LocalSrtLinesUsedToday = dto.LocalSrtLinesUsedToday;
             DailyLocalSrtLineLimit = dto.DailyLocalSrtLineLimit;
             var latestDevice = dto.Devices?.FirstOrDefault();

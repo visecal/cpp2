@@ -30,9 +30,6 @@ namespace SubPhim.Server.Services
         private static int _freeKeyRoundRobinIndex = 0;
         private static readonly object _roundRobinLock = new();
         
-        // === Timer tracking to prevent garbage collection ===
-        private static readonly ConcurrentBag<Timer> _activeTimers = new();
-        
         // === Constants ===
         private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
@@ -670,7 +667,7 @@ namespace SubPhim.Server.Services
                     }
 
                 }
-                catch (OperationCanceledException ex)
+                catch (OperationCanceledException)
                 {
                     // Operation was cancelled - this is expected when timeout occurs or cancellation requested
                     if (selectedKey != null)
@@ -802,8 +799,9 @@ namespace SubPhim.Server.Services
         /// </summary>
         private static void ScheduleSemaphoreRelease(SemaphoreSlim semaphore, TimeSpan delay)
         {
-            // Tạo Timer và lưu vào collection để tránh bị garbage collected
-            var timer = new Timer(_ =>
+            // Tạo timer với callback tự dispose - ngăn GC bằng cách giữ tham chiếu trong closure
+            Timer? timer = null;
+            timer = new Timer(_ =>
             {
                 try 
                 { 
@@ -817,16 +815,13 @@ namespace SubPhim.Server.Services
                 { 
                     // Semaphore đã bị disposed, ignore 
                 }
+                finally
+                {
+                    // Dispose timer sau khi callback hoàn thành
+                    try { timer?.Dispose(); }
+                    catch { /* Ignore dispose errors */ }
+                }
             }, null, delay, Timeout.InfiniteTimeSpan);
-            
-            // Lưu timer vào collection để tránh GC
-            _activeTimers.Add(timer);
-            
-            // Lên lịch dispose timer sau khi nó đã fire (thêm 1 giây buffer)
-            _ = Task.Delay(delay.Add(TimeSpan.FromSeconds(1))).ContinueWith(_ =>
-            {
-                timer.Dispose();
-            });
         }
         
         // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết, random User-Agent, PROXY support và PROXY RPM LIMITING ===== 

@@ -51,34 +51,54 @@ namespace SubPhim.Server.Services
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             
-            var user = await context.Users.FindAsync(userId);
-            if (user == null)
-                return new VipCreateJobResult { Status = "Error", Message = "Tài khoản không tồn tại." };
-
-            // Reset quota if needed (12:00 AM Vietnam time)
-            var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-            var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
-            var lastResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(user.LastVipSrtResetUtc, vietnamTimeZone);
-
-            if (lastResetInVietnam.Date < vietnamNow.Date)
+            // Check if this is an API key request (negative userId indicates external API key)
+            bool isApiKeyRequest = userId < 0;
+            
+            if (!isApiKeyRequest)
             {
-                user.VipSrtLinesUsedToday = 0;
-                user.LastVipSrtResetUtc = DateTime.UtcNow; // Keep full DateTime
+                // Regular user validation and quota checks
+                var user = await context.Users.FindAsync(userId);
+                if (user == null)
+                    return new VipCreateJobResult { Status = "Error", Message = "Tài khoản không tồn tại." };
+
+                // Reset quota if needed (12:00 AM Vietnam time)
+                var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+                var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+                var lastResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(user.LastVipSrtResetUtc, vietnamTimeZone);
+
+                if (lastResetInVietnam.Date < vietnamNow.Date)
+                {
+                    user.VipSrtLinesUsedToday = 0;
+                    user.LastVipSrtResetUtc = DateTime.UtcNow; // Keep full DateTime
+                    await context.SaveChangesAsync();
+                }
+
+                // Check quota
+                int remainingLines = user.DailyVipSrtLimit - user.VipSrtLinesUsedToday;
+                if (remainingLines <= 0)
+                {
+                    return new VipCreateJobResult 
+                    { 
+                        Status = "Error", 
+                        Message = $"Bạn đã hết lượt dịch VIP hôm nay. Giới hạn: {user.DailyVipSrtLimit} dòng/ngày." 
+                    };
+                }
+
+                if (lines.Count > remainingLines)
+                {
+                    return new VipCreateJobResult 
+                    { 
+                        Status = "Error", 
+                        Message = $"Không đủ lượt dịch. Yêu cầu: {lines.Count} dòng, còn lại: {remainingLines} dòng." 
+                    };
+                }
+
+                // Deduct quota
+                user.VipSrtLinesUsedToday += lines.Count;
                 await context.SaveChangesAsync();
             }
 
-            // Check quota
-            int remainingLines = user.DailyVipSrtLimit - user.VipSrtLinesUsedToday;
-            if (remainingLines <= 0)
-            {
-                return new VipCreateJobResult 
-                { 
-                    Status = "Error", 
-                    Message = $"Bạn đã hết lượt dịch VIP hôm nay. Giới hạn: {user.DailyVipSrtLimit} dòng/ngày." 
-                };
-            }
-
-            // Validate line length (reject if any line > 3000 characters)
+            // Validate line length (reject if any line > 3000 characters) - applies to both users and API keys
             foreach (var line in lines)
             {
                 if (line.OriginalText.Length > MAX_SRT_LINE_LENGTH)
@@ -90,19 +110,6 @@ namespace SubPhim.Server.Services
                     };
                 }
             }
-
-            if (lines.Count > remainingLines)
-            {
-                return new VipCreateJobResult 
-                { 
-                    Status = "Error", 
-                    Message = $"Không đủ lượt dịch. Yêu cầu: {lines.Count} dòng, còn lại: {remainingLines} dòng." 
-                };
-            }
-
-            // Deduct quota
-            user.VipSrtLinesUsedToday += lines.Count;
-            await context.SaveChangesAsync();
 
             // Create session
             var sessionId = Guid.NewGuid().ToString();
@@ -478,21 +485,25 @@ namespace SubPhim.Server.Services
             session.Status = VipJobStatus.Failed;
             session.ErrorMessage = "Job đã bị hủy bởi người dùng.";
 
-            // Refund unused lines
-            using var scope = _serviceProvider.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var user = await context.Users.FindAsync(userId);
-            
-            if (user != null)
+            // Refund unused lines (only for regular users, not API keys)
+            bool isApiKeyRequest = userId < 0;
+            if (!isApiKeyRequest)
             {
-                int translatedCount = session.TranslatedLines.Count(l => l.Success);
-                int refundLines = session.TotalLines - translatedCount;
+                using var scope = _serviceProvider.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var user = await context.Users.FindAsync(userId);
                 
-                if (refundLines > 0)
+                if (user != null)
                 {
-                    user.VipSrtLinesUsedToday -= refundLines;
-                    await context.SaveChangesAsync();
-                    _logger.LogInformation("Refunded {Count} lines to user {UserId}", refundLines, userId);
+                    int translatedCount = session.TranslatedLines.Count(l => l.Success);
+                    int refundLines = session.TotalLines - translatedCount;
+                    
+                    if (refundLines > 0)
+                    {
+                        user.VipSrtLinesUsedToday -= refundLines;
+                        await context.SaveChangesAsync();
+                        _logger.LogInformation("Refunded {Count} lines to user {UserId}", refundLines, userId);
+                    }
                 }
             }
 

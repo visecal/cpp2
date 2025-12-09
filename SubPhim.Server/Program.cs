@@ -388,8 +388,8 @@ static void EnsureMissingColumnsExist(AppDbContext context, ILogger logger)
             {
                 using var insertCmd = connection.CreateCommand();
                 insertCmd.CommandText = @"
-                    INSERT INTO ""VipTranslationSettings"" (""Id"", ""Rpm"", ""BatchSize"", ""MaxRetries"", ""RetryDelayMs"", ""DelayBetweenBatchesMs"", ""Temperature"", ""MaxOutputTokens"", ""EnableThinkingBudget"", ""ThinkingBudget"", ""RpmPerProxy"")
-                    VALUES (1, 60, 10, 3, 1000, 100, '0.7', 8192, 0, 0, 10);";
+                    INSERT INTO ""VipTranslationSettings"" (""Id"", ""Rpm"", ""BatchSize"", ""MaxRetries"", ""RetryDelayMs"", ""DelayBetweenBatchesMs"", ""Temperature"", ""MaxOutputTokens"", ""EnableThinkingBudget"", ""ThinkingBudget"", ""RpmPerProxy"", ""MaxSrtLineLength"")
+                    VALUES (1, 60, 10, 3, 1000, 100, '0.7', 8192, 0, 0, 10, 3000);";
                 insertCmd.ExecuteNonQuery();
                 logger.LogInformation("Seeded default VipTranslationSettings");
             }
@@ -405,7 +405,8 @@ static void EnsureMissingColumnsExist(AppDbContext context, ILogger logger)
             ("Users", "DailyVipSrtLimit", "INTEGER NOT NULL DEFAULT 0"),
             ("Users", "VipSrtLinesUsedToday", "INTEGER NOT NULL DEFAULT 0"),
             ("Users", "LastVipSrtResetUtc", "TEXT NOT NULL DEFAULT '0001-01-01 00:00:00'"),
-            ("TierDefaultSettings", "DailyVipSrtLimit", "INTEGER NOT NULL DEFAULT 0")
+            ("TierDefaultSettings", "DailyVipSrtLimit", "INTEGER NOT NULL DEFAULT 0"),
+            ("VipTranslationSettings", "MaxSrtLineLength", "INTEGER NOT NULL DEFAULT 3000")
         };
 
         foreach (var (tableName, columnName, columnDefinition) in columnsToAdd)

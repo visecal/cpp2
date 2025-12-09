@@ -45,7 +45,7 @@ namespace SubPhim.Server.Services
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
         private const int MAX_PROXY_SEARCH_ATTEMPTS = 10; // Số lần thử tìm proxy có RPM slot
         private const int FINAL_KEY_WAIT_TIMEOUT_MS = 30000; // Thời gian chờ tối đa khi tất cả keys bận (30 giây)
-        private const int MAX_SRT_LINE_LENGTH = 3000;
+        // MAX_SRT_LINE_LENGTH moved to VipTranslationSettings.MaxSrtLineLength (customizable in admin)
         private const int DEFAULT_SETTINGS_ID = 1;
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
@@ -208,15 +208,25 @@ namespace SubPhim.Server.Services
                 await context.SaveChangesAsync();
             }
 
-            // Validate line length (reject if any line > 3000 characters) - applies to both users and API keys
+            // Load settings to get the max line length
+            var settings = await context.VipTranslationSettings.FindAsync(DEFAULT_SETTINGS_ID);
+            if (settings == null)
+            {
+                settings = new VipTranslationSetting { Id = DEFAULT_SETTINGS_ID };
+                context.VipTranslationSettings.Add(settings);
+                await context.SaveChangesAsync();
+            }
+            int maxLineLength = settings.MaxSrtLineLength;
+
+            // Validate line length - applies to both users and API keys
             foreach (var line in lines)
             {
-                if (line.OriginalText.Length > MAX_SRT_LINE_LENGTH)
+                if (line.OriginalText.Length > maxLineLength)
                 {
                     return new VipCreateJobResult
                     {
                         Status = "Error",
-                        Message = $"Dòng {line.Index} vượt quá giới hạn {MAX_SRT_LINE_LENGTH} ký tự. Vui lòng kiểm tra lại file SRT."
+                        Message = $"Dòng {line.Index} vượt quá giới hạn {maxLineLength} ký tự. Vui lòng kiểm tra lại file SRT."
                     };
                 }
             }

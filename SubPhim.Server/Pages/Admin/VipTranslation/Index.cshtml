@@ -100,6 +100,25 @@
                             </div>
                         </div>
                     </div>
+
+                    <hr class="my-3" />
+                    <h6 class="text-warning mb-3"><i class="bi bi-text-paragraph me-1"></i> Giới hạn ký tự</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.MaxSrtLineLength" class="form-label">Giới hạn ký tự/dòng (Max Characters per Line)</label>
+                            <input asp-for="GlobalSettings.MaxSrtLineLength" type="number" class="form-control" />
+                            <small class="text-muted">Số ký tự tối đa cho mỗi dòng phụ đề</small>
+                        </div>
+                        <div class="col-md-8 mb-3 d-flex align-items-center">
+                            <div class="alert alert-warning mb-0 py-2 w-100">
+                                <small>
+                                    <strong>Mặc định:</strong> 3000 ký tự/dòng<br/>
+                                    <i class="bi bi-info-circle me-1"></i>Dòng phụ đề vượt quá giới hạn này sẽ bị từ chối.<br/>
+                                    <i class="bi bi-exclamation-triangle text-danger me-1"></i>Giá trị quá cao có thể gây lỗi với API hoặc ảnh hưởng hiệu suất.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
                     
                     <button type="submit" class="btn btn-info">Lưu Cài Đặt Chung</button>
                 </form>

@@ -612,6 +612,9 @@ namespace SubPhim.Server.Data
 
         [Display(Name = "Request/Phút/Proxy (RPM)")]
         public int RpmPerProxy { get; set; } = 10;
+
+        [Display(Name = "Giới hạn ký tự/dòng (Max Characters per Line)")]
+        public int MaxSrtLineLength { get; set; } = 3000;
     }
     
     public class VipApiKey

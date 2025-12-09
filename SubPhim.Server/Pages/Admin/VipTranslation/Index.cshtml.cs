@@ -63,6 +63,7 @@ namespace SubPhim.Server.Pages.Admin.VipTranslation
             public bool EnableThinkingBudget { get; set; }
             [Range(0, 16384)] public int ThinkingBudget { get; set; }
             [Required][Range(1, 1000)] public int RpmPerProxy { get; set; }
+            [Required][Range(100, 10000)] public int MaxSrtLineLength { get; set; }
         }
         #endregion
 
@@ -81,7 +82,8 @@ namespace SubPhim.Server.Pages.Admin.VipTranslation
                 MaxOutputTokens = settingsFromDb.MaxOutputTokens,
                 EnableThinkingBudget = settingsFromDb.EnableThinkingBudget,
                 ThinkingBudget = settingsFromDb.ThinkingBudget,
-                RpmPerProxy = settingsFromDb.RpmPerProxy
+                RpmPerProxy = settingsFromDb.RpmPerProxy,
+                MaxSrtLineLength = settingsFromDb.MaxSrtLineLength
             };
         }
 
@@ -190,6 +192,7 @@ namespace SubPhim.Server.Pages.Admin.VipTranslation
                 settingsInDb.EnableThinkingBudget = GlobalSettings.EnableThinkingBudget;
                 settingsInDb.ThinkingBudget = GlobalSettings.ThinkingBudget;
                 settingsInDb.RpmPerProxy = GlobalSettings.RpmPerProxy;
+                settingsInDb.MaxSrtLineLength = GlobalSettings.MaxSrtLineLength;
                 await _context.SaveChangesAsync();
                 SuccessMessage = "Đã lưu thành công cài đặt chung.";
             }

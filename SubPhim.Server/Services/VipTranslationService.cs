@@ -36,6 +36,12 @@ namespace SubPhim.Server.Services
         private static int _keyRoundRobinIndex = 0;
         private static readonly object _roundRobinLock = new();
         
+        // === Cached Settings - Cache MaxSrtLineLength to avoid DB query on every request ===
+        private static int _cachedMaxSrtLineLength = 3000; // Default value
+        private static DateTime _lastSettingsLoadTime = DateTime.MinValue;
+        private static readonly TimeSpan SETTINGS_CACHE_DURATION = TimeSpan.FromMinutes(5); // Refresh every 5 minutes
+        private static readonly object _settingsCacheLock = new();
+        
         // Regex pattern to parse Gemini response in format "{index}: {translated_text}"
         // (matches SrtTranslationService pattern)
         private static readonly Regex TranslationLineRegex = new(@"^\s*(\d+):\s*(.*)$", RegexOptions.Multiline | RegexOptions.Compiled);
@@ -156,6 +162,39 @@ namespace SubPhim.Server.Services
             }
         }
 
+        /// <summary>
+        /// Get MaxSrtLineLength from settings with caching to avoid DB queries on every request
+        /// </summary>
+        private async Task<int> GetMaxSrtLineLengthAsync(AppDbContext context)
+        {
+            // Check if cache is still valid
+            if (DateTime.UtcNow - _lastSettingsLoadTime < SETTINGS_CACHE_DURATION)
+            {
+                return _cachedMaxSrtLineLength;
+            }
+
+            // Cache expired, reload from database
+            lock (_settingsCacheLock)
+            {
+                // Double-check inside lock
+                if (DateTime.UtcNow - _lastSettingsLoadTime >= SETTINGS_CACHE_DURATION)
+                {
+                    var settings = context.VipTranslationSettings.Find(DEFAULT_SETTINGS_ID);
+                    if (settings == null)
+                    {
+                        settings = new VipTranslationSetting { Id = DEFAULT_SETTINGS_ID };
+                        context.VipTranslationSettings.Add(settings);
+                        context.SaveChanges();
+                    }
+                    _cachedMaxSrtLineLength = settings.MaxSrtLineLength;
+                    _lastSettingsLoadTime = DateTime.UtcNow;
+                    _logger.LogInformation("Refreshed MaxSrtLineLength cache: {MaxLength}", _cachedMaxSrtLineLength);
+                }
+            }
+            
+            return _cachedMaxSrtLineLength;
+        }
+
         public async Task<VipCreateJobResult> CreateJobAsync(int userId, string targetLanguage, List<SrtLine> lines, string systemInstruction)
         {
             using var scope = _serviceProvider.CreateScope();
@@ -208,15 +247,8 @@ namespace SubPhim.Server.Services
                 await context.SaveChangesAsync();
             }
 
-            // Load settings to get the max line length
-            var settings = await context.VipTranslationSettings.FindAsync(DEFAULT_SETTINGS_ID);
-            if (settings == null)
-            {
-                settings = new VipTranslationSetting { Id = DEFAULT_SETTINGS_ID };
-                context.VipTranslationSettings.Add(settings);
-                await context.SaveChangesAsync();
-            }
-            int maxLineLength = settings.MaxSrtLineLength;
+            // Get max line length from cached settings
+            int maxLineLength = await GetMaxSrtLineLengthAsync(context);
 
             // Validate line length - applies to both users and API keys
             foreach (var line in lines)

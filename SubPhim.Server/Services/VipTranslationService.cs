@@ -476,6 +476,9 @@ namespace SubPhim.Server.Services
             if (!_sessions.TryGetValue(sessionId, out var session))
                 return null;
 
+            // Update last polled time for auto-cleanup tracking
+            session.LastPolledAt = DateTime.UtcNow;
+            
             return session.TranslatedLines.OrderBy(l => l.Index).ToList();
         }
 
@@ -484,6 +487,9 @@ namespace SubPhim.Server.Services
             if (!_sessions.TryGetValue(sessionId, out var session))
                 return (true, "Session không tồn tại hoặc đã hết hạn.");
 
+            // Update last polled time for auto-cleanup tracking
+            session.LastPolledAt = DateTime.UtcNow;
+            
             bool isCompleted = session.Status == VipJobStatus.Completed || session.Status == VipJobStatus.Failed;
             return (isCompleted, session.ErrorMessage);
         }
@@ -525,6 +531,58 @@ namespace SubPhim.Server.Services
             return true;
         }
 
+        /// <summary>
+        /// Cleanup stale API key sessions that have completed but not been polled for 5 minutes.
+        /// For API key requests (userId < 0), sessions are auto-deleted if:
+        /// - The job is completed or failed, AND
+        /// - Either never polled after completion, OR not polled for 5 minutes since completion
+        /// </summary>
+        /// <returns>Number of sessions cleaned up</returns>
+        public int CleanupStaleApiKeySessions()
+        {
+            var now = DateTime.UtcNow;
+            var staleThreshold = TimeSpan.FromMinutes(5);
+            int cleanedCount = 0;
+            
+            // Find all API key sessions (userId < 0) that are completed and stale
+            var sessionIds = _sessions.Keys.ToList();
+            
+            foreach (var sessionId in sessionIds)
+            {
+                if (!_sessions.TryGetValue(sessionId, out var session))
+                    continue;
+                    
+                // Only process API key sessions (negative userId)
+                if (session.UserId >= 0)
+                    continue;
+                    
+                // Only process completed or failed sessions
+                if (session.Status != VipJobStatus.Completed && session.Status != VipJobStatus.Failed)
+                    continue;
+                    
+                // Check if session is stale (not polled for 5 minutes after completion)
+                var completedAt = session.CompletedAt ?? session.CreatedAt;
+                var lastActivity = session.LastPolledAt ?? completedAt;
+                
+                if (now - lastActivity >= staleThreshold)
+                {
+                    // Remove the session
+                    if (_sessions.TryRemove(sessionId, out var removed))
+                    {
+                        cleanedCount++;
+                        _logger.LogInformation(
+                            "Cleaned up stale API key session {SessionId} (ApiKeyId={ApiKeyId}, CompletedAt={CompletedAt}, LastPolledAt={LastPolledAt})",
+                            sessionId, -removed.UserId, removed.CompletedAt, removed.LastPolledAt);
+                            
+                        // Dispose the CancellationTokenSource
+                        try { removed.Cts?.Dispose(); } catch { }
+                    }
+                }
+            }
+            
+            return cleanedCount;
+        }
+
         private class TranslationItem
         {
             [JsonProperty("index")]
@@ -556,6 +614,12 @@ namespace SubPhim.Server.Services
         public DateTime CreatedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public CancellationTokenSource Cts { get; set; }
+        
+        /// <summary>
+        /// Timestamp of the last time this session was polled for results.
+        /// Used for auto-cleanup of API key sessions that are not polled after completion.
+        /// </summary>
+        public DateTime? LastPolledAt { get; set; }
     }
 
     public enum VipJobStatus

@@ -8,12 +8,17 @@ namespace SubPhim.Server.Services
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<CleanupService> _logger;
+        private readonly VipTranslationService _vipTranslationService;
         private readonly TimeSpan _period = TimeSpan.FromMinutes(5);
 
-        public CleanupService(IServiceProvider serviceProvider, ILogger<CleanupService> logger)
+        public CleanupService(
+            IServiceProvider serviceProvider, 
+            ILogger<CleanupService> logger,
+            VipTranslationService vipTranslationService)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
+            _vipTranslationService = vipTranslationService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -95,6 +100,18 @@ namespace SubPhim.Server.Services
                     else
                     {
                         _logger.LogInformation("No old AIO TTS Batch jobs found to delete.");
+                    }
+
+                    // Cleanup stale VIP translation sessions for API key requests
+                    _logger.LogInformation("Checking for stale VIP translation API key sessions to cleanup...");
+                    var vipCleanedCount = _vipTranslationService.CleanupStaleApiKeySessions();
+                    if (vipCleanedCount > 0)
+                    {
+                        _logger.LogInformation("Cleanup Service successfully cleaned up {Count} stale VIP translation API key session(s).", vipCleanedCount);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("No stale VIP translation API key sessions found to cleanup.");
                     }
 
                     _logger.LogInformation("Performing database WAL checkpoint...");

@@ -389,10 +389,10 @@ namespace SubPhim.Server.Services
                 // Check if response is valid JSON before parsing
                 // Proxies may return HTML error pages even with HTTP 200 status
                 var trimmedResponse = responseText.TrimStart();
-                if (string.IsNullOrEmpty(trimmedResponse) || (!trimmedResponse.StartsWith("{") && !trimmedResponse.StartsWith("[")))
+                if (string.IsNullOrWhiteSpace(trimmedResponse) || (!trimmedResponse.StartsWith("{") && !trimmedResponse.StartsWith("[")))
                 {
                     // Log the first 500 characters of the non-JSON response for debugging
-                    var logPreview = responseText.Length > 500 ? responseText.Substring(0, 500) + "..." : responseText;
+                    var logPreview = responseText.Length > 500 ? responseText[..500] + "..." : responseText;
                     _logger.LogError("Gemini API returned non-JSON response (possibly proxy/firewall HTML page): {Response}", logPreview);
                     return new GeminiCallResult
                     {

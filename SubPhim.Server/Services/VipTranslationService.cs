@@ -329,32 +329,26 @@ namespace SubPhim.Server.Services
                 var decryptedKey = _encryptionService.Decrypt(apiKey.EncryptedApiKey, apiKey.Iv);
                 var url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={decryptedKey}";
 
-                object generationConfig = settings.EnableThinkingBudget
-                    ? new
-                    {
-                        temperature = settings.Temperature,
-                        maxOutputTokens = settings.MaxOutputTokens,
-                        thinkingConfig = new { thinkingBudget = settings.ThinkingBudget }
-                    }
-                    : new
-                    {
-                        temperature = settings.Temperature,
-                        maxOutputTokens = settings.MaxOutputTokens
-                    };
+                // Build generationConfig using JObject for snake_case field names (matching Gemini API format)
+                var generationConfig = new JObject 
+                { 
+                    ["temperature"] = (double)settings.Temperature, 
+                    ["maxOutputTokens"] = settings.MaxOutputTokens 
+                };
+                if (settings.EnableThinkingBudget) 
+                {
+                    generationConfig["thinking_config"] = new JObject { ["thinking_budget"] = settings.ThinkingBudget };
+                }
 
+                // Build user content with input JSON
+                string userContent = $"Dịch sang {session.TargetLanguage}:\n{inputJson}";
+                
+                // Use proper Gemini API format with system_instruction as separate field
+                // This matches the AioLauncherService implementation
                 var requestBody = new
                 {
-                    contents = new[]
-                    {
-                        new
-                        {
-                            parts = new[]
-                            {
-                                new { text = session.SystemInstruction },
-                                new { text = $"Dịch sang {session.TargetLanguage}:\n{inputJson}" }
-                            }
-                        }
-                    },
+                    contents = new[] { new { role = "user", parts = new[] { new { text = userContent } } } },
+                    system_instruction = new { parts = new[] { new { text = session.SystemInstruction } } },
                     generationConfig
                 };
 

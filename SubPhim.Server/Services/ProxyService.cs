@@ -20,7 +20,12 @@ namespace SubPhim.Server.Services
         private const int MaxConsecutiveFailuresBeforeDisable = 5;
         private const int MaxFailureReasonLength = 500;
         private const int ProxyConnectTimeoutSeconds = 10; // Gi?m t? 30s xu?ng 10s ?? fail fast
-        private const int HttpClientTimeoutMinutes = 3; // Gi?m t? 5 phút xu?ng 3 phút
+        private const int HttpClientTimeoutMinutes = 3; // Gi?m t? 5 phï¿½t xu?ng 3 phï¿½t
+        
+        // Database retry configuration
+        private const int MaxDatabaseRetries = 3;
+        private const int InitialRetryDelayMs = 100;
+        private const int MaxRetryDelayMs = 1000;
         
         // Round-robin index for proxy selection
         private static int _proxyRoundRobinIndex = 0;
@@ -45,6 +50,63 @@ namespace SubPhim.Server.Services
         }
 
         /// <summary>
+        /// Execute a database operation with retry logic for handling SQLite lock errors.
+        /// Uses exponential backoff to avoid overwhelming the database.
+        /// </summary>
+        private async Task ExecuteWithRetryAsync(Func<Task> operation, string operationName)
+        {
+            int retryCount = 0;
+            int delayMs = InitialRetryDelayMs;
+            
+            while (true)
+            {
+                try
+                {
+                    await operation();
+                    return; // Success
+                }
+                catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 5 && retryCount < MaxDatabaseRetries)
+                {
+                    // SQLite Error 5: database is locked
+                    retryCount++;
+                    _logger.LogWarning("Database locked during {OperationName} (attempt {Retry}/{Max}). Retrying after {Delay}ms...", 
+                        operationName, retryCount, MaxDatabaseRetries, delayMs);
+                    
+                    await Task.Delay(delayMs);
+                    delayMs = CalculateNextDelay(delayMs);
+                }
+                catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.Sqlite.SqliteException sqliteEx && 
+                                                   sqliteEx.SqliteErrorCode == 5 && 
+                                                   retryCount < MaxDatabaseRetries)
+                {
+                    // Handle DbUpdateException wrapping SQLite lock error
+                    retryCount++;
+                    _logger.LogWarning("Database locked during {OperationName} (attempt {Retry}/{Max}). Retrying after {Delay}ms...", 
+                        operationName, retryCount, MaxDatabaseRetries, delayMs);
+                    
+                    await Task.Delay(delayMs);
+                    delayMs = CalculateNextDelay(delayMs);
+                }
+                catch (Exception ex)
+                {
+                    // Total attempts = retryCount + 1 (initial attempt)
+                    _logger.LogWarning(ex, "Failed to execute {OperationName} after {TotalAttempts} attempts ({Retries} retries)", 
+                        operationName, retryCount + 1, retryCount);
+                    throw;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Calculate the next retry delay using exponential backoff with jitter.
+        /// Random.Shared is thread-safe (introduced in .NET 6) and designed for concurrent access.
+        /// </summary>
+        private static int CalculateNextDelay(int currentDelayMs)
+        {
+            return Math.Min(currentDelayMs * 2 + Random.Shared.Next(0, 100), MaxRetryDelayMs);
+        }
+
+        /// <summary>
         /// Get the next proxy using round-robin selection.
         /// </summary>
         /// <param name="excludeProxyIds">Optional set of proxy IDs to exclude (e.g., proxies that failed in current request)</param>
@@ -60,14 +122,14 @@ namespace SubPhim.Server.Services
             
             if (!proxies.Any())
             {
-                // AUTO-RECOVERY: N?u không còn proxy nào ???c b?t, t? ??ng b?t l?i các proxy có ít l?i
+                // AUTO-RECOVERY: N?u khï¿½ng cï¿½n proxy nï¿½o ???c b?t, t? ??ng b?t l?i cï¿½c proxy cï¿½ ï¿½t l?i
                 var reEnabledCount = await TryAutoReEnableProxiesAsync();
                 
                 if (reEnabledCount > 0)
                 {
                     _logger.LogWarning("?? AUTO-RECOVERY: Re-enabled {Count} proxies with low failure count. Retrying proxy selection...", reEnabledCount);
                     
-                    // Refresh cache và th? l?i
+                    // Refresh cache vï¿½ th? l?i
                     proxies = await GetEnabledProxiesAsync();
                     
                     // Filter l?i n?u c?n
@@ -118,56 +180,67 @@ namespace SubPhim.Server.Services
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                // Use a captured variable to return the count from the retry operation
+                // This is a standard closure pattern in C#
+                int reenabledCount = 0;
                 
-                // Ki?m tra xem có proxy nào ?ang enabled không
-                var enabledCount = await context.Proxies.CountAsync(p => p.IsEnabled);
-                
-                if (enabledCount > 0)
+                await ExecuteWithRetryAsync(async () =>
                 {
-                    // V?n còn proxy enabled, không c?n auto-recovery
-                    return 0;
-                }
-                
-                // Tìm các proxy b? t?t có ít h?n MaxFailureCountForAutoReEnable l?n l?i
-                var proxiesToReEnable = await context.Proxies
-                    .Where(p => !p.IsEnabled && p.FailureCount < MaxFailureCountForAutoReEnable)
-                    .ToListAsync();
-                
-                if (!proxiesToReEnable.Any())
-                {
-                    _logger.LogWarning("?? AUTO-RECOVERY: No proxies eligible for re-enabling. All proxies have {MaxFailures}+ failures.", 
-                        MaxFailureCountForAutoReEnable);
-                    return 0;
-                }
-                
-                // B?t l?i các proxy này và reset failure count v? 0
-                foreach (var proxy in proxiesToReEnable)
-                {
-                    proxy.IsEnabled = true;
-                    proxy.FailureCount = 0; // Reset failure count ?? cho c? h?i m?i
-                    proxy.LastFailureReason = $"[AUTO-RECOVERY] Re-enabled at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC";
+                    using var scope = _serviceProvider.CreateScope();
+                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                     
-                    _logger.LogInformation("?? AUTO-RECOVERY: Re-enabling proxy {ProxyId} ({Host}:{Port}) - previous failures: {PreviousFailures}", 
-                        proxy.Id, proxy.Host, proxy.Port, proxy.FailureCount);
-                }
+                    // Ki?m tra xem cï¿½ proxy nï¿½o ?ang enabled khï¿½ng
+                    var enabledCount = await context.Proxies.CountAsync(p => p.IsEnabled);
+                    
+                    if (enabledCount > 0)
+                    {
+                        // V?n cï¿½n proxy enabled, khï¿½ng c?n auto-recovery
+                        reenabledCount = 0;
+                        return;
+                    }
+                    
+                    // Tï¿½m cï¿½c proxy b? t?t cï¿½ ï¿½t h?n MaxFailureCountForAutoReEnable l?n l?i
+                    var proxiesToReEnable = await context.Proxies
+                        .Where(p => !p.IsEnabled && p.FailureCount < MaxFailureCountForAutoReEnable)
+                        .ToListAsync();
+                    
+                    if (!proxiesToReEnable.Any())
+                    {
+                        _logger.LogWarning("?? AUTO-RECOVERY: No proxies eligible for re-enabling. All proxies have {MaxFailures}+ failures.", 
+                            MaxFailureCountForAutoReEnable);
+                        reenabledCount = 0;
+                        return;
+                    }
+                    
+                    // B?t l?i cï¿½c proxy nï¿½y vï¿½ reset failure count v? 0
+                    foreach (var proxy in proxiesToReEnable)
+                    {
+                        proxy.IsEnabled = true;
+                        proxy.FailureCount = 0; // Reset failure count ?? cho c? h?i m?i
+                        proxy.LastFailureReason = $"[AUTO-RECOVERY] Re-enabled at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC";
+                        
+                        _logger.LogInformation("?? AUTO-RECOVERY: Re-enabling proxy {ProxyId} ({Host}:{Port}) - previous failures: {PreviousFailures}", 
+                            proxy.Id, proxy.Host, proxy.Port, proxy.FailureCount);
+                    }
+                    
+                    await context.SaveChangesAsync();
+                    
+                    // Force refresh cache immediately with the new data
+                    // Don't just invalidate - actually update the cache with fresh data
+                    lock (_cacheLock)
+                    {
+                        _cachedProxies = proxiesToReEnable; // Directly set the re-enabled proxies
+                        _lastCacheUpdate = DateTime.UtcNow;
+                        _cacheRefreshInProgress = false;
+                    }
+                    
+                    reenabledCount = proxiesToReEnable.Count;
+                    
+                    _logger.LogWarning("?? AUTO-RECOVERY COMPLETE: Re-enabled {Count} proxies with < {MaxFailures} failures", 
+                        reenabledCount, MaxFailureCountForAutoReEnable);
+                }, "TryAutoReEnableProxies");
                 
-                await context.SaveChangesAsync();
-                
-                // Force refresh cache immediately with the new data
-                // Don't just invalidate - actually update the cache with fresh data
-                lock (_cacheLock)
-                {
-                    _cachedProxies = proxiesToReEnable; // Directly set the re-enabled proxies
-                    _lastCacheUpdate = DateTime.UtcNow;
-                    _cacheRefreshInProgress = false;
-                }
-                
-                _logger.LogWarning("?? AUTO-RECOVERY COMPLETE: Re-enabled {Count} proxies with < {MaxFailures} failures", 
-                    proxiesToReEnable.Count, MaxFailureCountForAutoReEnable);
-                
-                return proxiesToReEnable.Count;
+                return reenabledCount;
             }
             catch (Exception ex)
             {
@@ -441,7 +514,7 @@ namespace SubPhim.Server.Services
         /// </summary>
         public async Task RecordProxySuccessAsync(int proxyId)
         {
-            try
+            await ExecuteWithRetryAsync(async () =>
             {
                 using var scope = _serviceProvider.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -463,11 +536,7 @@ namespace SubPhim.Server.Services
                     
                     await context.SaveChangesAsync();
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to record proxy success for ID {ProxyId}", proxyId);
-            }
+            }, $"RecordProxySuccess(ID={proxyId})");
         }
 
         /// <summary>
@@ -480,7 +549,7 @@ namespace SubPhim.Server.Services
         /// <param name="isTimeoutError">True if this is a timeout/cancellation error (very transient)</param>
         public async Task RecordProxyFailureAsync(int proxyId, string reason, bool isIntermittent = false, bool isTimeoutError = false)
         {
-            try
+            await ExecuteWithRetryAsync(async () =>
             {
                 using var scope = _serviceProvider.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -536,11 +605,7 @@ namespace SubPhim.Server.Services
                     
                     await context.SaveChangesAsync();
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to record proxy failure for ID {ProxyId}", proxyId);
-            }
+            }, $"RecordProxyFailure(ID={proxyId})");
         }
         
         /// <summary>
@@ -549,7 +614,7 @@ namespace SubPhim.Server.Services
         /// </summary>
         public async Task DisableProxyImmediatelyAsync(int proxyId, string reason)
         {
-            try
+            await ExecuteWithRetryAsync(async () =>
             {
                 using var scope = _serviceProvider.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -575,11 +640,7 @@ namespace SubPhim.Server.Services
                     _logger.LogWarning("?? Proxy {ProxyId} ({Host}:{Port}) PERMANENTLY DISABLED due to critical error: {Reason}", 
                         proxyId, proxy.Host, proxy.Port, reason);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to disable proxy for ID {ProxyId}", proxyId);
-            }
+            }, $"DisableProxyImmediately(ID={proxyId})");
         }
         
         /// <summary>

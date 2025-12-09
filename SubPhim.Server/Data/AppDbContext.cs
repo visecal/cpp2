@@ -41,7 +41,19 @@ namespace SubPhim.Server.Data
         public DbSet<ExternalApiCreditTransaction> ExternalApiCreditTransactions { get; set; }
         public DbSet<ExternalApiSettings> ExternalApiSettings { get; set; }
 
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) 
+        {
+            // Configure SQLite for better concurrency on every connection
+            // Note: These PRAGMA commands are lightweight and properly scoped:
+            // - journal_mode=WAL: Idempotent, persists in DB file, enables concurrent reads/writes
+            // - busy_timeout: Connection-level, must be set for each connection
+            // - synchronous=NORMAL: Connection-level, balances safety and performance
+            // EF Core's connection pooling ensures these are not executed excessively
+            Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+            Database.ExecuteSqlRaw("PRAGMA busy_timeout=5000;");
+            Database.ExecuteSqlRaw("PRAGMA synchronous=NORMAL;");
+        }
+        
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

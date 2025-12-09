@@ -544,7 +544,8 @@ namespace SubPhim.Server.Services
             var staleThreshold = TimeSpan.FromMinutes(5);
             int cleanedCount = 0;
             
-            // Find all API key sessions (userId < 0) that are completed and stale
+            // Snapshot of session keys for thread-safe iteration
+            // ConcurrentDictionary methods (TryGetValue, TryRemove) are atomic
             var sessionIds = _sessions.Keys.ToList();
             
             foreach (var sessionId in sessionIds)
@@ -559,10 +560,20 @@ namespace SubPhim.Server.Services
                 // Only process completed or failed sessions
                 if (session.Status != VipJobStatus.Completed && session.Status != VipJobStatus.Failed)
                     continue;
+                
+                // Session must have CompletedAt set for proper cleanup timing
+                // If CompletedAt is null for a completed/failed session, it's a data inconsistency - skip and log
+                if (session.CompletedAt == null)
+                {
+                    _logger.LogWarning(
+                        "API key session {SessionId} is {Status} but has no CompletedAt timestamp, skipping cleanup",
+                        sessionId, session.Status);
+                    continue;
+                }
                     
                 // Check if session is stale (not polled for 5 minutes after completion)
-                var completedAt = session.CompletedAt ?? session.CreatedAt;
-                var lastActivity = session.LastPolledAt ?? completedAt;
+                // Use LastPolledAt if available, otherwise use CompletedAt
+                var lastActivity = session.LastPolledAt ?? session.CompletedAt.Value;
                 
                 if (now - lastActivity >= staleThreshold)
                 {
@@ -575,7 +586,14 @@ namespace SubPhim.Server.Services
                             sessionId, -removed.UserId, removed.CompletedAt, removed.LastPolledAt);
                             
                         // Dispose the CancellationTokenSource
-                        try { removed.Cts?.Dispose(); } catch { }
+                        try 
+                        { 
+                            removed.Cts?.Dispose(); 
+                        } 
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error disposing CancellationTokenSource for session {SessionId}", sessionId);
+                        }
                     }
                 }
             }

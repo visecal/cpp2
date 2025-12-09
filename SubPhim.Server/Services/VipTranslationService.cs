@@ -10,6 +10,11 @@ using System.Text.RegularExpressions;
 
 namespace SubPhim.Server.Services
 {
+    /// <summary>
+    /// VIP Translation Service - Hoạt động giống 100% như TranslationOrchestratorService (LocalAPI)
+    /// về logic gọi API, lấy proxy, đánh dấu API key bị limit RPM, và retry khi proxy lỗi.
+    /// Sử dụng chung bể proxy với LocalApi/Proxy.
+    /// </summary>
     public class VipTranslationService
     {
         private readonly IServiceProvider _serviceProvider;
@@ -18,22 +23,47 @@ namespace SubPhim.Server.Services
         private readonly IEncryptionService _encryptionService;
         private readonly ProxyService _proxyService;
         private readonly ProxyRateLimiterService _proxyRateLimiter;
+        private readonly VipApiKeyCooldownService _cooldownService;
 
         // Session storage
         private static readonly ConcurrentDictionary<string, VipTranslationSession> _sessions = new();
         
-        // RPM Limiter per API Key
+        // === RPM Limiter per API Key - Đảm bảo mỗi key tôn trọng RPM riêng (giống LocalAPI) ===
         private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
+        private static readonly ConcurrentDictionary<int, int> _keyRpmCapacities = new(); // Track capacity per key
+        
+        // === Round-Robin Index - Đảm bảo phân bổ đều request giữa các key (giống LocalAPI) ===
+        private static int _keyRoundRobinIndex = 0;
+        private static readonly object _roundRobinLock = new();
         
         // Regex pattern to parse Gemini response in format "{index}: {translated_text}"
         // (matches SrtTranslationService pattern)
         private static readonly Regex TranslationLineRegex = new(@"^\s*(\d+):\s*(.*)$", RegexOptions.Multiline | RegexOptions.Compiled);
         
-        private const int RPM_WAIT_TIMEOUT_MS = 100;
-        private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500;
-        private const int MAX_PROXY_SEARCH_ATTEMPTS = 10;
+        // === Constants (giống LocalAPI) ===
+        private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
+        private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
+        private const int MAX_PROXY_SEARCH_ATTEMPTS = 10; // Số lần thử tìm proxy có RPM slot
+        private const int FINAL_KEY_WAIT_TIMEOUT_MS = 30000; // Thời gian chờ tối đa khi tất cả keys bận (30 giây)
         private const int MAX_SRT_LINE_LENGTH = 3000;
         private const int DEFAULT_SETTINGS_ID = 1;
+        
+        // Chrome-based templates use {0}=major, {1}=build, {2}=patch
+        // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
+        private static readonly string[] _chromeTemplates = new[]
+        {
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36 Edg/{0}.0.{1}.{2}",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{0}.0.{1}.{2} Safari/537.36"
+        };
+        
+        private static readonly string[] _firefoxTemplates = new[]
+        {
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:{0}.0) Gecko/20100101 Firefox/{0}.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:{0}.0) Gecko/20100101 Firefox/{0}.0",
+            "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:{0}.0) Gecko/20100101 Firefox/{0}.0"
+        };
 
         public VipTranslationService(
             IServiceProvider serviceProvider,
@@ -41,7 +71,8 @@ namespace SubPhim.Server.Services
             IHttpClientFactory httpClientFactory,
             IEncryptionService encryptionService,
             ProxyService proxyService,
-            ProxyRateLimiterService proxyRateLimiter)
+            ProxyRateLimiterService proxyRateLimiter,
+            VipApiKeyCooldownService cooldownService)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
@@ -49,6 +80,80 @@ namespace SubPhim.Server.Services
             _encryptionService = encryptionService;
             _proxyService = proxyService;
             _proxyRateLimiter = proxyRateLimiter;
+            _cooldownService = cooldownService;
+        }
+        
+        /// <summary>
+        /// Tạo User-Agent ngẫu nhiên cho mỗi request để tránh bị rate limit (giống LocalAPI)
+        /// </summary>
+        private static string GenerateRandomUserAgent()
+        {
+            var random = new Random(Guid.NewGuid().GetHashCode()); // Random seed cho mỗi request
+            
+            // Chọn ngẫu nhiên giữa Chrome và Firefox
+            bool useChrome = random.Next(2) == 0;
+            
+            if (useChrome)
+            {
+                var template = _chromeTemplates[random.Next(_chromeTemplates.Length)];
+                var majorVersion = random.Next(100, 131); // Chrome versions 100-130
+                var buildNumber = random.Next(1000, 9999);
+                var patchNumber = random.Next(100, 999);
+                return string.Format(template, majorVersion, buildNumber, patchNumber);
+            }
+            else
+            {
+                var template = _firefoxTemplates[random.Next(_firefoxTemplates.Length)];
+                var majorVersion = random.Next(100, 135); // Firefox versions 100-134
+                return string.Format(template, majorVersion);
+            }
+        }
+        
+        /// <summary>
+        /// Helper method để chọn key theo round-robin (giống LocalAPI)
+        /// </summary>
+        private VipApiKey GetNextKeyRoundRobin(List<VipApiKey> eligibleKeys)
+        {
+            lock (_roundRobinLock)
+            {
+                if (_keyRoundRobinIndex >= eligibleKeys.Count)
+                    _keyRoundRobinIndex = 0;
+                var currentIndex = _keyRoundRobinIndex;
+                _keyRoundRobinIndex++;
+                return eligibleKeys[currentIndex];
+            }
+        }
+        
+        /// <summary>
+        /// Đảm bảo key có RPM limiter với capacity đúng. Tạo mới nếu cần. (giống LocalAPI)
+        /// </summary>
+        private void EnsureKeyRpmLimiter(int keyId, int rpmCapacity)
+        {
+            // Kiểm tra capacity đã lưu
+            if (_keyRpmCapacities.TryGetValue(keyId, out int currentCapacity) && currentCapacity == rpmCapacity)
+            {
+                // Capacity không thay đổi, không cần làm gì
+                return;
+            }
+            
+            // Capacity thay đổi hoặc chưa có, cần tạo/cập nhật semaphore
+            lock (_roundRobinLock) // Sử dụng lock để tránh race condition
+            {
+                // Double-check sau khi lấy lock
+                if (_keyRpmCapacities.TryGetValue(keyId, out currentCapacity) && currentCapacity == rpmCapacity)
+                    return;
+                
+                // Dispose old semaphore nếu có
+                if (_keyRpmLimiters.TryRemove(keyId, out var oldSemaphore))
+                {
+                    try { oldSemaphore.Dispose(); }
+                    catch { /* Ignore dispose errors */ }
+                }
+                
+                // Tạo semaphore mới
+                _keyRpmLimiters[keyId] = new SemaphoreSlim(rpmCapacity, rpmCapacity);
+                _keyRpmCapacities[keyId] = rpmCapacity;
+            }
         }
 
         public async Task<VipCreateJobResult> CreateJobAsync(int userId, string targetLanguage, List<SrtLine> lines, string systemInstruction)
@@ -143,10 +248,16 @@ namespace SubPhim.Server.Services
             };
         }
 
+        /// <summary>
+        /// Xử lý translation job (giống LocalAPI ProcessJob)
+        /// </summary>
         private async Task ProcessTranslationAsync(string sessionId, List<SrtLine> lines)
         {
             if (!_sessions.TryGetValue(sessionId, out var session))
                 return;
+
+            var cancellationToken = session.Cts.Token;
+            _logger.LogInformation("Starting VIP translation for session {SessionId} with {LineCount} lines", sessionId, lines.Count);
 
             try
             {
@@ -163,14 +274,43 @@ namespace SubPhim.Server.Services
 
                 // Get active model
                 var activeModel = await context.VipAvailableApiModels
-                    .FirstOrDefaultAsync(m => m.IsActive);
+                    .FirstOrDefaultAsync(m => m.IsActive, cancellationToken);
                 
                 if (activeModel == null)
                 {
                     session.Status = VipJobStatus.Failed;
                     session.ErrorMessage = "Không tìm thấy model đang hoạt động.";
+                    session.CompletedAt = DateTime.UtcNow;
                     return;
                 }
+
+                // === SỬA ĐỔI: Load tất cả keys enabled và filter cooldown (giống LocalAPI) ===
+                var enabledKeys = await context.VipApiKeys.AsNoTracking()
+                    .Where(k => k.IsEnabled)
+                    .ToListAsync(cancellationToken);
+                
+                // Filter out keys in cooldown
+                enabledKeys = enabledKeys.Where(k => !_cooldownService.IsInCooldown(k.Id)).ToList();
+                
+                if (!enabledKeys.Any())
+                {
+                    session.Status = VipJobStatus.Failed;
+                    session.ErrorMessage = "Không có VIP API key nào đang hoạt động (có thể tất cả đang trong cooldown).";
+                    session.CompletedAt = DateTime.UtcNow;
+                    return;
+                }
+
+                // === MỚI: Lấy RPM từ Admin/VipTranslation settings (giống LocalAPI) ===
+                int rpmPerKey = settings.Rpm;
+                
+                // Đảm bảo mỗi key có SemaphoreSlim riêng để tuân thủ RPM
+                foreach (var key in enabledKeys)
+                {
+                    EnsureKeyRpmLimiter(key.Id, rpmPerKey);
+                }
+                
+                _logger.LogInformation("Session {SessionId}: Using {KeyCount} VIP API keys, each with {Rpm} RPM (from Admin settings)", 
+                    sessionId, enabledKeys.Count, rpmPerKey);
 
                 // Batch processing
                 int batchSize = settings.BatchSize;
@@ -179,18 +319,47 @@ namespace SubPhim.Server.Services
                     .Select(g => g.Select(x => x.line).ToList())
                     .ToList();
 
-                foreach (var batch in batches)
-                {
-                    if (session.Cts.Token.IsCancellationRequested)
-                        break;
+                _logger.LogInformation("Session {SessionId}: Processing {BatchCount} batches", sessionId, batches.Count);
 
-                    await TranslateBatchAsync(session, batch, activeModel.ModelName, settings, context);
+                for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
+                {
+                    // === Kiểm tra cancellation trước mỗi batch (giống LocalAPI) ===
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        _logger.LogInformation("Session {SessionId}: Cancellation requested, stopping at batch {BatchIndex}/{TotalBatches}",
+                            sessionId, batchIndex + 1, batches.Count);
+                        break;
+                    }
                     
-                    if (batch != batches.Last())
-                        await Task.Delay(settings.DelayBetweenBatchesMs, session.Cts.Token);
+                    var batch = batches[batchIndex];
+                    
+                    // === Delay giữa các batch theo cài đặt (giống LocalAPI) ===
+                    if (batchIndex > 0 && settings.DelayBetweenBatchesMs > 0)
+                    {
+                        _logger.LogDebug("Session {SessionId}: Waiting {DelayMs}ms before batch {BatchIndex}/{TotalBatches}", 
+                            sessionId, settings.DelayBetweenBatchesMs, batchIndex + 1, batches.Count);
+                        await Task.Delay(settings.DelayBetweenBatchesMs, cancellationToken);
+                    }
+
+                    // Translate batch với full logic giống LocalAPI
+                    var translatedLines = await TranslateBatchAsync(session, batch, activeModel.ModelName, settings, enabledKeys, rpmPerKey, cancellationToken);
+                    
+                    // Add results to session
+                    foreach (var line in translatedLines)
+                    {
+                        session.TranslatedLines.Add(line);
+                    }
                 }
 
                 session.Status = VipJobStatus.Completed;
+                session.CompletedAt = DateTime.UtcNow;
+                _logger.LogInformation("🎉 Session {SessionId} COMPLETED!", sessionId);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Session {SessionId} đã bị hủy (timeout hoặc user request).", sessionId);
+                session.Status = VipJobStatus.Failed;
+                session.ErrorMessage = "Job đã bị hủy.";
                 session.CompletedAt = DateTime.UtcNow;
             }
             catch (Exception ex)
@@ -198,298 +367,724 @@ namespace SubPhim.Server.Services
                 _logger.LogError(ex, "Error processing VIP translation session {SessionId}", sessionId);
                 session.Status = VipJobStatus.Failed;
                 session.ErrorMessage = ex.Message;
+                session.CompletedAt = DateTime.UtcNow;
             }
         }
 
-        private async Task TranslateBatchAsync(VipTranslationSession session, List<SrtLine> batch, 
-            string modelName, VipTranslationSetting settings, AppDbContext context)
+        /// <summary>
+        /// Translate một batch - hoạt động giống 100% TranslationOrchestratorService.TranslateBatchAsync
+        /// </summary>
+        private async Task<List<TranslatedSrtLine>> TranslateBatchAsync(VipTranslationSession session, List<SrtLine> batch, 
+            string modelName, VipTranslationSetting settings, List<VipApiKey> availableKeys, int rpmPerKey, CancellationToken token)
         {
             // Build input text in line-by-line format: "{index}: {text}" 
-            // This matches the format expected by client's SystemInstruction (GetSystemInstructionForGeminiSrtTranslation)
-            // and matches how AioLauncherService sends data to Gemini API
             var inputBuilder = new StringBuilder();
             foreach (var line in batch)
             {
-                // Replace newlines with spaces to keep each line on a single line (same as SrtTranslationService)
                 var cleanText = line.OriginalText.Replace("\r\n", " ").Replace("\n", " ");
                 inputBuilder.AppendLine($"{line.Index}: {cleanText}");
             }
             string inputText = inputBuilder.ToString().TrimEnd();
 
-            int retryCount = 0;
-            while (retryCount <= settings.MaxRetries)
+            var generationConfig = new JObject
             {
-                if (session.Cts.Token.IsCancellationRequested)
-                    break;
+                ["temperature"] = 1,
+                ["topP"] = 0.95,
+                ["maxOutputTokens"] = settings.MaxOutputTokens
+            };
 
+            if (settings.EnableThinkingBudget && settings.ThinkingBudget > 0)
+            {
+                generationConfig["thinking_config"] = new JObject { ["thinking_budget"] = settings.ThinkingBudget };
+            }
+
+            var requestPayloadObject = new
+            {
+                contents = new[] { new { role = "user", parts = new[] { new { text = inputText } } } },
+                system_instruction = new { parts = new[] { new { text = session.SystemInstruction } } },
+                generationConfig
+            };
+
+            string jsonPayload = JsonConvert.SerializeObject(requestPayloadObject, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+
+            // === MỚI: Sử dụng round-robin và per-key RPM limiter (giống LocalAPI) ===
+            HashSet<int> triedKeyIds = new HashSet<int>();
+            int? successfulKeyId = null;
+            
+            for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
+            {
+                VipApiKey? selectedKey = null;
+                
                 try
                 {
-                    // Get API key
-                    var apiKey = await GetAvailableKeyAsync(context, settings.Rpm);
-                    if (apiKey == null)
+                    // === Chọn key bằng round-robin và chờ per-key RPM limiter (giống LocalAPI) ===
+                    selectedKey = await GetAvailableKeyWithRpmLimitAsync(availableKeys, triedKeyIds, rpmPerKey, token);
+                    
+                    if (selectedKey == null)
                     {
-                        _logger.LogError("No available VIP API keys");
-                        await Task.Delay(settings.RetryDelayMs);
-                        retryCount++;
-                        continue;
+                        _logger.LogWarning("Batch: Không còn VIP key nào khả dụng sau {Attempts} lần thử với {TriedKeys} keys",
+                            attempt, triedKeyIds.Count);
+                        break; // Không còn key nào để thử
                     }
 
-                    // Get proxy
-                    var proxy = await _proxyService.GetNextProxyAsync();
-                    if (proxy == null)
-                    {
-                        _logger.LogWarning("No proxy available, using direct connection");
-                    }
+                    triedKeyIds.Add(selectedKey.Id);
+                    
+                    var apiKey = _encryptionService.Decrypt(selectedKey.EncryptedApiKey, selectedKey.Iv);
+                    string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={apiKey}";
 
-                    // Attempt to acquire proxy RPM slot if proxy exists
-                    if (proxy != null)
+                    _logger.LogInformation("Batch attempt {Attempt}/{MaxRetries}: Using VIP Key ID {KeyId} (round-robin)", 
+                        attempt, settings.MaxRetries, selectedKey.Id);
+
+                    var (responseText, tokensUsed, errorType, errorDetail, httpStatusCode) = 
+                        await CallApiWithRetryAsync(apiUrl, jsonPayload, settings, selectedKey.Id, token);
+
+                    // === XỬ LÝ LỖI 429 (giống LocalAPI) ===
+                    if (httpStatusCode == 429)
                     {
-                        string requestId = Guid.NewGuid().ToString();
-                        string? slotId = await _proxyRateLimiter.TryAcquireSlotAsync(
-                            proxy.Id, requestId, session.Cts.Token);
+                        _logger.LogWarning("VIP Key ID {KeyId} gặp lỗi 429 Rate Limit. Đặt vào cooldown và chờ {Delay}ms trước khi thử key khác.", 
+                            selectedKey.Id, settings.RetryDelayMs);
                         
-                        if (slotId == null)
+                        await _cooldownService.SetCooldownAsync(selectedKey.Id, $"HTTP 429 on attempt {attempt}");
+                        
+                        if (attempt < settings.MaxRetries)
                         {
-                            _logger.LogWarning("Proxy {ProxyId} RPM limit reached, retrying", proxy.Id);
-                            await Task.Delay(settings.RetryDelayMs);
-                            retryCount++;
+                            await Task.Delay(settings.RetryDelayMs, token);
+                            continue; // Thử lại với key khác
+                        }
+                    }
+                    
+                    // === XỬ LÝ CÁC LỖI NGHIÊM TRỌNG KHÁC (giống LocalAPI) ===
+                    if (httpStatusCode == 401 || httpStatusCode == 403 || 
+                        errorType == "INVALID_ARGUMENT" || errorDetail?.Contains("API key") == true)
+                    {
+                        _logger.LogError("VIP Key ID {KeyId} gặp lỗi nghiêm trọng ({ErrorType}). Vô hiệu hóa vĩnh viễn và thử key khác NGAY.", 
+                            selectedKey.Id, errorType);
+                        
+                        await _cooldownService.DisableKeyPermanentlyAsync(selectedKey.Id, 
+                            $"{errorType}: {errorDetail}");
+                        
+                        if (attempt < settings.MaxRetries)
+                        {
+                            // Không delay cho lỗi nghiêm trọng - thử ngay với key khác
                             continue;
                         }
                     }
 
-                    // Translate
-                    var result = await CallGeminiApiAsync(apiKey, modelName, inputText, session, settings, proxy);
-                    
-                    if (result.Success)
+                    // === THÀNH CÔNG ===
+                    if (responseText != null && !responseText.StartsWith("Lỗi", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Parse results and add to session
-                        var translatedLines = ParseTranslationResult(result.ResponseText, batch);
-                        foreach (var line in translatedLines)
+                        successfulKeyId = selectedKey.Id;
+                        
+                        var results = new List<TranslatedSrtLine>();
+                        var translatedLinesDict = new Dictionary<int, string>();
+                        
+                        foreach (Match m in TranslationLineRegex.Matches(responseText))
                         {
-                            session.TranslatedLines.Add(line);
+                            if (int.TryParse(m.Groups[1].Value, out int idx))
+                                translatedLinesDict[idx] = m.Groups[2].Value.Trim();
                         }
 
-                        // Update API key usage
-                        apiKey.RequestsToday++;
-                        apiKey.TotalTokensUsed += result.TokensUsed;
-                        await context.SaveChangesAsync();
+                        foreach (var line in batch)
+                        {
+                            if (translatedLinesDict.TryGetValue(line.Index, out string? translated))
+                                results.Add(new TranslatedSrtLine
+                                {
+                                    Index = line.Index,
+                                    TranslatedText = string.IsNullOrWhiteSpace(translated) ? "[API DỊCH RỖNG]" : translated,
+                                    Success = true
+                                });
+                            else
+                                results.Add(new TranslatedSrtLine
+                                {
+                                    Index = line.Index,
+                                    TranslatedText = "[API KHÔNG TRẢ VỀ DÒNG NÀY]",
+                                    Success = false
+                                });
+                        }
                         
-                        return; // Success
+                        // Update API key usage
+                        await UpdateKeyUsageAsync(successfulKeyId.Value, tokensUsed);
+                        
+                        // Reset cooldown nếu batch thành công (giống LocalAPI)
+                        await _cooldownService.ResetCooldownAsync(successfulKeyId.Value);
+                        
+                        return results;
+                    }
+                    
+                    // === LỖI KHÁC (không phải 429, không nghiêm trọng) ===
+                    if (attempt < settings.MaxRetries)
+                    {
+                        int delayMs = settings.RetryDelayMs * attempt;
+                        
+                        _logger.LogWarning("Batch attempt {Attempt} failed with VIP Key ID {KeyId}. Error: {Error}. Retrying after {Delay}ms...",
+                            attempt, selectedKey.Id, errorType, delayMs);
+                        
+                        await Task.Delay(delayMs, token);
+                        continue;
+                    }
+
+                }
+                catch (OperationCanceledException)
+                {
+                    if (selectedKey != null)
+                    {
+                        _logger.LogInformation("Batch processing cancelled for session {SessionId} at attempt {Attempt} with VIP Key ID {KeyId}", 
+                            session.SessionId, attempt, selectedKey.Id);
                     }
                     else
                     {
-                        _logger.LogWarning("Translation failed: {Error}", result.ErrorMessage);
-                        retryCount++;
-                        if (retryCount <= settings.MaxRetries)
-                            await Task.Delay(settings.RetryDelayMs);
+                        _logger.LogInformation("Batch processing cancelled for session {SessionId} at attempt {Attempt} (no key was selected)", 
+                            session.SessionId, attempt);
                     }
+                    break; // Exit retry loop on cancellation
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error translating batch in session {SessionId}", session.SessionId);
-                    retryCount++;
-                    if (retryCount <= settings.MaxRetries)
-                        await Task.Delay(settings.RetryDelayMs);
+                    if (selectedKey != null)
+                    {
+                        _logger.LogError(ex, "Exception during batch translation attempt {Attempt} with VIP Key ID {KeyId}", 
+                            attempt, selectedKey.Id);
+                    }
+                    else
+                    {
+                        _logger.LogError(ex, "Exception during batch translation attempt {Attempt} (no key was selected). Available keys: {KeyCount}, Tried keys: {TriedCount}", 
+                            attempt, availableKeys.Count, triedKeyIds.Count);
+                    }
+                    
+                    if (attempt >= settings.MaxRetries) break;
+                    await Task.Delay(settings.RetryDelayMs * attempt, token);
                 }
             }
-
-            // If we reach here, all retries failed - mark lines as failed
-            foreach (var line in batch)
+            
+            // === TẤT CẢ ATTEMPTS ĐỀU THẤT BẠI ===
+            _logger.LogError("Batch translation failed after {MaxRetries} attempts with {KeyCount} different VIP keys",
+                settings.MaxRetries, triedKeyIds.Count);
+            
+            return batch.Select(l => new TranslatedSrtLine
             {
-                session.TranslatedLines.Add(new TranslatedSrtLine
-                {
-                    Index = line.Index,
-                    TranslatedText = line.OriginalText,
-                    Success = false
-                });
-            }
+                Index = l.Index,
+                TranslatedText = "[LỖI: Không thể dịch sau nhiều lần thử]",
+                Success = false
+            }).ToList();
         }
 
-        private async Task<VipApiKey?> GetAvailableKeyAsync(AppDbContext context, int rpm)
+        /// <summary>
+        /// Chọn key bằng round-robin và đợi per-key RPM limiter (giống LocalAPI)
+        /// </summary>
+        private async Task<VipApiKey?> GetAvailableKeyWithRpmLimitAsync(
+            List<VipApiKey> availableKeys, HashSet<int> excludeKeyIds, int rpmPerKey, CancellationToken token)
         {
-            var now = DateTime.UtcNow;
+            // Lọc keys chưa thử và không trong cooldown
+            var eligibleKeys = availableKeys
+                .Where(k => !excludeKeyIds.Contains(k.Id) && !_cooldownService.IsInCooldown(k.Id))
+                .ToList();
             
-            var keys = await context.VipApiKeys
-                .Where(k => k.IsEnabled)
-                .Where(k => k.TemporaryCooldownUntil == null || k.TemporaryCooldownUntil < now)
-                .OrderBy(k => k.RequestsToday)
-                .ToListAsync();
-
-            foreach (var key in keys)
+            if (!eligibleKeys.Any()) 
             {
-                var limiter = _keyRpmLimiters.GetOrAdd(key.Id, _ => new SemaphoreSlim(rpm, rpm));
+                var totalKeys = availableKeys.Count;
+                var excludedKeys = excludeKeyIds.Count;
+                var cooldownKeys = availableKeys.Count(k => _cooldownService.IsInCooldown(k.Id));
                 
-                if (await limiter.WaitAsync(RPM_WAIT_TIMEOUT_MS))
+                _logger.LogWarning(
+                    "No eligible VIP keys available. Total: {Total}, Excluded: {Excluded}, In Cooldown: {Cooldown}",
+                    totalKeys, excludedKeys, cooldownKeys);
+                    
+                return null;
+            }
+            
+            // === ROUND-ROBIN SELECTION: Đảm bảo phân bổ đều ===
+            VipApiKey selectedKey = GetNextKeyRoundRobin(eligibleKeys);
+            
+            // === PER-KEY RPM LIMITER: Đảm bảo mỗi key tuân thủ RPM riêng ===
+            var semaphore = _keyRpmLimiters.GetOrAdd(selectedKey.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
+            
+            // Thử lấy slot từ semaphore (không chờ vô hạn)
+            if (await semaphore.WaitAsync(RPM_WAIT_TIMEOUT_MS, token))
+            {
+                // Tự động release sau 1 phút (60 giây = 1 phút trong context RPM)
+                ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
+                
+                _logger.LogDebug("VIP Key ID {KeyId} selected via round-robin. RPM slots remaining: {Remaining}/{Total}", 
+                    selectedKey.Id, semaphore.CurrentCount, rpmPerKey);
+                
+                return selectedKey;
+            }
+            
+            // Nếu key đã đạt RPM limit, thử key tiếp theo
+            _logger.LogWarning("VIP Key ID {KeyId} đã đạt giới hạn {Rpm} RPM, thử key khác", selectedKey.Id, rpmPerKey);
+            
+            // Thử các key còn lại
+            foreach (var key in eligibleKeys.Where(k => k.Id != selectedKey.Id))
+            {
+                var keySemaphore = _keyRpmLimiters.GetOrAdd(key.Id, _ => new SemaphoreSlim(rpmPerKey, rpmPerKey));
+                if (await keySemaphore.WaitAsync(RPM_WAIT_TIMEOUT_MS, token))
                 {
-                    // Release after 1 minute
-                    _ = Task.Run(async () =>
-                    {
-                        await Task.Delay(60000);
-                        limiter.Release();
-                    });
+                    ScheduleSemaphoreRelease(keySemaphore, TimeSpan.FromMinutes(1));
+                    
+                    _logger.LogDebug("Alternative VIP Key ID {KeyId} selected. RPM slots remaining: {Remaining}/{Total}", 
+                        key.Id, keySemaphore.CurrentCount, rpmPerKey);
                     
                     return key;
                 }
             }
-
+            
+            // Nếu tất cả key đều đạt RPM limit, chờ key đầu tiên với timeout
+            _logger.LogInformation("Tất cả VIP keys đều đạt giới hạn RPM, đợi key ID {KeyId} với timeout {TimeoutMs}ms...", 
+                selectedKey.Id, FINAL_KEY_WAIT_TIMEOUT_MS);
+            
+            // Sử dụng timeout để tránh chờ vô hạn
+            if (await semaphore.WaitAsync(FINAL_KEY_WAIT_TIMEOUT_MS, token))
+            {
+                ScheduleSemaphoreRelease(semaphore, TimeSpan.FromMinutes(1));
+                return selectedKey;
+            }
+            
+            // Timeout - không có key nào khả dụng
+            _logger.LogWarning("Timeout khi đợi VIP key khả dụng sau {TimeoutMs}ms. Tất cả {Count} keys đều bận.", 
+                FINAL_KEY_WAIT_TIMEOUT_MS, eligibleKeys.Count);
             return null;
         }
+        
+        /// <summary>
+        /// Lên lịch release semaphore sau một khoảng thời gian (giống LocalAPI)
+        /// </summary>
+        private static void ScheduleSemaphoreRelease(SemaphoreSlim semaphore, TimeSpan delay)
+        {
+            // Sử dụng object holder để tránh race condition với timer assignment
+            var timerHolder = new TimerHolder();
+            timerHolder.Timer = new Timer(_ =>
+            {
+                try 
+                { 
+                    semaphore.Release(); 
+                }
+                catch (SemaphoreFullException) 
+                { 
+                    // Semaphore đã đầy, ignore
+                }
+                catch (ObjectDisposedException) 
+                { 
+                    // Semaphore đã bị disposed, ignore 
+                }
+                finally
+                {
+                    // Dispose timer sau khi callback hoàn thành
+                    try { timerHolder.Timer?.Dispose(); }
+                    catch { /* Ignore dispose errors */ }
+                }
+            }, null, delay, Timeout.InfiniteTimeSpan);
+        }
+        
+        // Helper class để giữ timer reference an toàn
+        private class TimerHolder
+        {
+            public Timer? Timer { get; set; }
+        }
+        
+        /// <summary>
+        /// Gọi API với retry và proxy handling (giống LocalAPI CallApiWithRetryAsync)
+        /// </summary>
+        private async Task<(string? responseText, int tokensUsed, string? errorType, string? errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
+            string url, string jsonPayload, VipTranslationSetting settings, int apiKeyId, CancellationToken token)
+        {
+            // Generate random User-Agent once per request to avoid fingerprinting (giống LocalAPI)
+            string userAgent = GenerateRandomUserAgent();
+            
+            // Track failed proxy IDs to exclude them from subsequent attempts within this request
+            var failedProxyIds = new HashSet<int>();
+            
+            // Track current proxy slot for RPM limiting
+            string? currentProxySlotId = null;
+            Proxy? currentProxy = null;
+            
+            // Create unique request ID for tracking
+            string requestId = $"vipkey{apiKeyId}_{Guid.NewGuid():N}";
+            
+            for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
+            {
+                if (token.IsCancellationRequested)
+                    return ("Lỗi: Tác vụ đã bị hủy.", 0, "CANCELLED", "Task was cancelled", 0);
 
-        private async Task<GeminiCallResult> CallGeminiApiAsync(VipApiKey apiKey, string modelName, 
-            string inputText, VipTranslationSession session, VipTranslationSetting settings, Proxy? proxy)
+                // === PROXY SELECTION WITH RPM LIMITING (giống LocalAPI) ===
+                // Release previous proxy slot if switching proxy
+                if (currentProxySlotId != null)
+                {
+                    _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                    currentProxySlotId = null;
+                }
+                
+                // Get a proxy with available RPM slots
+                currentProxy = await GetProxyWithAvailableRpmSlotAsync(failedProxyIds, requestId, token);
+                
+                // Acquire RPM slot for this proxy (if proxy is available)
+                if (currentProxy != null)
+                {
+                    currentProxySlotId = await _proxyRateLimiter.TryAcquireSlotWithTimeoutAsync(
+                        currentProxy.Id, requestId, PROXY_RPM_WAIT_TIMEOUT_MS, token);
+                    
+                    if (currentProxySlotId == null)
+                    {
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) đã đạt giới hạn RPM, thử proxy khác",
+                            currentProxy.Id, currentProxy.Host, currentProxy.Port);
+                        failedProxyIds.Add(currentProxy.Id); // Tạm exclude proxy này
+                        
+                        // Try to get another proxy
+                        currentProxy = await GetProxyWithAvailableRpmSlotAsync(failedProxyIds, requestId, token);
+                        if (currentProxy != null)
+                        {
+                            currentProxySlotId = await _proxyRateLimiter.TryAcquireSlotWithTimeoutAsync(
+                                currentProxy.Id, requestId, PROXY_RPM_WAIT_TIMEOUT_MS, token);
+                        }
+                    }
+                }
+
+                try
+                {
+                    // Create HttpClient with the current proxy (or direct if no proxy)
+                    using var httpClient = _proxyService.CreateHttpClientWithProxy(currentProxy);
+                    using var request = new HttpRequestMessage(HttpMethod.Post, url)
+                    {
+                        Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
+                    };
+                    
+                    // Add random User-Agent header to avoid rate limiting
+                    request.Headers.Add("User-Agent", userAgent);
+
+                    if (currentProxy != null)
+                    {
+                        var (rpmPerProxy, availSlots, _) = _proxyRateLimiter.GetProxyStatus(currentProxy.Id);
+                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending VIP request via Proxy {ProxyId} ({Type}://{Host}:{Port}) (Key ID: {KeyId}) RPM slots: {Available}/{Max}", 
+                            attempt, settings.MaxRetries, currentProxy.Id, currentProxy.Type, currentProxy.Host, currentProxy.Port, apiKeyId, availSlots, rpmPerProxy);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending VIP request directly (no proxy) (Key ID: {KeyId})", 
+                            attempt, settings.MaxRetries, apiKeyId);
+                    }
+                    
+                    using HttpResponseMessage response = await httpClient.SendAsync(request, token);
+                    string responseBody = await response.Content.ReadAsStringAsync(token);
+
+                    // === REQUEST ĐÃ KẾT NỐI THÀNH CÔNG ĐẾN API GEMINI ===
+                    // Đánh dấu slot đã được sử dụng (sẽ tự auto-release sau 1 phút)
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.MarkSlotAsUsed(currentProxySlotId);
+                        currentProxySlotId = null; // Prevent early release
+                    }
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        int statusCode = (int)response.StatusCode;
+                        string errorType = $"HTTP_{statusCode}";
+                        string errorMsg = $"HTTP Error {statusCode}";
+
+                        _logger.LogWarning("HTTP Error {StatusCode}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
+                            statusCode, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
+
+                        // Ghi nhận proxy failure nếu lỗi không phải 429 (429 là do API, không phải proxy)
+                        if (currentProxy != null && statusCode != 429)
+                        {
+                            await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"HTTP {statusCode}");
+                        }
+
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+
+                        // Hết số lần retry, trả về lỗi
+                        return ($"Lỗi API: {response.StatusCode}", 0, errorType, errorMsg, statusCode);
+                    }
+
+                    // === Request thành công, ghi nhận proxy success ===
+                    if (currentProxy != null)
+                    {
+                        await _proxyService.RecordProxySuccessAsync(currentProxy.Id);
+                    }
+
+                    // === Parse JSON response với error handling ===
+                    JObject parsedBody;
+                    try
+                    {
+                        parsedBody = JObject.Parse(responseBody);
+                    }
+                    catch (JsonReaderException jsonEx)
+                    {
+                        // Response không phải JSON (có thể là HTML error page từ proxy hoặc server)
+                        var previewBody = responseBody.Length > 200 ? responseBody.Substring(0, 200) + "..." : responseBody;
+                        _logger.LogWarning("Response is not valid JSON (possibly HTML error page). Preview: {Preview}. Retrying... (Attempt {Attempt}/{MaxRetries})",
+                            previewBody, attempt, settings.MaxRetries);
+                        
+                        // Nếu response bắt đầu bằng HTML tag, có thể proxy trả về error page
+                        if (responseBody.TrimStart().StartsWith("<", StringComparison.Ordinal))
+                        {
+                            if (currentProxy != null)
+                            {
+                                await _proxyService.RecordProxyFailureAsync(currentProxy.Id, "Proxy returned HTML instead of JSON", isIntermittent: true);
+                                failedProxyIds.Add(currentProxy.Id);
+                            }
+                        }
+                        
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+                        
+                        return ("Lỗi: Response không phải JSON hợp lệ", 0, "INVALID_JSON", $"JSON parse error: {jsonEx.Message}", 200);
+                    }
+
+                    // Kiểm tra lỗi trong response body
+                    if (parsedBody?["error"] != null)
+                    {
+                        string errorMsg = parsedBody["error"]?["message"]?.ToString() ?? "Unknown error";
+                        _logger.LogWarning("API returned error: {ErrorMsg}. Retrying... (Attempt {Attempt}/{MaxRetries})",
+                            errorMsg, attempt, settings.MaxRetries);
+
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+
+                        return ($"Lỗi API: {errorMsg}", 0, "API_ERROR", errorMsg, 200);
+                    }
+
+                    // === Kiểm tra blockReason (vi phạm chính sách an toàn) ===
+                    if (parsedBody?["promptFeedback"]?["blockReason"] != null)
+                    {
+                        string blockReason = parsedBody["promptFeedback"]["blockReason"]?.ToString() ?? "Unknown";
+                        string errorMsg = $"Nội dung bị chặn. Lý do: {blockReason}";
+
+                        _logger.LogWarning("Content blocked by safety filters: {BlockReason}. This will NOT be retried.", blockReason);
+
+                        // Vi phạm chính sách không retry
+                        return ($"Lỗi: {errorMsg}", 0, "BLOCKED_CONTENT", errorMsg, 200);
+                    }
+
+                    // === Kiểm tra finishReason ===
+                    var finishReason = parsedBody?["candidates"]?[0]?["finishReason"]?.ToString();
+                    if (!string.IsNullOrEmpty(finishReason) && finishReason != "STOP")
+                    {
+                        string errorMsg = $"FinishReason không hợp lệ: {finishReason}";
+
+                        _logger.LogWarning("Invalid finishReason: {FinishReason}. Possible safety violation. Retrying... (Attempt {Attempt}/{MaxRetries})",
+                            finishReason, attempt, settings.MaxRetries);
+
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+
+                        return ($"Lỗi: {errorMsg}", 0, "FINISH_REASON", errorMsg, 200);
+                    }
+
+                    int tokens = parsedBody?["usageMetadata"]?["totalTokenCount"]?.Value<int>() ?? 0;
+                    string? responseText = parsedBody?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
+
+                    if (responseText == null)
+                    {
+                        _logger.LogWarning("API returned OK but content is empty. Retrying... (Attempt {Attempt}/{MaxRetries})",
+                            attempt, settings.MaxRetries);
+
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+
+                        return ("Lỗi: API trả về phản hồi rỗng.", 0, "EMPTY_RESPONSE", "API returned empty response", 200);
+                    }
+
+                    // Success
+                    return (responseText, tokens, null, null, 200);
+                }
+                catch (HttpRequestException ex) when (IsProxyTunnelError(ex))
+                {
+                    // === PROXY TUNNEL ERROR: Immediately switch to different proxy or direct connection ===
+                    // Lỗi kết nối proxy - KHÔNG tính vào RPM (release slot early)
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                        currentProxySlotId = null;
+                    }
+                    
+                    if (currentProxy != null)
+                    {
+                        failedProxyIds.Add(currentProxy.Id);
+                        await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"Proxy tunnel failed: {ex.Message}");
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) tunnel connection failed: {Error}. Excluding and trying another proxy immediately.", 
+                            currentProxy.Id, currentProxy.Host, currentProxy.Port, ex.Message);
+                    }
+                    
+                    // Don't count proxy failures as API retry attempts - retry immediately with new proxy
+                    if (attempt < settings.MaxRetries)
+                    {
+                        await Task.Delay(500, token); // Short delay before retry with new proxy
+                        continue;
+                    }
+                    
+                    return ($"Lỗi Proxy: {ex.Message}", 0, "PROXY_TUNNEL_ERROR", ex.Message, 0);
+                }
+                catch (Exception ex)
+                {
+                    // === Lỗi kết nối - KHÔNG tính vào RPM (release slot early) ===
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                        currentProxySlotId = null;
+                    }
+                    
+                    // Check if this is a CRITICAL proxy error (connection timeout, host unreachable, etc.)
+                    if (currentProxy != null && ProxyService.IsCriticalProxyError(ex))
+                    {
+                        var errorDescription = ProxyService.GetProxyErrorDescription(ex);
+                        _logger.LogError("🚫 CRITICAL PROXY ERROR for Proxy {ProxyId} ({Host}:{Port}): {Error}. Disabling proxy PERMANENTLY.", 
+                            currentProxy.Id, currentProxy.Host, currentProxy.Port, errorDescription);
+                        
+                        await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, errorDescription);
+                        failedProxyIds.Add(currentProxy.Id);
+                        
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(500, token); // Short delay before retry
+                            continue;
+                        }
+                    }
+                    // Record non-critical proxy failure and switch to a new proxy
+                    else if (currentProxy != null && (ex is HttpRequestException || ex is TaskCanceledException))
+                    {
+                        failedProxyIds.Add(currentProxy.Id);
+                        
+                        bool isTimeoutError = ProxyService.IsTimeoutOrCancellationError(ex);
+                        var errorMessage = ProxyService.GetProxyErrorDescription(ex);
+                        
+                        await _proxyService.RecordProxyFailureAsync(currentProxy.Id, errorMessage, 
+                            isIntermittent: false, isTimeoutError: isTimeoutError);
+                        
+                        if (isTimeoutError)
+                        {
+                            _logger.LogDebug("Proxy {ProxyId} ({Host}:{Port}) timeout (transient): {Error}. Switching to another proxy.", 
+                                currentProxy.Id, currentProxy.Host, currentProxy.Port, errorMessage);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) connection failed: {Error}. Switching to a new proxy.", 
+                                currentProxy.Id, currentProxy.Host, currentProxy.Port, errorMessage);
+                        }
+                    }
+                    
+                    _logger.LogError(ex, "Exception during VIP API call. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
+                        settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
+
+                    if (attempt >= settings.MaxRetries)
+                        return ($"Lỗi Exception: {ex.Message}", 0, "EXCEPTION", ex.Message, 0);
+
+                    await Task.Delay(settings.RetryDelayMs * attempt, token);
+                }
+            }
+
+            // Cleanup: release slot if still held
+            if (currentProxySlotId != null)
+            {
+                _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+            }
+
+            return ("Lỗi API: Hết số lần thử lại.", 0, "MAX_RETRIES", "Exceeded maximum retry attempts", 0);
+        }
+        
+        /// <summary>
+        /// Lấy proxy có RPM slot khả dụng, loại trừ các proxy đã failed. (giống LocalAPI)
+        /// </summary>
+        private async Task<Proxy?> GetProxyWithAvailableRpmSlotAsync(HashSet<int> excludeProxyIds, string requestId, CancellationToken token)
+        {
+            // Get list of available proxies
+            var proxy = await _proxyService.GetNextProxyAsync(excludeProxyIds);
+            if (proxy == null)
+            {
+                return null;
+            }
+            
+            // Check if this proxy has available RPM slots
+            if (_proxyRateLimiter.HasAvailableSlot(proxy.Id))
+            {
+                return proxy;
+            }
+            
+            // Current proxy is at RPM limit, try to find another one
+            var triedProxyIds = new HashSet<int>(excludeProxyIds) { proxy.Id };
+            
+            for (int i = 0; i < MAX_PROXY_SEARCH_ATTEMPTS; i++)
+            {
+                var nextProxy = await _proxyService.GetNextProxyAsync(triedProxyIds);
+                if (nextProxy == null)
+                {
+                    // No more proxies available - return the original one (will wait for slot)
+                    _logger.LogInformation("All proxies at RPM limit or excluded. Using proxy {ProxyId} and waiting for slot.", proxy.Id);
+                    return proxy;
+                }
+                
+                if (_proxyRateLimiter.HasAvailableSlot(nextProxy.Id))
+                {
+                    return nextProxy;
+                }
+                
+                triedProxyIds.Add(nextProxy.Id);
+            }
+            
+            // All proxies at RPM limit, return the first one
+            return proxy;
+        }
+        
+        /// <summary>
+        /// Check if the exception is a proxy tunnel error (giống LocalAPI)
+        /// </summary>
+        private static bool IsProxyTunnelError(HttpRequestException ex)
+        {
+            var message = ex.Message ?? string.Empty;
+            return message.Contains("proxy tunnel", StringComparison.OrdinalIgnoreCase) ||
+                   message.Contains("proxy", StringComparison.OrdinalIgnoreCase) && 
+                   (message.Contains("400") || message.Contains("407") || message.Contains("403"));
+        }
+        
+        /// <summary>
+        /// Update API key usage after successful translation
+        /// </summary>
+        private async Task UpdateKeyUsageAsync(int keyId, int tokensUsed)
         {
             try
             {
-                var decryptedKey = _encryptionService.Decrypt(apiKey.EncryptedApiKey, apiKey.Iv);
-                var url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={decryptedKey}";
-
-                // Build generationConfig using JObject for snake_case field names (matching Gemini API format)
-                var generationConfig = new JObject 
-                { 
-                    ["temperature"] = (double)settings.Temperature, 
-                    ["maxOutputTokens"] = settings.MaxOutputTokens 
-                };
-                if (settings.EnableThinkingBudget) 
+                using var scope = _serviceProvider.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var apiKey = await context.VipApiKeys.FindAsync(keyId);
+                if (apiKey == null)
                 {
-                    generationConfig["thinking_config"] = new JObject { ["thinking_budget"] = settings.ThinkingBudget };
+                    _logger.LogWarning("Không thể cập nhật sử dụng: Không tìm thấy VIP API Key ID {ApiKeyId}", keyId);
+                    return;
                 }
-
-                // Send the input text as user content - SystemInstruction from client controls all translation logic
-                // This matches the AioLauncherService pattern where client has full control via SystemInstruction
-                // Input format: "{index}: {text}" for each line (matches SrtTranslationService pattern)
-                string userContent = inputText;
-                
-                // Use proper Gemini API format with system_instruction as separate field
-                // This matches the AioLauncherService implementation
-                var requestBody = new
+                var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+                var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+                var lastResetInVietnam = TimeZoneInfo.ConvertTimeFromUtc(apiKey.LastRequestCountResetUtc, vietnamTimeZone);
+                if (lastResetInVietnam.Date < vietnamNow.Date)
                 {
-                    contents = new[] { new { role = "user", parts = new[] { new { text = userContent } } } },
-                    system_instruction = new { parts = new[] { new { text = session.SystemInstruction } } },
-                    generationConfig
-                };
-
-                var json = JsonConvert.SerializeObject(requestBody);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                HttpClient httpClient;
-                if (proxy != null)
-                {
-                    httpClient = _proxyService.CreateHttpClientWithProxy(proxy);
-                    httpClient.Timeout = TimeSpan.FromMinutes(5);
+                    _logger.LogInformation("Resetting daily request count for VIP API Key ID {ApiKeyId}", keyId);
+                    apiKey.RequestsToday = 0;
+                    apiKey.LastRequestCountResetUtc = DateTime.UtcNow.Date;
                 }
-                else
+                apiKey.RequestsToday++;
+                if (tokensUsed > 0)
                 {
-                    httpClient = _httpClientFactory.CreateClient();
-                    httpClient.Timeout = TimeSpan.FromMinutes(5);
+                    apiKey.TotalTokensUsed += tokensUsed;
                 }
-
-                var response = await httpClient.PostAsync(url, content);
-                var responseText = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogError("Gemini API error: {Status} - {Response}", response.StatusCode, responseText);
-                    return new GeminiCallResult 
-                    { 
-                        Success = false, 
-                        ErrorMessage = $"API Error: {response.StatusCode}" 
-                    };
-                }
-
-                // Check if response is valid JSON before parsing
-                // Proxies may return HTML error pages even with HTTP 200 status
-                var trimmedResponse = responseText.TrimStart();
-                if (string.IsNullOrWhiteSpace(trimmedResponse) || (!trimmedResponse.StartsWith("{") && !trimmedResponse.StartsWith("[")))
-                {
-                    // Log the first 500 characters of the non-JSON response for debugging
-                    var logPreview = responseText.Length > 500 ? responseText[..500] + "..." : responseText;
-                    _logger.LogError("Gemini API returned non-JSON response (possibly proxy/firewall HTML page): {Response}", logPreview);
-                    return new GeminiCallResult
-                    {
-                        Success = false,
-                        ErrorMessage = "API returned non-JSON response (proxy/firewall issue)"
-                    };
-                }
-
-                var responseJson = JObject.Parse(responseText);
-                var textResult = responseJson["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
-                var tokensUsed = responseJson["usageMetadata"]?["totalTokenCount"]?.Value<int>() ?? 0;
-
-                return new GeminiCallResult
-                {
-                    Success = true,
-                    ResponseText = textResult ?? "",
-                    TokensUsed = tokensUsed
-                };
+                await context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Exception calling Gemini API");
-                return new GeminiCallResult 
-                { 
-                    Success = false, 
-                    ErrorMessage = ex.Message 
-                };
+                _logger.LogError(ex, "Lỗi khi cập nhật sử dụng cho VIP API Key ID {ApiKeyId}", keyId);
             }
-        }
-
-        private List<TranslatedSrtLine> ParseTranslationResult(string responseText, List<SrtLine> originalBatch)
-        {
-            var result = new List<TranslatedSrtLine>();
-            
-            if (string.IsNullOrWhiteSpace(responseText))
-            {
-                // No response - return original text as failed
-                foreach (var line in originalBatch)
-                {
-                    result.Add(new TranslatedSrtLine
-                    {
-                        Index = line.Index,
-                        TranslatedText = line.OriginalText,
-                        Success = false
-                    });
-                }
-                return result;
-            }
-
-            // Parse response using regex pattern "{index}: {translated_text}"
-            // This matches the format returned by Gemini when using SystemInstruction from client
-            // (same pattern as SrtTranslationService.TranslateAllSrtLinesAsync)
-            var translatedLinesDict = new Dictionary<int, string>();
-            
-            foreach (Match m in TranslationLineRegex.Matches(responseText))
-            {
-                if (int.TryParse(m.Groups[1].Value, out int idx))
-                {
-                    translatedLinesDict[idx] = m.Groups[2].Value.Trim();
-                }
-            }
-
-            // Map parsed translations back to original lines
-            foreach (var line in originalBatch)
-            {
-                if (translatedLinesDict.TryGetValue(line.Index, out string translated))
-                {
-                    result.Add(new TranslatedSrtLine
-                    {
-                        Index = line.Index,
-                        TranslatedText = string.IsNullOrWhiteSpace(translated) ? "[API DỊCH RỖNG]" : translated,
-                        Success = !string.IsNullOrWhiteSpace(translated)
-                    });
-                }
-                else
-                {
-                    // Line not found in response
-                    result.Add(new TranslatedSrtLine
-                    {
-                        Index = line.Index,
-                        TranslatedText = line.OriginalText,
-                        Success = false
-                    });
-                }
-            }
-
-            return result;
         }
 
         public async Task<List<TranslatedSrtLine>?> GetResultsAsync(string sessionId)
@@ -620,14 +1215,6 @@ namespace SubPhim.Server.Services
             }
             
             return cleanedCount;
-        }
-
-        private class GeminiCallResult
-        {
-            public bool Success { get; set; }
-            public string ResponseText { get; set; }
-            public int TokensUsed { get; set; }
-            public string ErrorMessage { get; set; }
         }
     }
 

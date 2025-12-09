@@ -1,8 +1,15 @@
 # VIP Translation API - Quick Reference
 
 ## Authentication
+
+**Method 1: Authorization Bearer (Recommended)**
 ```
 Authorization: Bearer AIO_xxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**Method 2: X-API-Key header**
+```
+X-API-Key: AIO_xxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## Base URL
@@ -55,6 +62,7 @@ while True:
 - **RPM**: Check `rpmLimit` in account info (default: 100)
 - **Max chars/line**: 3000
 - **Credit charge**: 1 credit = 1 output character
+- **Rate limit headers**: Check `X-RateLimit-Remaining` to monitor usage
 
 ## Common Status Codes
 
@@ -90,12 +98,19 @@ while True:
 try:
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
+    
+    # Monitor rate limits
+    remaining = response.headers.get('X-RateLimit-Remaining')
+    if remaining and int(remaining) < 10:
+        print(f"Warning: Only {remaining} requests remaining")
+        
 except requests.exceptions.HTTPError as e:
     status_code = e.response.status_code
     if status_code == 402:
         print("Insufficient credits")
     elif status_code == 429:
-        print("Rate limit exceeded")
+        retry_after = e.response.headers.get('Retry-After', 60)
+        print(f"Rate limit exceeded. Retry after {retry_after}s")
     else:
         print(f"Error: {e.response.json()}")
 ```
@@ -104,10 +119,12 @@ except requests.exceptions.HTTPError as e:
 
 ✅ Check credit balance before large jobs  
 ✅ Poll results every 2-5 seconds  
+✅ Monitor `X-RateLimit-Remaining` header  
+✅ Respect `Retry-After` header on 429 errors  
 ✅ Implement exponential backoff for retries  
 ✅ Handle all error codes properly  
 ✅ Monitor credit usage regularly  
-✅ Never hardcode API keys  
+✅ Never hardcode API keys (use environment variables)  
 ✅ Log all API interactions  
 
 ## Need Help?

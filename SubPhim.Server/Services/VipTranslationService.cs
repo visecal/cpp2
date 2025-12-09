@@ -180,16 +180,25 @@ namespace SubPhim.Server.Services
                 // Double-check inside lock
                 if (DateTime.UtcNow - _lastSettingsLoadTime >= SETTINGS_CACHE_DURATION)
                 {
-                    var settings = await context.VipTranslationSettings.FindAsync(DEFAULT_SETTINGS_ID);
-                    if (settings == null)
+                    try
                     {
-                        settings = new VipTranslationSetting { Id = DEFAULT_SETTINGS_ID };
-                        context.VipTranslationSettings.Add(settings);
-                        await context.SaveChangesAsync();
+                        var settings = await context.VipTranslationSettings.FindAsync(DEFAULT_SETTINGS_ID);
+                        if (settings == null)
+                        {
+                            // Settings don't exist, try to create them
+                            settings = new VipTranslationSetting { Id = DEFAULT_SETTINGS_ID };
+                            context.VipTranslationSettings.Add(settings);
+                            await context.SaveChangesAsync();
+                        }
+                        _cachedMaxSrtLineLength = settings.MaxSrtLineLength;
+                        _lastSettingsLoadTime = DateTime.UtcNow;
+                        _logger.LogInformation("Refreshed MaxSrtLineLength cache: {MaxLength}", _cachedMaxSrtLineLength);
                     }
-                    _cachedMaxSrtLineLength = settings.MaxSrtLineLength;
-                    _lastSettingsLoadTime = DateTime.UtcNow;
-                    _logger.LogInformation("Refreshed MaxSrtLineLength cache: {MaxLength}", _cachedMaxSrtLineLength);
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to load MaxSrtLineLength from DB, using cached value: {CachedValue}", _cachedMaxSrtLineLength);
+                        // Keep using cached value if DB operation fails
+                    }
                 }
             }
             finally

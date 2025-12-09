@@ -14,21 +14,38 @@ VIP Translation API cung cấp dịch vụ dịch văn bản tự động sử d
 API Key có định dạng: `AIO_xxxxxxxxxxxxxxxxxxxxxxxxx`
 
 ### Cách sử dụng
-Thêm API Key vào header của mỗi request:
+Có 2 cách để truyền API Key vào header:
 
+**Cách 1: Authorization Bearer (Khuyến nghị)**
 ```
 Authorization: Bearer AIO_xxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
+**Cách 2: X-API-Key header**
+```
+X-API-Key: AIO_xxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
 ### Ví dụ với cURL
 ```bash
+# Sử dụng Authorization Bearer
 curl -X GET "https://your-domain.com/api/v1/external/account/info" \
   -H "Authorization: Bearer AIO_xxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Hoặc sử dụng X-API-Key header
+curl -X GET "https://your-domain.com/api/v1/external/account/info" \
+  -H "X-API-Key: AIO_xxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ### Lỗi xác thực
 - **401 Unauthorized**: API Key không hợp lệ hoặc đã bị vô hiệu hóa
 - **403 Forbidden**: API Key đã hết hạn hoặc không có quyền truy cập
+
+### Bảo mật API Key
+- **KHÔNG BAO GIỜ** chia sẻ API Key công khai
+- Lưu API Key trong biến môi trường hoặc file cấu hình bảo mật
+- Rotate (thay đổi) API Key định kỳ
+- Mỗi ứng dụng nên có API Key riêng để dễ quản lý và thu hồi
 
 ---
 
@@ -122,11 +139,15 @@ curl -X POST "https://your-domain.com/api/v1/external/estimate" \
 ```
 
 **Parameters**:
-- `targetLanguage` (required): Ngôn ngữ đích (ví dụ: "Vietnamese", "English", "Japanese")
+- `targetLanguage` (required): Ngôn ngữ đích (ví dụ: "Vietnamese", "English", "Japanese", "Korean", "Thai", "Chinese")
 - `lines` (required): Mảng các dòng cần dịch
-  - `index`: Số thứ tự dòng
+  - `index`: Số thứ tự dòng (phải là số nguyên dương)
   - `text`: Nội dung cần dịch (tối đa 3000 ký tự/dòng)
-- `systemInstruction` (optional): Hướng dẫn đặc biệt cho AI
+- `systemInstruction` (optional): Hướng dẫn đặc biệt cho AI về cách dịch. Ví dụ:
+  - "Dịch tự nhiên, giữ nguyên tên riêng"
+  - "Dịch phong cách trang trọng, phù hợp văn phong công sở"
+  - "Dịch phong cách trẻ trung, sử dụng ngôn ngữ đời thường"
+  - Nếu không truyền, mặc định sẽ dùng: "Dịch tự nhiên, phù hợp ngữ cảnh"
 
 **Response Success (202 Accepted)**:
 ```json
@@ -379,6 +400,20 @@ curl -X GET "https://your-domain.com/api/v1/external/account/transactions?page=1
 - Khi vượt giới hạn, API trả về **429 Too Many Requests**
 - Header `Retry-After` chỉ định thời gian chờ (giây)
 
+**Response Headers theo dõi rate limit:**
+- `X-RateLimit-Limit`: Số request tối đa mỗi phút
+- `X-RateLimit-Remaining`: Số request còn lại trong phút hiện tại
+- `X-RateLimit-Reset`: Thời điểm reset (Unix timestamp)
+
+**Ví dụ Response Headers:**
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 85
+X-RateLimit-Reset: 1702123620
+```
+
+**Best Practice:** Kiểm tra các headers này để tránh bị rate limited
+
 ### Credit System
 - **1 credit = 1 ký tự đầu ra đã dịch**
 - Credit chỉ bị trừ khi job hoàn thành thành công
@@ -578,6 +613,8 @@ Response sẽ có field `pricing`:
 
 ### 1. Xử lý lỗi đầy đủ
 ```python
+import requests
+
 try:
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
@@ -585,12 +622,34 @@ except requests.exceptions.HTTPError as e:
     if e.response.status_code == 402:
         print("Insufficient credits!")
     elif e.response.status_code == 429:
-        print("Rate limit exceeded!")
+        # Rate limit exceeded - check Retry-After header
+        retry_after = int(e.response.headers.get('Retry-After', 60))
+        print(f"Rate limit exceeded! Retry after {retry_after} seconds")
     else:
         print(f"Error: {e.response.json()}")
 ```
 
-### 2. Implement retry logic với exponential backoff
+### 2. Theo dõi Rate Limit trong code
+```python
+def make_api_request(url, headers, data=None):
+    """Make API request and monitor rate limit"""
+    response = requests.post(url, headers=headers, json=data) if data else requests.get(url, headers=headers)
+    
+    # Check rate limit headers
+    limit = response.headers.get('X-RateLimit-Limit')
+    remaining = response.headers.get('X-RateLimit-Remaining')
+    reset = response.headers.get('X-RateLimit-Reset')
+    
+    if remaining and int(remaining) < 10:
+        print(f"Warning: Only {remaining} requests remaining in current window")
+    
+    return response
+
+# Sử dụng
+response = make_api_request(f"{BASE_URL}/account/info", headers)
+```
+
+### 3. Implement retry logic với exponential backoff
 ```python
 import time
 
@@ -598,14 +657,20 @@ def call_api_with_retry(func, max_retries=3):
     for i in range(max_retries):
         try:
             return func()
-        except Exception as e:
-            if i == max_retries - 1:
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                # Rate limit - respect Retry-After header
+                retry_after = int(e.response.headers.get('Retry-After', 60))
+                print(f"Rate limited. Waiting {retry_after} seconds...")
+                time.sleep(retry_after)
+            elif i == max_retries - 1:
                 raise
-            wait_time = 2 ** i  # 1s, 2s, 4s
-            time.sleep(wait_time)
+            else:
+                wait_time = 2 ** i  # 1s, 2s, 4s
+                time.sleep(wait_time)
 ```
 
-### 3. Kiểm tra credit trước khi gửi job lớn
+### 4. Kiểm tra credit trước khi gửi job lớn
 ```python
 # Ước tính trước
 estimate = api.estimate(char_count)
@@ -616,12 +681,21 @@ if not estimate['hasEnoughCredits']:
 # Tiếp tục với job
 ```
 
-### 4. Cache API Key
+### 5. Cache API Key
 - Không hardcode API Key trong code
 - Sử dụng environment variables hoặc config files
 - Bảo mật API Key như password
 
-### 5. Log và Monitor
+**Ví dụ Python với environment variable:**
+```python
+import os
+
+API_KEY = os.environ.get('VIP_TRANSLATION_API_KEY')
+if not API_KEY:
+    raise ValueError("API_KEY not found in environment variables")
+```
+
+### 6. Log và Monitor
 - Log tất cả các API calls và responses
 - Monitor credit balance
 - Set up alerts khi credit thấp

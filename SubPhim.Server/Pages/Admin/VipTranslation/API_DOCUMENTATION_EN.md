@@ -14,21 +14,38 @@ VIP Translation API provides AI-powered text translation with credit-based billi
 API Keys follow the format: `AIO_xxxxxxxxxxxxxxxxxxxxxxxxx`
 
 ### Usage
-Include the API Key in the Authorization header:
+There are 2 ways to pass the API Key in headers:
 
+**Method 1: Authorization Bearer (Recommended)**
 ```
 Authorization: Bearer AIO_xxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
+**Method 2: X-API-Key header**
+```
+X-API-Key: AIO_xxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
 ### Example with cURL
 ```bash
+# Using Authorization Bearer
 curl -X GET "https://your-domain.com/api/v1/external/account/info" \
   -H "Authorization: Bearer AIO_xxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Or using X-API-Key header
+curl -X GET "https://your-domain.com/api/v1/external/account/info" \
+  -H "X-API-Key: AIO_xxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ### Authentication Errors
 - **401 Unauthorized**: Invalid or disabled API Key
 - **403 Forbidden**: API Key expired or lacks permission
+
+### API Key Security
+- **NEVER** share API Keys publicly
+- Store API Keys in environment variables or secure config files
+- Rotate API Keys periodically
+- Use separate API Keys for each application for easier management and revocation
 
 ---
 
@@ -108,11 +125,15 @@ curl -X GET "https://your-domain.com/api/v1/external/account/info" \
 ```
 
 **Parameters**:
-- `targetLanguage` (required): Target language (e.g., "Vietnamese", "English", "Japanese")
+- `targetLanguage` (required): Target language (e.g., "Vietnamese", "English", "Japanese", "Korean", "Thai", "Chinese")
 - `lines` (required): Array of lines to translate
-  - `index`: Line number
+  - `index`: Line number (must be a positive integer)
   - `text`: Content to translate (max 3000 chars/line)
-- `systemInstruction` (optional): Special instructions for AI
+- `systemInstruction` (optional): Special instructions for AI translation style. Examples:
+  - "Translate naturally, keep proper nouns unchanged"
+  - "Translate in formal style, suitable for business context"
+  - "Translate in casual style, use everyday language"
+  - If not provided, defaults to: "Translate naturally, context-appropriate"
 
 **Response (202 Accepted)**:
 ```json
@@ -297,6 +318,20 @@ curl -X GET "https://your-domain.com/api/v1/external/account/info" \
 - Exceeding limits returns **429 Too Many Requests**
 - `Retry-After` header indicates wait time (seconds)
 
+**Response Headers for rate limit tracking:**
+- `X-RateLimit-Limit`: Maximum requests per minute
+- `X-RateLimit-Remaining`: Remaining requests in current minute
+- `X-RateLimit-Reset`: Reset timestamp (Unix timestamp)
+
+**Example Response Headers:**
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 85
+X-RateLimit-Reset: 1702123620
+```
+
+**Best Practice:** Monitor these headers to avoid rate limiting
+
 ### Credit System
 - **1 credit = 1 output character translated**
 - Credits only charged when job completes successfully
@@ -410,6 +445,8 @@ Example: 1000 characters = 1000 credits
 
 ### 1. Handle Errors Properly
 ```python
+import requests
+
 try:
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
@@ -417,22 +454,52 @@ except requests.exceptions.HTTPError as e:
     if e.response.status_code == 402:
         print("Insufficient credits!")
     elif e.response.status_code == 429:
-        print("Rate limit exceeded!")
+        # Rate limit exceeded - check Retry-After header
+        retry_after = int(e.response.headers.get('Retry-After', 60))
+        print(f"Rate limit exceeded! Retry after {retry_after} seconds")
+    else:
+        print(f"Error: {e.response.json()}")
 ```
 
-### 2. Implement Exponential Backoff
+### 2. Monitor Rate Limits in Code
+```python
+def make_api_request(url, headers, data=None):
+    """Make API request and monitor rate limit"""
+    response = requests.post(url, headers=headers, json=data) if data else requests.get(url, headers=headers)
+    
+    # Check rate limit headers
+    limit = response.headers.get('X-RateLimit-Limit')
+    remaining = response.headers.get('X-RateLimit-Remaining')
+    reset = response.headers.get('X-RateLimit-Reset')
+    
+    if remaining and int(remaining) < 10:
+        print(f"Warning: Only {remaining} requests remaining in current window")
+    
+    return response
+
+# Usage
+response = make_api_request(f"{BASE_URL}/account/info", headers)
+```
+
+### 3. Implement Exponential Backoff
 ```python
 def call_with_retry(func, max_retries=3):
     for i in range(max_retries):
         try:
             return func()
-        except Exception as e:
-            if i == max_retries - 1:
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                # Rate limit - respect Retry-After header
+                retry_after = int(e.response.headers.get('Retry-After', 60))
+                print(f"Rate limited. Waiting {retry_after} seconds...")
+                time.sleep(retry_after)
+            elif i == max_retries - 1:
                 raise
-            time.sleep(2 ** i)  # 1s, 2s, 4s
+            else:
+                time.sleep(2 ** i)  # 1s, 2s, 4s
 ```
 
-### 3. Check Credits Before Large Jobs
+### 4. Check Credits Before Large Jobs
 ```python
 estimate = api.estimate(char_count)
 if not estimate['hasEnoughCredits']:
@@ -440,12 +507,21 @@ if not estimate['hasEnoughCredits']:
     return
 ```
 
-### 4. Secure API Keys
+### 5. Secure API Keys
 - Never hardcode API Keys
 - Use environment variables
 - Treat keys like passwords
 
-### 5. Monitor Usage
+**Python example with environment variable:**
+```python
+import os
+
+API_KEY = os.environ.get('VIP_TRANSLATION_API_KEY')
+if not API_KEY:
+    raise ValueError("API_KEY not found in environment variables")
+```
+
+### 6. Monitor Usage
 - Log all API calls
 - Monitor credit balance
 - Set up low-credit alerts

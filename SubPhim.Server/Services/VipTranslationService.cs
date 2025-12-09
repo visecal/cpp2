@@ -340,8 +340,9 @@ namespace SubPhim.Server.Services
                     generationConfig["thinking_config"] = new JObject { ["thinking_budget"] = settings.ThinkingBudget };
                 }
 
-                // Build user content with input JSON
-                string userContent = $"Dịch sang {session.TargetLanguage}:\n{inputJson}";
+                // Send only the input JSON as user content - SystemInstruction from client controls all translation logic
+                // This matches the AioLauncherService pattern where client has full control via SystemInstruction
+                string userContent = inputJson;
                 
                 // Use proper Gemini API format with system_instruction as separate field
                 // This matches the AioLauncherService implementation

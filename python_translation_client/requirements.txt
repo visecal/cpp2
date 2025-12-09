@@ -1,0 +1,8 @@
+# Requirements for LocalAPI Translation Client
+# Python 3.8+ required
+
+# HTTP requests library
+requests>=2.28.0
+
+# tkinter is part of Python standard library, no need to install separately
+# For Linux users, you may need to install: sudo apt-get install python3-tk

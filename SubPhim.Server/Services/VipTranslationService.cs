@@ -40,7 +40,7 @@ namespace SubPhim.Server.Services
         private static int _cachedMaxSrtLineLength = 3000; // Default value
         private static DateTime _lastSettingsLoadTime = DateTime.MinValue;
         private static readonly TimeSpan SETTINGS_CACHE_DURATION = TimeSpan.FromMinutes(5); // Refresh every 5 minutes
-        private static readonly object _settingsCacheLock = new();
+        private static readonly SemaphoreSlim _settingsCacheSemaphore = new(1, 1); // For async locking
         
         // Regex pattern to parse Gemini response in format "{index}: {translated_text}"
         // (matches SrtTranslationService pattern)
@@ -167,29 +167,34 @@ namespace SubPhim.Server.Services
         /// </summary>
         private async Task<int> GetMaxSrtLineLengthAsync(AppDbContext context)
         {
-            // Check if cache is still valid
+            // Check if cache is still valid (without locking for better performance)
             if (DateTime.UtcNow - _lastSettingsLoadTime < SETTINGS_CACHE_DURATION)
             {
                 return _cachedMaxSrtLineLength;
             }
 
-            // Cache expired, reload from database
-            lock (_settingsCacheLock)
+            // Cache expired, reload from database with async locking
+            await _settingsCacheSemaphore.WaitAsync();
+            try
             {
                 // Double-check inside lock
                 if (DateTime.UtcNow - _lastSettingsLoadTime >= SETTINGS_CACHE_DURATION)
                 {
-                    var settings = context.VipTranslationSettings.Find(DEFAULT_SETTINGS_ID);
+                    var settings = await context.VipTranslationSettings.FindAsync(DEFAULT_SETTINGS_ID);
                     if (settings == null)
                     {
                         settings = new VipTranslationSetting { Id = DEFAULT_SETTINGS_ID };
                         context.VipTranslationSettings.Add(settings);
-                        context.SaveChanges();
+                        await context.SaveChangesAsync();
                     }
                     _cachedMaxSrtLineLength = settings.MaxSrtLineLength;
                     _lastSettingsLoadTime = DateTime.UtcNow;
                     _logger.LogInformation("Refreshed MaxSrtLineLength cache: {MaxLength}", _cachedMaxSrtLineLength);
                 }
+            }
+            finally
+            {
+                _settingsCacheSemaphore.Release();
             }
             
             return _cachedMaxSrtLineLength;

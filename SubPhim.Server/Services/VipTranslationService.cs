@@ -6,6 +6,7 @@ using SubPhim.Server.Models;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SubPhim.Server.Services
 {
@@ -23,6 +24,10 @@ namespace SubPhim.Server.Services
         
         // RPM Limiter per API Key
         private static readonly ConcurrentDictionary<int, SemaphoreSlim> _keyRpmLimiters = new();
+        
+        // Regex pattern to parse Gemini response in format "{index}: {translated_text}"
+        // (matches SrtTranslationService pattern)
+        private static readonly Regex TranslationLineRegex = new(@"^\s*(\d+):\s*(.*)$", RegexOptions.Multiline | RegexOptions.Compiled);
         
         private const int RPM_WAIT_TIMEOUT_MS = 100;
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500;
@@ -199,8 +204,17 @@ namespace SubPhim.Server.Services
         private async Task TranslateBatchAsync(VipTranslationSession session, List<SrtLine> batch, 
             string modelName, VipTranslationSetting settings, AppDbContext context)
         {
-            var inputLines = batch.Select(line => new { index = line.Index, text = line.OriginalText }).ToList();
-            string inputJson = JsonConvert.SerializeObject(inputLines);
+            // Build input text in line-by-line format: "{index}: {text}" 
+            // This matches the format expected by client's SystemInstruction (GetSystemInstructionForGeminiSrtTranslation)
+            // and matches how AioLauncherService sends data to Gemini API
+            var inputBuilder = new StringBuilder();
+            foreach (var line in batch)
+            {
+                // Replace newlines with spaces to keep each line on a single line (same as SrtTranslationService)
+                var cleanText = line.OriginalText.Replace("\r\n", " ").Replace("\n", " ");
+                inputBuilder.AppendLine($"{line.Index}: {cleanText}");
+            }
+            string inputText = inputBuilder.ToString().TrimEnd();
 
             int retryCount = 0;
             while (retryCount <= settings.MaxRetries)
@@ -244,7 +258,7 @@ namespace SubPhim.Server.Services
                     }
 
                     // Translate
-                    var result = await CallGeminiApiAsync(apiKey, modelName, inputJson, session, settings, proxy);
+                    var result = await CallGeminiApiAsync(apiKey, modelName, inputText, session, settings, proxy);
                     
                     if (result.Success)
                     {
@@ -322,7 +336,7 @@ namespace SubPhim.Server.Services
         }
 
         private async Task<GeminiCallResult> CallGeminiApiAsync(VipApiKey apiKey, string modelName, 
-            string inputJson, VipTranslationSession session, VipTranslationSetting settings, Proxy? proxy)
+            string inputText, VipTranslationSession session, VipTranslationSetting settings, Proxy? proxy)
         {
             try
             {
@@ -340,9 +354,10 @@ namespace SubPhim.Server.Services
                     generationConfig["thinking_config"] = new JObject { ["thinking_budget"] = settings.ThinkingBudget };
                 }
 
-                // Send only the input JSON as user content - SystemInstruction from client controls all translation logic
+                // Send the input text as user content - SystemInstruction from client controls all translation logic
                 // This matches the AioLauncherService pattern where client has full control via SystemInstruction
-                string userContent = inputJson;
+                // Input format: "{index}: {text}" for each line (matches SrtTranslationService pattern)
+                string userContent = inputText;
                 
                 // Use proper Gemini API format with system_instruction as separate field
                 // This matches the AioLauncherService implementation
@@ -422,38 +437,49 @@ namespace SubPhim.Server.Services
         {
             var result = new List<TranslatedSrtLine>();
             
-            try
+            if (string.IsNullOrWhiteSpace(responseText))
             {
-                // Try to parse as JSON array
-                var cleanedText = responseText.Trim();
-                if (cleanedText.StartsWith("```json"))
-                    cleanedText = cleanedText.Substring(7);
-                if (cleanedText.StartsWith("```"))
-                    cleanedText = cleanedText.Substring(3);
-                if (cleanedText.EndsWith("```"))
-                    cleanedText = cleanedText.Substring(0, cleanedText.Length - 3);
-                
-                cleanedText = cleanedText.Trim();
-                
-                var parsed = JsonConvert.DeserializeObject<List<TranslationItem>>(cleanedText);
-                if (parsed != null)
-                {
-                    foreach (var item in parsed)
-                    {
-                        result.Add(new TranslatedSrtLine
-                        {
-                            Index = item.Index,
-                            TranslatedText = item.Text,
-                            Success = true
-                        });
-                    }
-                }
-            }
-            catch
-            {
-                // Fallback: return original text
+                // No response - return original text as failed
                 foreach (var line in originalBatch)
                 {
+                    result.Add(new TranslatedSrtLine
+                    {
+                        Index = line.Index,
+                        TranslatedText = line.OriginalText,
+                        Success = false
+                    });
+                }
+                return result;
+            }
+
+            // Parse response using regex pattern "{index}: {translated_text}"
+            // This matches the format returned by Gemini when using SystemInstruction from client
+            // (same pattern as SrtTranslationService.TranslateAllSrtLinesAsync)
+            var translatedLinesDict = new Dictionary<int, string>();
+            
+            foreach (Match m in TranslationLineRegex.Matches(responseText))
+            {
+                if (int.TryParse(m.Groups[1].Value, out int idx))
+                {
+                    translatedLinesDict[idx] = m.Groups[2].Value.Trim();
+                }
+            }
+
+            // Map parsed translations back to original lines
+            foreach (var line in originalBatch)
+            {
+                if (translatedLinesDict.TryGetValue(line.Index, out string translated))
+                {
+                    result.Add(new TranslatedSrtLine
+                    {
+                        Index = line.Index,
+                        TranslatedText = string.IsNullOrWhiteSpace(translated) ? "[API DỊCH RỖNG]" : translated,
+                        Success = !string.IsNullOrWhiteSpace(translated)
+                    });
+                }
+                else
+                {
+                    // Line not found in response
                     result.Add(new TranslatedSrtLine
                     {
                         Index = line.Index,
@@ -594,15 +620,6 @@ namespace SubPhim.Server.Services
             }
             
             return cleanedCount;
-        }
-
-        private class TranslationItem
-        {
-            [JsonProperty("index")]
-            public int Index { get; set; }
-            
-            [JsonProperty("text")]
-            public string Text { get; set; }
         }
 
         private class GeminiCallResult

@@ -29,16 +29,25 @@ Complete API documentation for customers is available in:
 
 - **📄 API_DOCUMENTATION.md** - Vietnamese version (comprehensive)
 - **📄 API_DOCUMENTATION_EN.md** - English version (comprehensive)
+- **📄 QUICK_REFERENCE.md** - Quick reference guide (bilingual)
 
 ### What's included in the API docs:
-- Authentication guide
-- All API endpoints with examples
-- Request/response formats
-- Error handling
-- Code examples (Python & JavaScript)
-- Best practices
-- FAQ section
-- Credit & billing information
+- **Authentication guide** - Bearer token and X-API-Key header methods
+- **All API endpoints** with request/response examples
+- **Rate limiting** - Monitor via X-RateLimit-* headers
+- **Error handling** - Complete error codes and retry strategies
+- **Code examples** - Python & JavaScript with best practices
+- **Security best practices** - API key management and protection
+- **systemInstruction** parameter - Customization examples
+- **Credit & billing** - Transparent pricing and usage tracking
+- **FAQ section** - Common questions answered
+
+### Recent Documentation Updates
+✅ Added X-API-Key authentication method  
+✅ Documented rate limit response headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)  
+✅ Enhanced error handling examples with rate limit retry logic  
+✅ Added API key security best practices  
+✅ Improved systemInstruction parameter documentation with examples
 
 ### Sharing with Customers
 Provide customers with either documentation file depending on their language preference. The docs contain all information needed to integrate with the VIP Translation API.
@@ -117,10 +126,11 @@ Global pricing settings:
 ⚠️ **Important**:
 - API Keys are hashed (SHA-256) in database
 - Plain text keys shown only once at creation
-- Keys use Bearer token authentication
-- Rate limiting per key (RPM)
+- Keys support both Bearer token and X-API-Key header authentication
+- Rate limiting per key (RPM) with transparent headers
 - Credit system prevents abuse
-- All API calls are logged
+- All API calls are logged with detailed metrics
+- Automatic credit refund on job failure or cancellation
 
 ## Support Workflow
 

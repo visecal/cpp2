@@ -34,6 +34,7 @@ namespace SubPhim.Server.Services
         private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
         private const int PROXY_RETRY_DELAY_MS = 500; // Delay ngắn giữa các lần thử proxy khác
+        private const int MAX_PROXY_RETRY_ITERATIONS = 1000; // Số vòng lặp tối đa khi thử proxy (safety limit)
         private const int FINAL_KEY_WAIT_TIMEOUT_MS = 30000; // Thời gian chờ tối đa khi tất cả keys bận (30 giây)
         private const int RETRY_RESULT_TIMEOUT_SECONDS = 30; // Timeout khi thử dịch lại trước khi trả kết quả
         private const int DEFAULT_LOCAL_API_SETTING_ID = 1;
@@ -1063,12 +1064,16 @@ namespace SubPhim.Server.Services
             string requestId = $"key{apiKeyId}_{Guid.NewGuid():N}";
             
             // === MỚI: Sử dụng biến riêng để đếm số lần retry thực sự (khi đã kết nối đến Gemini) ===
-            // Lỗi proxy KHÔNG tính vào số lần retry
+            // Lỗi proxy KHÔNG tính vào số lần retry, nhưng có safety limit để tránh infinite loop
             int geminiAttempt = 0;
+            int totalIterations = 0; // Safety counter để tránh infinite loop
             
             // Vòng lặp chính - tiếp tục cho đến khi thành công hoặc hết số lần retry Gemini
-            while (geminiAttempt < settings.MaxRetries)
+            // Safety limit: MAX_PROXY_RETRY_ITERATIONS để tránh infinite loop nếu tất cả proxy đều fail
+            while (geminiAttempt < settings.MaxRetries && totalIterations < MAX_PROXY_RETRY_ITERATIONS)
             {
+                totalIterations++;
+                
                 if (token.IsCancellationRequested)
                     return ("Lỗi: Tác vụ đã bị hủy.", 0, "CANCELLED", "Task was cancelled", 0);
 
@@ -1404,7 +1409,20 @@ namespace SubPhim.Server.Services
                 _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
             }
 
-            return ("Lỗi API: Hết số lần thử lại.", 0, "MAX_RETRIES", $"Exceeded maximum {settings.MaxRetries} Gemini API retry attempts", 0);
+            // Determine which limit was hit
+            string errorDetail;
+            if (totalIterations >= MAX_PROXY_RETRY_ITERATIONS)
+            {
+                errorDetail = $"Reached safety limit of {MAX_PROXY_RETRY_ITERATIONS} iterations (Gemini attempts: {geminiAttempt}/{settings.MaxRetries}). Too many proxy connection failures.";
+                _logger.LogError("Safety limit reached: {TotalIterations} iterations, {GeminiAttempts}/{MaxRetries} Gemini attempts", 
+                    totalIterations, geminiAttempt, settings.MaxRetries);
+            }
+            else
+            {
+                errorDetail = $"Exceeded maximum {settings.MaxRetries} Gemini API retry attempts";
+            }
+
+            return ("Lỗi API: Hết số lần thử lại.", 0, "MAX_RETRIES", errorDetail, 0);
         }
         
         /// <summary>
@@ -1451,7 +1469,7 @@ namespace SubPhim.Server.Services
                 triedProxyIds.Add(nextProxy.Id);
             }
             
-            // Cancelled - return the first one
+            // Loop exited due to cancellation token - return the first available proxy
             return proxy;
         }
         

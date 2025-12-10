@@ -38,6 +38,7 @@ namespace SubPhim.Server.Services
         private const int RETRY_RESULT_TIMEOUT_SECONDS = 30; // Timeout khi thử dịch lại trước khi trả kết quả
         private const int DEFAULT_LOCAL_API_SETTING_ID = 1;
         private const int MIN_BATCH_SIZE = 1;
+        private const double MISSING_INDEX_RETRY_THRESHOLD = 0.5; // Retry batch nếu >50% dòng bị thiếu index trong response
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
         // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
@@ -814,14 +815,28 @@ namespace SubPhim.Server.Services
                                 translatedLinesDict[idx] = m.Groups[2].Value.Trim();
                         }
 
-                        // === MỚI: Kiểm tra nếu response thiếu quá nhiều index (>50%), retry với key khác ===
-                        int missingCount = batch.Count(line => !translatedLinesDict.ContainsKey(line.LineIndex));
-                        double missingRatio = (double)missingCount / batch.Count;
+                        // === MỚI: Kiểm tra nếu response thiếu quá nhiều index, retry với key khác ===
+                        int batchCount = batch.Count;
+                        int missingCount = 0;
+                        int retryThreshold = (int)(batchCount * MISSING_INDEX_RETRY_THRESHOLD);
                         
-                        if (missingRatio > 0.5 && attempt < settings.MaxRetries)
+                        // Đếm số dòng thiếu, dừng sớm nếu đã vượt threshold
+                        foreach (var line in batch)
                         {
-                            _logger.LogWarning("Batch có {MissingCount}/{TotalCount} dòng thiếu index ({MissingPercent:P0}). Retry với key khác...",
-                                missingCount, batch.Count, missingRatio);
+                            if (!translatedLinesDict.ContainsKey(line.LineIndex))
+                            {
+                                missingCount++;
+                                if (missingCount > retryThreshold && attempt < settings.MaxRetries)
+                                {
+                                    break; // Đã vượt threshold, không cần đếm tiếp
+                                }
+                            }
+                        }
+                        
+                        if (missingCount > retryThreshold && attempt < settings.MaxRetries)
+                        {
+                            _logger.LogWarning("Batch có {MissingCount}/{TotalCount} dòng thiếu index (>{Threshold:P0}). Retry với key khác...",
+                                missingCount, batchCount, MISSING_INDEX_RETRY_THRESHOLD);
                             
                             int delayMs = settings.RetryDelayMs * attempt;
                             await Task.Delay(delayMs, token);

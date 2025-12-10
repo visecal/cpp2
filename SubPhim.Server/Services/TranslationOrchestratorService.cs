@@ -1135,14 +1135,44 @@ namespace SubPhim.Server.Services
                     // === REQUEST ĐÃ KẾT NỐI THÀNH CÔNG ĐẾN API GEMINI ===
                     // Tại đây, request đã được gửi thành công qua proxy và nhận response từ Gemini
                     // => Đánh dấu slot đã được sử dụng (sẽ tự auto-release sau 1 phút)
-                    // => TĂNG geminiAttempt vì đã kết nối được đến Gemini API
                     if (currentProxySlotId != null)
                     {
                         _proxyRateLimiter.MarkSlotAsUsed(currentProxySlotId);
                         currentProxySlotId = null; // Prevent early release
                     }
                     
-                    // === TĂNG COUNTER: Đã kết nối thành công đến Gemini, bây giờ mới tính là 1 attempt ===
+                    // === KIỂM TRA LỖI PROXY "location is not supported" TRƯỚC KHI TĂNG COUNTER ===
+                    // Lỗi này cho biết proxy IP location không được hỗ trợ bởi Gemini API
+                    // Cần disable proxy ngay lập tức và KHÔNG tính vào geminiAttempt
+                    if (!response.IsSuccessStatusCode && (int)response.StatusCode == 400 && currentProxy != null)
+                    {
+                        try
+                        {
+                            var errorBody = JObject.Parse(responseBody);
+                            var errorStatus = errorBody?["error"]?["status"]?.ToString();
+                            var errorMessage = errorBody?["error"]?["message"]?.ToString() ?? "";
+                            
+                            if (errorStatus == "FAILED_PRECONDITION" && 
+                                errorMessage.Contains("location is not supported", StringComparison.OrdinalIgnoreCase))
+                            {
+                                _logger.LogError("🚫 Proxy {ProxyId} ({Host}:{Port}) bị khoá do lỗi FAILED_PRECONDITION: {ErrorMessage}. Disable proxy ngay lập tức (NOT counting as Gemini attempt).",
+                                    currentProxy.Id, currentProxy.Host, currentProxy.Port, errorMessage);
+                                
+                                await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, "location is not supported");
+                                failedProxyIds.Add(currentProxy.Id);
+                                
+                                // Lỗi location không được hỗ trợ là lỗi proxy, KHÔNG tính vào geminiAttempt
+                                // Thử ngay với proxy khác (không delay)
+                                continue;
+                            }
+                        }
+                        catch (JsonReaderException)
+                        {
+                            // Không parse được JSON, tiếp tục xử lý như HTTP error bình thường
+                        }
+                    }
+                    
+                    // === TĂNG COUNTER: Đã kết nối thành công đến Gemini và không phải lỗi proxy ===
                     geminiAttempt++;
 
                     if (!response.IsSuccessStatusCode)
@@ -1150,42 +1180,6 @@ namespace SubPhim.Server.Services
                         int statusCode = (int)response.StatusCode;
                         string errorType = $"HTTP_{statusCode}";
                         string errorMsg = $"HTTP Error {statusCode}";
-
-                        // === THÊM MỚI: Kiểm tra lỗi FAILED_PRECONDITION "location is not supported" từ Gemini API ===
-                        // Lỗi này cho biết proxy IP location không được hỗ trợ bởi Gemini API
-                        // Cần disable proxy ngay lập tức để tránh tái sử dụng
-                        // LƯU Ý: Lỗi này KHÔNG tính là Gemini retry (đã bị giảm 1 từ geminiAttempt++)
-                        if (statusCode == 400 && currentProxy != null)
-                        {
-                            try
-                            {
-                                var errorBody = JObject.Parse(responseBody);
-                                var errorStatus = errorBody?["error"]?["status"]?.ToString();
-                                var errorMessage = errorBody?["error"]?["message"]?.ToString() ?? "";
-                                
-                                if (errorStatus == "FAILED_PRECONDITION" && 
-                                    errorMessage.Contains("location is not supported", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    _logger.LogError("🚫 Proxy {ProxyId} ({Host}:{Port}) bị khoá do lỗi FAILED_PRECONDITION: {ErrorMessage}. Disable proxy ngay lập tức.",
-                                        currentProxy.Id, currentProxy.Host, currentProxy.Port, errorMessage);
-                                    
-                                    await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, "location is not supported");
-                                    failedProxyIds.Add(currentProxy.Id);
-                                    
-                                    // Lỗi location không được hỗ trợ là lỗi proxy, KHÔNG tính vào geminiAttempt
-                                    // Hoàn trả 1 attempt đã bị tăng ở trên
-                                    geminiAttempt--;
-                                    
-                                    // Thử ngay với proxy khác (không delay)
-                                    continue;
-                                }
-                            }
-                            catch (JsonReaderException)
-                            {
-                                // Không parse được JSON, tiếp tục xử lý như HTTP error bình thường
-                            }
-                        }
-                        // === KẾT THÚC THÊM MỚI ===
 
                         _logger.LogWarning("HTTP Error {StatusCode}. Retrying in {Delay}ms... (Gemini Attempt {Attempt}/{MaxRetries})",
                             statusCode, settings.RetryDelayMs * geminiAttempt, geminiAttempt, settings.MaxRetries);
@@ -1435,7 +1429,8 @@ namespace SubPhim.Server.Services
             }
             
             // Current proxy is at RPM limit, try to find another one
-            // KHÔNG GIỚI HẠN số lần tìm kiếm - tiếp tục cho đến khi hết proxy hoặc tìm được
+            // Loop tìm proxy có slot khả dụng - BOUNDED bởi số lượng proxy
+            // (mỗi iteration thêm 1 proxy vào triedProxyIds, GetNextProxyAsync sẽ trả về null khi hết proxy)
             var triedProxyIds = new HashSet<int>(excludeProxyIds) { proxy.Id };
             
             while (!token.IsCancellationRequested)

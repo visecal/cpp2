@@ -814,6 +814,21 @@ namespace SubPhim.Server.Services
                                 translatedLinesDict[idx] = m.Groups[2].Value.Trim();
                         }
 
+                        // === MỚI: Kiểm tra nếu response thiếu quá nhiều index (>50%), retry với key khác ===
+                        int missingCount = batch.Count(line => !translatedLinesDict.ContainsKey(line.LineIndex));
+                        double missingRatio = (double)missingCount / batch.Count;
+                        
+                        if (missingRatio > 0.5 && attempt < settings.MaxRetries)
+                        {
+                            _logger.LogWarning("Batch có {MissingCount}/{TotalCount} dòng thiếu index ({MissingPercent:P0}). Retry với key khác...",
+                                missingCount, batch.Count, missingRatio);
+                            
+                            int delayMs = settings.RetryDelayMs * attempt;
+                            await Task.Delay(delayMs, token);
+                            continue; // Retry với key khác
+                        }
+                        // === KẾT THÚC MỚI ===
+
                         foreach (var line in batch)
                         {
                             if (translatedLinesDict.TryGetValue(line.LineIndex, out string translated))

@@ -33,12 +33,13 @@ namespace SubPhim.Server.Services
         // === Constants ===
         private const int RPM_WAIT_TIMEOUT_MS = 100; // Thời gian chờ khi kiểm tra RPM slot khả dụng
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
-        private const int MAX_PROXY_SEARCH_ATTEMPTS = 10; // Số lần thử tìm proxy có RPM slot
+        // Không giới hạn số lần tìm proxy - sẽ thử cho đến khi tìm được proxy hoạt động hoặc hết proxy
         private const int FINAL_KEY_WAIT_TIMEOUT_MS = 30000; // Thời gian chờ tối đa khi tất cả keys bận (30 giây)
         private const int RETRY_RESULT_TIMEOUT_SECONDS = 30; // Timeout khi thử dịch lại trước khi trả kết quả
         private const int DEFAULT_LOCAL_API_SETTING_ID = 1;
         private const int MIN_BATCH_SIZE = 1;
         private const double MISSING_INDEX_RETRY_THRESHOLD = 0.5; // Retry batch nếu >50% dòng bị thiếu index trong response
+        private const int PROXY_SEARCH_DELAY_MS = 500; // Delay giữa các lần thử proxy mới
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
         // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
@@ -1045,7 +1046,7 @@ namespace SubPhim.Server.Services
             public Timer? Timer { get; set; }
         }
         
-        // ===== SỬA ĐỔI: Thêm tracking lỗi chi tiết, random User-Agent, PROXY support và PROXY RPM LIMITING ===== 
+        // ===== SỬA ĐỔI: Cơ chế retry mới - không giới hạn số lần tìm proxy, chỉ giới hạn retry khi lỗi API ===== 
         private async Task<(string responseText, int tokensUsed, string errorType, string errorDetail, int httpStatusCode)> CallApiWithRetryAsync(
             string url, string jsonPayload, LocalApiSetting settings, int apiKeyId, CancellationToken token)
         {
@@ -1062,7 +1063,15 @@ namespace SubPhim.Server.Services
             // Create unique request ID for tracking
             string requestId = $"key{apiKeyId}_{Guid.NewGuid():N}";
             
-            for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
+            // API retry counter - chỉ tăng khi đã kết nối thành công với Gemini nhưng gặp lỗi API
+            int apiRetryCount = 0;
+            
+            // Không giới hạn số lần tìm proxy - chỉ dừng khi:
+            // 1. Thành công
+            // 2. Hết proxy (không tìm được proxy mới)
+            // 3. Cancellation
+            // 4. Đạt giới hạn API retry (sau khi kết nối thành công với Gemini)
+            while (!token.IsCancellationRequested)
             {
                 if (token.IsCancellationRequested)
                     return ("Lỗi: Tác vụ đã bị hủy.", 0, "CANCELLED", "Task was cancelled", 0);
@@ -1078,6 +1087,14 @@ namespace SubPhim.Server.Services
                 // Get a proxy with available RPM slots
                 currentProxy = await GetProxyWithAvailableRpmSlotAsync(failedProxyIds, requestId, token);
                 
+                // Kiểm tra nếu không còn proxy nào khả dụng
+                if (currentProxy == null && failedProxyIds.Count > 0)
+                {
+                    // Không còn proxy nào khả dụng sau khi đã thử nhiều proxy
+                    _logger.LogWarning("Không còn proxy nào khả dụng sau khi đã thử {FailedCount} proxy. Thử gửi request trực tiếp.",
+                        failedProxyIds.Count);
+                }
+                
                 // Acquire RPM slot for this proxy (if proxy is available)
                 if (currentProxy != null)
                 {
@@ -1088,15 +1105,11 @@ namespace SubPhim.Server.Services
                     {
                         _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) đã đạt giới hạn RPM, thử proxy khác",
                             currentProxy.Id, currentProxy.Host, currentProxy.Port);
-                        failedProxyIds.Add(currentProxy.Id); // Tạm exclude proxy này
+                        failedProxyIds.Add(currentProxy.Id); // Tạm exclude proxy này (do RPM limit)
                         
-                        // Try to get another proxy
-                        currentProxy = await GetProxyWithAvailableRpmSlotAsync(failedProxyIds, requestId, token);
-                        if (currentProxy != null)
-                        {
-                            currentProxySlotId = await _proxyRateLimiter.TryAcquireSlotWithTimeoutAsync(
-                                currentProxy.Id, requestId, PROXY_RPM_WAIT_TIMEOUT_MS, token);
-                        }
+                        // Tiếp tục vòng lặp để tìm proxy khác - KHÔNG tính là retry
+                        await Task.Delay(PROXY_SEARCH_DELAY_MS, token);
+                        continue;
                     }
                 }
 
@@ -1115,13 +1128,13 @@ namespace SubPhim.Server.Services
                     if (currentProxy != null)
                     {
                         var (rpmPerProxy, availSlots, _) = _proxyRateLimiter.GetProxyStatus(currentProxy.Id);
-                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request via Proxy {ProxyId} ({Type}://{Host}:{Port}) (Key ID: {KeyId}) RPM slots: {Available}/{Max}", 
-                            attempt, settings.MaxRetries, currentProxy.Id, currentProxy.Type, currentProxy.Host, currentProxy.Port, apiKeyId, availSlots, rpmPerProxy);
+                        _logger.LogDebug("API Retry {ApiRetry}/{MaxRetries}, Proxy search: Using Proxy {ProxyId} ({Type}://{Host}:{Port}) (Key ID: {KeyId}) RPM slots: {Available}/{Max}", 
+                            apiRetryCount, settings.MaxRetries, currentProxy.Id, currentProxy.Type, currentProxy.Host, currentProxy.Port, apiKeyId, availSlots, rpmPerProxy);
                     }
                     else
                     {
-                        _logger.LogDebug("Attempt {Attempt}/{MaxRetries}: Sending request directly (no proxy) (Key ID: {KeyId})", 
-                            attempt, settings.MaxRetries, apiKeyId);
+                        _logger.LogDebug("API Retry {ApiRetry}/{MaxRetries}: Sending request directly (no proxy) (Key ID: {KeyId})", 
+                            apiRetryCount, settings.MaxRetries, apiKeyId);
                     }
                     
                     using HttpResponseMessage response = await httpClient.SendAsync(request, token);
@@ -1130,6 +1143,7 @@ namespace SubPhim.Server.Services
                     // === REQUEST ĐÃ KẾT NỐI THÀNH CÔNG ĐẾN API GEMINI ===
                     // Tại đây, request đã được gửi thành công qua proxy và nhận response từ Gemini
                     // => Đánh dấu slot đã được sử dụng (sẽ tự auto-release sau 1 phút)
+                    // RPM/proxy chỉ tính khi đã kết nối thành công với Gemini API
                     if (currentProxySlotId != null)
                     {
                         _proxyRateLimiter.MarkSlotAsUsed(currentProxySlotId);
@@ -1142,9 +1156,9 @@ namespace SubPhim.Server.Services
                         string errorType = $"HTTP_{statusCode}";
                         string errorMsg = $"HTTP Error {statusCode}";
 
-                        // === THÊM MỚI: Kiểm tra lỗi FAILED_PRECONDITION "location is not supported" từ Gemini API ===
+                        // === Kiểm tra lỗi FAILED_PRECONDITION "location is not supported" từ Gemini API ===
                         // Lỗi này cho biết proxy IP location không được hỗ trợ bởi Gemini API
-                        // Cần disable proxy ngay lập tức để tránh tái sử dụng
+                        // Cần disable proxy ngay lập tức và thử proxy khác - KHÔNG tính là API retry
                         if (statusCode == 400 && currentProxy != null)
                         {
                             try
@@ -1156,19 +1170,14 @@ namespace SubPhim.Server.Services
                                 if (errorStatus == "FAILED_PRECONDITION" && 
                                     errorMessage.Contains("location is not supported", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    _logger.LogError("🚫 Proxy {ProxyId} ({Host}:{Port}) bị khoá do lỗi FAILED_PRECONDITION: {ErrorMessage}. Disable proxy ngay lập tức.",
+                                    _logger.LogError("🚫 Proxy {ProxyId} ({Host}:{Port}) bị khoá do lỗi FAILED_PRECONDITION: {ErrorMessage}. Disable proxy và thử proxy khác.",
                                         currentProxy.Id, currentProxy.Host, currentProxy.Port, errorMessage);
                                     
                                     await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, "location is not supported");
                                     failedProxyIds.Add(currentProxy.Id);
                                     
-                                    // Thử ngay với proxy khác (không delay)
-                                    if (attempt < settings.MaxRetries)
-                                    {
-                                        continue;
-                                    }
-                                    
-                                    return ($"Lỗi API: {errorMessage}", 0, "FAILED_PRECONDITION", errorMessage, statusCode);
+                                    // Tiếp tục tìm proxy khác - KHÔNG tính là API retry vì đây là lỗi proxy
+                                    continue;
                                 }
                             }
                             catch (JsonReaderException)
@@ -1176,10 +1185,12 @@ namespace SubPhim.Server.Services
                                 // Không parse được JSON, tiếp tục xử lý như HTTP error bình thường
                             }
                         }
-                        // === KẾT THÚC THÊM MỚI ===
 
-                        _logger.LogWarning("HTTP Error {StatusCode}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
-                            statusCode, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
+                        // === API error (sau khi kết nối thành công với Gemini) - TÍNH là API retry ===
+                        apiRetryCount++;
+                        
+                        _logger.LogWarning("HTTP Error {StatusCode}. API Retry {ApiRetry}/{MaxRetries}. Retrying in {Delay}ms...",
+                            statusCode, apiRetryCount, settings.MaxRetries, settings.RetryDelayMs * apiRetryCount);
 
                         // Ghi nhận proxy failure nếu lỗi không phải 429 (429 là do API, không phải proxy)
                         if (currentProxy != null && statusCode != 429)
@@ -1187,14 +1198,14 @@ namespace SubPhim.Server.Services
                             await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"HTTP {statusCode}");
                         }
 
-                        if (attempt < settings.MaxRetries)
+                        if (apiRetryCount >= settings.MaxRetries)
                         {
-                            await Task.Delay(settings.RetryDelayMs * attempt, token);
-                            continue;
+                            // Hết số lần API retry
+                            return ($"Lỗi API: {response.StatusCode}", 0, errorType, errorMsg, statusCode);
                         }
 
-                        // Hết số lần retry, trả về lỗi
-                        return ($"Lỗi API: {response.StatusCode}", 0, errorType, errorMsg, statusCode);
+                        await Task.Delay(settings.RetryDelayMs * apiRetryCount, token);
+                        continue;
                     }
 
                     // === Request thành công, ghi nhận proxy success ===
@@ -1213,47 +1224,60 @@ namespace SubPhim.Server.Services
                     {
                         // Response không phải JSON (có thể là HTML error page từ proxy hoặc server)
                         var previewBody = responseBody.Length > 200 ? responseBody.Substring(0, 200) + "..." : responseBody;
-                        _logger.LogWarning("Response is not valid JSON (possibly HTML error page). Preview: {Preview}. Retrying... (Attempt {Attempt}/{MaxRetries})",
-                            previewBody, attempt, settings.MaxRetries);
                         
                         // Nếu response bắt đầu bằng HTML tag, có thể proxy trả về error page
-                        // Đây là lỗi INTERMITTENT - proxy có thể hoạt động lần sau
+                        // Đây là lỗi proxy - KHÔNG tính là API retry
                         if (responseBody.TrimStart().StartsWith("<", StringComparison.Ordinal))
                         {
+                            _logger.LogWarning("Response is HTML (proxy error page). Preview: {Preview}. Trying another proxy...",
+                                previewBody);
+                            
                             if (currentProxy != null)
                             {
                                 // isIntermittent = true: sử dụng threshold cao hơn (10 thay vì 5)
                                 await _proxyService.RecordProxyFailureAsync(currentProxy.Id, "Proxy returned HTML instead of JSON", isIntermittent: true);
                                 failedProxyIds.Add(currentProxy.Id);
                             }
-                        }
-                        
-                        if (attempt < settings.MaxRetries)
-                        {
-                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            
+                            // Tiếp tục tìm proxy khác - KHÔNG tính là API retry
+                            await Task.Delay(PROXY_SEARCH_DELAY_MS, token);
                             continue;
                         }
                         
-                        return ("Lỗi: Response không phải JSON hợp lệ", 0, "INVALID_JSON", $"JSON parse error: {jsonEx.Message}", 200);
+                        // Response không phải HTML nhưng cũng không phải JSON - đây là lỗi API
+                        apiRetryCount++;
+                        _logger.LogWarning("Response is not valid JSON. Preview: {Preview}. API Retry {ApiRetry}/{MaxRetries}...",
+                            previewBody, apiRetryCount, settings.MaxRetries);
+                        
+                        if (apiRetryCount >= settings.MaxRetries)
+                        {
+                            return ("Lỗi: Response không phải JSON hợp lệ", 0, "INVALID_JSON", $"JSON parse error: {jsonEx.Message}", 200);
+                        }
+                        
+                        await Task.Delay(settings.RetryDelayMs * apiRetryCount, token);
+                        continue;
                     }
 
                     // Kiểm tra lỗi trong response body
                     if (parsedBody?["error"] != null)
                     {
                         string errorMsg = parsedBody["error"]?["message"]?.ToString() ?? "Unknown error";
-                        _logger.LogWarning("API returned error: {ErrorMsg}. Retrying... (Attempt {Attempt}/{MaxRetries})",
-                            errorMsg, attempt, settings.MaxRetries);
+                        
+                        // API error - TÍNH là API retry
+                        apiRetryCount++;
+                        _logger.LogWarning("API returned error: {ErrorMsg}. API Retry {ApiRetry}/{MaxRetries}...",
+                            errorMsg, apiRetryCount, settings.MaxRetries);
 
-                        if (attempt < settings.MaxRetries)
+                        if (apiRetryCount >= settings.MaxRetries)
                         {
-                            await Task.Delay(settings.RetryDelayMs * attempt, token);
-                            continue;
+                            return ($"Lỗi API: {errorMsg}", 0, "API_ERROR", errorMsg, 200);
                         }
 
-                        return ($"Lỗi API: {errorMsg}", 0, "API_ERROR", errorMsg, 200);
+                        await Task.Delay(settings.RetryDelayMs * apiRetryCount, token);
+                        continue;
                     }
 
-                    // ===== THÊM MỚI: Kiểm tra blockReason (vi phạm chính sách an toàn) =====
+                    // ===== Kiểm tra blockReason (vi phạm chính sách an toàn) =====
                     if (parsedBody?["promptFeedback"]?["blockReason"] != null)
                     {
                         string blockReason = parsedBody["promptFeedback"]["blockReason"].ToString();
@@ -1264,24 +1288,25 @@ namespace SubPhim.Server.Services
                         // Vi phạm chính sách không retry
                         return ($"Lỗi: {errorMsg}", 0, "BLOCKED_CONTENT", errorMsg, 200);
                     }
-                    // ===== KẾT THÚC THÊM MỚI =====
 
-                    // ===== THÊM MỚI: Kiểm tra finishReason =====
+                    // ===== Kiểm tra finishReason =====
                     var finishReason = parsedBody?["candidates"]?[0]?["finishReason"]?.ToString();
                     if (!string.IsNullOrEmpty(finishReason) && finishReason != "STOP")
                     {
                         string errorMsg = $"FinishReason không hợp lệ: {finishReason}";
 
-                        _logger.LogWarning("Invalid finishReason: {FinishReason}. Possible safety violation. Retrying... (Attempt {Attempt}/{MaxRetries})",
-                            finishReason, attempt, settings.MaxRetries);
+                        // API error - TÍNH là API retry
+                        apiRetryCount++;
+                        _logger.LogWarning("Invalid finishReason: {FinishReason}. API Retry {ApiRetry}/{MaxRetries}...",
+                            finishReason, apiRetryCount, settings.MaxRetries);
 
-                        if (attempt < settings.MaxRetries)
+                        if (apiRetryCount >= settings.MaxRetries)
                         {
-                            await Task.Delay(settings.RetryDelayMs * attempt, token);
-                            continue;
+                            return ($"Lỗi: {errorMsg}", 0, "FINISH_REASON", errorMsg, 200);
                         }
 
-                        return ($"Lỗi: {errorMsg}", 0, "FINISH_REASON", errorMsg, 200);
+                        await Task.Delay(settings.RetryDelayMs * apiRetryCount, token);
+                        continue;
                     }
 
                     int tokens = parsedBody?["usageMetadata"]?["totalTokenCount"]?.Value<int>() ?? 0;
@@ -1289,16 +1314,18 @@ namespace SubPhim.Server.Services
 
                     if (responseText == null)
                     {
-                        _logger.LogWarning("API returned OK but content is empty. Retrying... (Attempt {Attempt}/{MaxRetries})",
-                            attempt, settings.MaxRetries);
+                        // API error - TÍNH là API retry
+                        apiRetryCount++;
+                        _logger.LogWarning("API returned OK but content is empty. API Retry {ApiRetry}/{MaxRetries}...",
+                            apiRetryCount, settings.MaxRetries);
 
-                        if (attempt < settings.MaxRetries)
+                        if (apiRetryCount >= settings.MaxRetries)
                         {
-                            await Task.Delay(settings.RetryDelayMs * attempt, token);
-                            continue;
+                            return ("Lỗi: API trả về phản hồi rỗng.", 0, "EMPTY_RESPONSE", "API returned empty response", 200);
                         }
 
-                        return ("Lỗi: API trả về phản hồi rỗng.", 0, "EMPTY_RESPONSE", "API returned empty response", 200);
+                        await Task.Delay(settings.RetryDelayMs * apiRetryCount, token);
+                        continue;
                     }
 
                     // Success
@@ -1306,8 +1333,8 @@ namespace SubPhim.Server.Services
                 }
                 catch (HttpRequestException ex) when (IsProxyTunnelError(ex))
                 {
-                    // === PROXY TUNNEL ERROR: Immediately switch to different proxy or direct connection ===
-                    // Lỗi kết nối proxy - KHÔNG tính vào RPM (release slot early)
+                    // === PROXY TUNNEL ERROR: Lỗi kết nối proxy - KHÔNG tính vào API retry ===
+                    // Release slot early vì chưa kết nối được đến Gemini
                     if (currentProxySlotId != null)
                     {
                         _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
@@ -1318,23 +1345,25 @@ namespace SubPhim.Server.Services
                     {
                         failedProxyIds.Add(currentProxy.Id);
                         await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"Proxy tunnel failed: {ex.Message}");
-                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) tunnel connection failed: {Error}. Excluding and trying another proxy immediately.", 
+                        _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) tunnel connection failed: {Error}. Trying another proxy (not counting as API retry).", 
                             currentProxy.Id, currentProxy.Host, currentProxy.Port, ex.Message);
                     }
                     
-                    // Don't count proxy failures as API retry attempts - retry immediately with new proxy
-                    // Only add minimal delay to prevent tight loop
-                    if (attempt < settings.MaxRetries)
+                    // Kiểm tra nếu không còn proxy nào để thử
+                    var nextProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
+                    if (nextProxy == null && currentProxy != null)
                     {
-                        await Task.Delay(500, token); // Short delay before retry with new proxy
-                        continue;
+                        _logger.LogError("Hết proxy sau {FailedCount} proxy lỗi. Không thể hoàn thành request.", failedProxyIds.Count);
+                        return ($"Lỗi Proxy: {ex.Message}", 0, "PROXY_TUNNEL_ERROR", $"All {failedProxyIds.Count} proxies failed", 0);
                     }
                     
-                    return ($"Lỗi Proxy: {ex.Message}", 0, "PROXY_TUNNEL_ERROR", ex.Message, 0);
+                    // Tiếp tục tìm proxy khác - KHÔNG tính là API retry
+                    await Task.Delay(PROXY_SEARCH_DELAY_MS, token);
+                    continue;
                 }
                 catch (Exception ex)
                 {
-                    // === Lỗi kết nối - KHÔNG tính vào RPM (release slot early) ===
+                    // === Lỗi kết nối - Release slot early vì chưa kết nối được đến Gemini ===
                     if (currentProxySlotId != null)
                     {
                         _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
@@ -1342,30 +1371,36 @@ namespace SubPhim.Server.Services
                     }
                     
                     // Check if this is a CRITICAL proxy error (connection timeout, host unreachable, etc.)
-                    // These proxies should be disabled IMMEDIATELY and PERMANENTLY
+                    // Đây là lỗi proxy - KHÔNG tính là API retry
                     if (currentProxy != null && ProxyService.IsCriticalProxyError(ex))
                     {
                         var errorDescription = ProxyService.GetProxyErrorDescription(ex);
-                        _logger.LogError("🚫 CRITICAL PROXY ERROR for Proxy {ProxyId} ({Host}:{Port}): {Error}. Disabling proxy PERMANENTLY.", 
+                        _logger.LogError("🚫 CRITICAL PROXY ERROR for Proxy {ProxyId} ({Host}:{Port}): {Error}. Disabling and trying another proxy (not counting as API retry).", 
                             currentProxy.Id, currentProxy.Host, currentProxy.Port, errorDescription);
                         
-                        // Disable proxy immediately - don't wait for consecutive failures
+                        // Disable proxy immediately
                         await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, errorDescription);
                         failedProxyIds.Add(currentProxy.Id);
                         
-                        // Retry immediately with new proxy (don't count as retry attempt for critical proxy errors)
-                        if (attempt < settings.MaxRetries)
+                        // Kiểm tra nếu không còn proxy nào để thử
+                        var nextProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
+                        if (nextProxy == null)
                         {
-                            await Task.Delay(500, token); // Short delay before retry
-                            continue;
+                            _logger.LogError("Hết proxy sau {FailedCount} proxy lỗi critical. Không thể hoàn thành request.", failedProxyIds.Count);
+                            return ($"Lỗi Proxy Critical: {errorDescription}", 0, "CRITICAL_PROXY_ERROR", $"All {failedProxyIds.Count} proxies failed", 0);
                         }
+                        
+                        // Tiếp tục tìm proxy khác - KHÔNG tính là API retry
+                        await Task.Delay(PROXY_SEARCH_DELAY_MS, token);
+                        continue;
                     }
-                    // Record non-critical proxy failure and switch to a new proxy
-                    else if (currentProxy != null && (ex is HttpRequestException || ex is TaskCanceledException))
+                    
+                    // Non-critical proxy error (e.g., timeout, connection refused)
+                    // Đây là lỗi proxy - KHÔNG tính là API retry
+                    if (currentProxy != null && (ex is HttpRequestException || ex is TaskCanceledException))
                     {
                         failedProxyIds.Add(currentProxy.Id);
                         
-                        // Check if this is a timeout/cancellation error (very transient)
                         bool isTimeoutError = ProxyService.IsTimeoutOrCancellationError(ex);
                         var errorMessage = ProxyService.GetProxyErrorDescription(ex);
                         
@@ -1374,23 +1409,39 @@ namespace SubPhim.Server.Services
                         
                         if (isTimeoutError)
                         {
-                            _logger.LogDebug("Proxy {ProxyId} ({Host}:{Port}) timeout (transient): {Error}. Switching to another proxy.", 
+                            _logger.LogDebug("Proxy {ProxyId} ({Host}:{Port}) timeout (transient): {Error}. Trying another proxy (not counting as API retry).", 
                                 currentProxy.Id, currentProxy.Host, currentProxy.Port, errorMessage);
                         }
                         else
                         {
-                            _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) connection failed: {Error}. Switching to a new proxy.", 
+                            _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) connection failed: {Error}. Trying another proxy (not counting as API retry).", 
                                 currentProxy.Id, currentProxy.Host, currentProxy.Port, errorMessage);
                         }
+                        
+                        // Kiểm tra nếu không còn proxy nào để thử
+                        var nextProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
+                        if (nextProxy == null)
+                        {
+                            _logger.LogError("Hết proxy sau {FailedCount} proxy lỗi. Không thể hoàn thành request.", failedProxyIds.Count);
+                            return ($"Lỗi Proxy: {errorMessage}", 0, "PROXY_CONNECTION_ERROR", $"All {failedProxyIds.Count} proxies failed", 0);
+                        }
+                        
+                        // Tiếp tục tìm proxy khác - KHÔNG tính là API retry
+                        await Task.Delay(PROXY_SEARCH_DELAY_MS, token);
+                        continue;
                     }
                     
-                    _logger.LogError(ex, "Exception during API call. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
-                        settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
+                    // Lỗi không xác định (không phải lỗi proxy) - TÍNH là API retry
+                    apiRetryCount++;
+                    _logger.LogError(ex, "Exception during API call. API Retry {ApiRetry}/{MaxRetries}. Retrying in {Delay}ms...",
+                        apiRetryCount, settings.MaxRetries, settings.RetryDelayMs * apiRetryCount);
 
-                    if (attempt >= settings.MaxRetries)
+                    if (apiRetryCount >= settings.MaxRetries)
+                    {
                         return ($"Lỗi Exception: {ex.Message}", 0, "EXCEPTION", ex.Message, 0);
+                    }
 
-                    await Task.Delay(settings.RetryDelayMs * attempt, token);
+                    await Task.Delay(settings.RetryDelayMs * apiRetryCount, token);
                 }
             }
 
@@ -1400,11 +1451,12 @@ namespace SubPhim.Server.Services
                 _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
             }
 
-            return ("Lỗi API: Hết số lần thử lại.", 0, "MAX_RETRIES", "Exceeded maximum retry attempts", 0);
+            return ("Lỗi: Tác vụ đã bị hủy.", 0, "CANCELLED", "Task was cancelled", 0);
         }
         
         /// <summary>
         /// Lấy proxy có RPM slot khả dụng, loại trừ các proxy đã failed.
+        /// Không giới hạn số lần tìm kiếm - sẽ thử tất cả proxy có sẵn.
         /// </summary>
         private async Task<Proxy?> GetProxyWithAvailableRpmSlotAsync(HashSet<int> excludeProxyIds, string requestId, CancellationToken token)
         {
@@ -1422,9 +1474,10 @@ namespace SubPhim.Server.Services
             }
             
             // Current proxy is at RPM limit, try to find another one
+            // Không giới hạn số lần tìm - sẽ thử tất cả proxy có sẵn
             var triedProxyIds = new HashSet<int>(excludeProxyIds) { proxy.Id };
             
-            for (int i = 0; i < MAX_PROXY_SEARCH_ATTEMPTS; i++)
+            while (!token.IsCancellationRequested)
             {
                 var nextProxy = await _proxyService.GetNextProxyAsync(triedProxyIds);
                 if (nextProxy == null)
@@ -1442,7 +1495,7 @@ namespace SubPhim.Server.Services
                 triedProxyIds.Add(nextProxy.Id);
             }
             
-            // All proxies at RPM limit, return the first one
+            // Cancellation requested, return the first available proxy
             return proxy;
         }
         

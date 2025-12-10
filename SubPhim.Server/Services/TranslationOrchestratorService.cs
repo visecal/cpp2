@@ -35,6 +35,9 @@ namespace SubPhim.Server.Services
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
         private const int MAX_PROXY_SEARCH_ATTEMPTS = 10; // Số lần thử tìm proxy có RPM slot
         private const int FINAL_KEY_WAIT_TIMEOUT_MS = 30000; // Thời gian chờ tối đa khi tất cả keys bận (30 giây)
+        private const int RETRY_RESULT_TIMEOUT_SECONDS = 30; // Timeout khi thử dịch lại trước khi trả kết quả
+        private const int DEFAULT_LOCAL_API_SETTING_ID = 1;
+        private const int MIN_BATCH_SIZE = 1;
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
         // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
@@ -251,8 +254,11 @@ namespace SubPhim.Server.Services
                     Success = l.Success
                 })
                 .ToList();
+            var translatedLookup = translatedLines
+                .GroupBy(l => l.Index)
+                .ToDictionary(g => g.Key, g => g.First());
 
-            // Auto-retry lines that are missing/failed before returning to client (do not charge extra usage)
+            // Auto-retry failed lines before returning to client (do not charge extra user quota; API key usage is still tracked)
             var retryIndexes = resultsDb
                 .Where(l => !l.Success)
                 .Select(l => l.LineIndex)
@@ -263,15 +269,17 @@ namespace SubPhim.Server.Services
             {
                 try
                 {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    _logger.LogInformation("Retrying {RetryCount} failed lines for session {SessionId} before returning results.", retryIndexes.Count, sessionId);
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(RETRY_RESULT_TIMEOUT_SECONDS));
                     var retryResults = await RetranslateLinesAsync(sessionId, retryIndexes, cts.Token);
 
-                    foreach (var line in translatedLines)
+                    foreach (var retried in retryResults)
                     {
-                        if (retryResults.TryGetValue(line.Index, out var retried))
+                        if (translatedLookup.TryGetValue(retried.Key, out var line))
                         {
-                            line.TranslatedText = retried.TranslatedText;
-                            line.Success = retried.Success;
+                            // Update the same instances that will be returned to the client
+                            line.TranslatedText = retried.Value.TranslatedText;
+                            line.Success = retried.Value.Success;
                         }
                     }
                 }
@@ -290,7 +298,7 @@ namespace SubPhim.Server.Services
             CancellationToken cancellationToken)
         {
             var result = new Dictionary<int, TranslatedSrtLine>();
-            if (lineIndexes == null || lineIndexes.Count == 0)
+            if (lineIndexes == null || !lineIndexes.Any())
                 return result;
 
             using var scope = _serviceProvider.CreateScope();
@@ -305,8 +313,7 @@ namespace SubPhim.Server.Services
                 .FirstOrDefaultAsync(u => u.Id == job.UserId, cancellationToken);
             if (user == null) return result;
 
-            var settings = await context.LocalApiSettings.AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Id == 1, cancellationToken) ?? new LocalApiSetting();
+            var settings = await GetLocalApiSettingsAsync(context, cancellationToken);
 
             var poolToUse = (user.Tier == SubscriptionTier.Free) ? ApiPoolType.Free : ApiPoolType.Paid;
 
@@ -322,7 +329,10 @@ namespace SubPhim.Server.Services
 
             foreach (var key in availableKeys)
             {
-                EnsureKeyRpmLimiter(key.Id, settings.Rpm);
+                if (!_keyRpmCapacities.TryGetValue(key.Id, out var capacity) || capacity != settings.Rpm)
+                {
+                    EnsureKeyRpmLimiter(key.Id, settings.Rpm);
+                }
             }
 
             var originalLines = await context.OriginalSrtLines.AsNoTracking()
@@ -331,9 +341,11 @@ namespace SubPhim.Server.Services
                 .ToListAsync(cancellationToken);
             if (!originalLines.Any()) return result;
 
+            int batchSize = GetValidBatchSize(settings);
+
             var batches = originalLines
                 .Select((line, index) => new { line, index })
-                .GroupBy(x => x.index / Math.Max(1, settings.BatchSize))
+                .GroupBy(x => x.index / batchSize)
                 .Select(g => g.Select(x => x.line).ToList())
                 .ToList();
 
@@ -394,6 +406,28 @@ namespace SubPhim.Server.Services
             return result;
         }
 
+        private int GetValidBatchSize(LocalApiSetting settings)
+        {
+            int? configuredBatchSize = settings?.BatchSize;
+            if (configuredBatchSize.HasValue && configuredBatchSize.Value > 0) return configuredBatchSize.Value;
+            _logger.LogWarning("Invalid BatchSize {BatchSize} detected. Falling back to {Fallback}.", configuredBatchSize, MIN_BATCH_SIZE);
+            return MIN_BATCH_SIZE;
+        }
+
+        private async Task<LocalApiSetting> GetLocalApiSettingsAsync(AppDbContext context, CancellationToken cancellationToken)
+        {
+            var settings = await context.LocalApiSettings.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == DEFAULT_LOCAL_API_SETTING_ID, cancellationToken);
+
+            if (settings == null)
+            {
+                _logger.LogWarning("LocalApiSettings with Id {Id} not found. Falling back to defaults.", DEFAULT_LOCAL_API_SETTING_ID);
+                return new LocalApiSetting();
+            }
+
+            return settings;
+        }
+
         public async Task<(bool isCompleted, string errorMessage)> GetJobStatusAsync(string sessionId)
         {
             using var scope = _serviceProvider.CreateScope();
@@ -429,7 +463,7 @@ namespace SubPhim.Server.Services
                 job.Status = JobStatus.Processing;
                 await context.SaveChangesAsync(cancellationToken);
 
-                var settings = await context.LocalApiSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == 1, cancellationToken) ?? new LocalApiSetting();
+                var settings = await GetLocalApiSettingsAsync(context, cancellationToken);
                 var activeModel = await context.AvailableApiModels.AsNoTracking().FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cancellationToken);
                 if (activeModel == null) throw new Exception($"Không có model nào đang hoạt động cho nhóm '{poolToUse}'.");
 
@@ -462,9 +496,11 @@ namespace SubPhim.Server.Services
                     .OrderBy(l => l.LineIndex)
                     .ToListAsync(cancellationToken);
 
+                int batchSize = GetValidBatchSize(settings);
+
                 var batches = allLines
                     .Select((line, index) => new { line, index })
-                    .GroupBy(x => x.index / settings.BatchSize)
+                    .GroupBy(x => x.index / batchSize)
                     .Select(g => g.Select(x => x.line).ToList())
                     .ToList();
 

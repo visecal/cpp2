@@ -35,6 +35,9 @@ namespace SubPhim.Server.Services
         private const int PROXY_RPM_WAIT_TIMEOUT_MS = 500; // Thời gian chờ khi kiểm tra proxy RPM slot
         private const int MAX_PROXY_SEARCH_ATTEMPTS = 10; // Số lần thử tìm proxy có RPM slot
         private const int FINAL_KEY_WAIT_TIMEOUT_MS = 30000; // Thời gian chờ tối đa khi tất cả keys bận (30 giây)
+        private const int RETRY_RESULT_TIMEOUT_SECONDS = 30; // Timeout khi thử dịch lại trước khi trả kết quả
+        private const int DEFAULT_LOCAL_API_SETTING_ID = 1;
+        private const int MIN_BATCH_SIZE = 1;
         
         // Chrome-based templates use {0}=major, {1}=build, {2}=patch
         // Firefox templates only use {0}=version (extra args are safely ignored by string.Format)
@@ -242,7 +245,187 @@ namespace SubPhim.Server.Services
                 await context.SaveChangesAsync();
             }
             await transaction.CommitAsync();
-            return resultsDb.Select(l => new TranslatedSrtLine { Index = l.LineIndex, TranslatedText = l.TranslatedText, Success = l.Success }).ToList();
+
+            var translatedLines = resultsDb
+                .Select(l => new TranslatedSrtLine
+                {
+                    Index = l.LineIndex,
+                    TranslatedText = l.TranslatedText,
+                    Success = l.Success
+                })
+                .ToList();
+            var translatedLookup = translatedLines
+                .GroupBy(l => l.Index)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // Auto-retry failed lines before returning to client (do not charge extra user quota; API key usage is still tracked)
+            var retryIndexes = resultsDb
+                .Where(l => !l.Success)
+                .Select(l => l.LineIndex)
+                .Distinct()
+                .ToList();
+
+            if (retryIndexes.Any())
+            {
+                try
+                {
+                    _logger.LogInformation("Retrying {RetryCount} failed lines for session {SessionId} before returning results.", retryIndexes.Count, sessionId);
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(RETRY_RESULT_TIMEOUT_SECONDS));
+                    var retryResults = await RetranslateLinesAsync(sessionId, retryIndexes, cts.Token);
+
+                    foreach (var retried in retryResults)
+                    {
+                        if (translatedLookup.TryGetValue(retried.Key, out var line))
+                        {
+                            // Update the same instances that will be returned to the client
+                            line.TranslatedText = retried.Value.TranslatedText;
+                            line.Success = retried.Value.Success;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Retry translation failed for session {SessionId}", sessionId);
+                }
+            }
+
+            return translatedLines;
+        }
+
+        private async Task<Dictionary<int, TranslatedSrtLine>> RetranslateLinesAsync(
+            string sessionId,
+            List<int> lineIndexes,
+            CancellationToken cancellationToken)
+        {
+            var result = new Dictionary<int, TranslatedSrtLine>();
+            if (lineIndexes == null || !lineIndexes.Any())
+                return result;
+
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var encryptionService = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
+
+            var job = await context.TranslationJobs.AsNoTracking()
+                .FirstOrDefaultAsync(j => j.SessionId == sessionId, cancellationToken);
+            if (job == null) return result;
+
+            var user = await context.Users.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == job.UserId, cancellationToken);
+            if (user == null) return result;
+
+            var settings = await GetLocalApiSettingsAsync(context, cancellationToken);
+
+            var poolToUse = (user.Tier == SubscriptionTier.Free) ? ApiPoolType.Free : ApiPoolType.Paid;
+
+            var activeModel = await context.AvailableApiModels.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cancellationToken);
+            if (activeModel == null) return result;
+
+            var availableKeys = await context.ManagedApiKeys.AsNoTracking()
+                .Where(k => k.IsEnabled && k.PoolType == poolToUse)
+                .ToListAsync(cancellationToken);
+            availableKeys = availableKeys.Where(k => !_cooldownService.IsInCooldown(k.Id)).ToList();
+            if (!availableKeys.Any()) return result;
+
+            foreach (var key in availableKeys)
+            {
+                if (!_keyRpmCapacities.TryGetValue(key.Id, out var capacity) || capacity != settings.Rpm)
+                {
+                    EnsureKeyRpmLimiter(key.Id, settings.Rpm);
+                }
+            }
+
+            var originalLines = await context.OriginalSrtLines.AsNoTracking()
+                .Where(l => l.SessionId == sessionId && lineIndexes.Contains(l.LineIndex))
+                .OrderBy(l => l.LineIndex)
+                .ToListAsync(cancellationToken);
+            if (!originalLines.Any()) return result;
+
+            int batchSize = GetValidBatchSize(settings);
+
+            var batches = originalLines
+                .Select((line, index) => new { line, index })
+                .GroupBy(x => x.index / batchSize)
+                .Select(g => g.Select(x => x.line).ToList())
+                .ToList();
+
+            for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
+            {
+                string? rateLimitSlotId = null;
+                try
+                {
+                    rateLimitSlotId = await _globalRateLimiter.AcquireSlotAsync(
+                        $"{sessionId}_retry_batch{batchIndex}", cancellationToken);
+
+                    var (translatedBatch, tokensUsed, usedKeyId) = await TranslateBatchAsync(
+                        batches[batchIndex],
+                        job,
+                        settings,
+                        activeModel.ModelName,
+                        job.SystemInstruction,
+                        poolToUse,
+                        encryptionService,
+                        availableKeys,
+                        settings.Rpm,
+                        cancellationToken);
+
+                    foreach (var item in translatedBatch)
+                    {
+                        result[item.LineIndex] = new TranslatedSrtLine
+                        {
+                            Index = item.LineIndex,
+                            TranslatedText = item.TranslatedText,
+                            Success = item.Success
+                        };
+                    }
+
+                    if (usedKeyId.HasValue)
+                    {
+                        await UpdateUsageInDb(usedKeyId.Value, tokensUsed);
+                        await _cooldownService.ResetCooldownAsync(usedKeyId.Value);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("Retry translation cancelled for session {SessionId}", sessionId);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error while retrying missing lines for session {SessionId}", sessionId);
+                }
+                finally
+                {
+                    if (rateLimitSlotId != null)
+                    {
+                        _globalRateLimiter.ReleaseSlot(rateLimitSlotId);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private int GetValidBatchSize(LocalApiSetting settings)
+        {
+            int? configuredBatchSize = settings?.BatchSize;
+            if (configuredBatchSize.HasValue && configuredBatchSize.Value > 0) return configuredBatchSize.Value;
+            _logger.LogWarning("Invalid BatchSize {BatchSize} detected. Falling back to {Fallback}.", configuredBatchSize, MIN_BATCH_SIZE);
+            return MIN_BATCH_SIZE;
+        }
+
+        private async Task<LocalApiSetting> GetLocalApiSettingsAsync(AppDbContext context, CancellationToken cancellationToken)
+        {
+            var settings = await context.LocalApiSettings.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == DEFAULT_LOCAL_API_SETTING_ID, cancellationToken);
+
+            if (settings == null)
+            {
+                _logger.LogWarning("LocalApiSettings with Id {Id} not found. Falling back to defaults.", DEFAULT_LOCAL_API_SETTING_ID);
+                return new LocalApiSetting();
+            }
+
+            return settings;
         }
 
         public async Task<(bool isCompleted, string errorMessage)> GetJobStatusAsync(string sessionId)
@@ -280,7 +463,7 @@ namespace SubPhim.Server.Services
                 job.Status = JobStatus.Processing;
                 await context.SaveChangesAsync(cancellationToken);
 
-                var settings = await context.LocalApiSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == 1, cancellationToken) ?? new LocalApiSetting();
+                var settings = await GetLocalApiSettingsAsync(context, cancellationToken);
                 var activeModel = await context.AvailableApiModels.AsNoTracking().FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cancellationToken);
                 if (activeModel == null) throw new Exception($"Không có model nào đang hoạt động cho nhóm '{poolToUse}'.");
 
@@ -313,9 +496,11 @@ namespace SubPhim.Server.Services
                     .OrderBy(l => l.LineIndex)
                     .ToListAsync(cancellationToken);
 
+                int batchSize = GetValidBatchSize(settings);
+
                 var batches = allLines
                     .Select((line, index) => new { line, index })
-                    .GroupBy(x => x.index / settings.BatchSize)
+                    .GroupBy(x => x.index / batchSize)
                     .Select(g => g.Select(x => x.line).ToList())
                     .ToList();
 

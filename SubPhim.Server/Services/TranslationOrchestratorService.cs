@@ -242,7 +242,156 @@ namespace SubPhim.Server.Services
                 await context.SaveChangesAsync();
             }
             await transaction.CommitAsync();
-            return resultsDb.Select(l => new TranslatedSrtLine { Index = l.LineIndex, TranslatedText = l.TranslatedText, Success = l.Success }).ToList();
+
+            var translatedLines = resultsDb
+                .Select(l => new TranslatedSrtLine
+                {
+                    Index = l.LineIndex,
+                    TranslatedText = l.TranslatedText,
+                    Success = l.Success
+                })
+                .ToList();
+
+            // Auto-retry lines that are missing/failed before returning to client (do not charge extra usage)
+            var retryIndexes = resultsDb
+                .Where(l => !l.Success)
+                .Select(l => l.LineIndex)
+                .Distinct()
+                .ToList();
+
+            if (retryIndexes.Any())
+            {
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    var retryResults = await RetranslateLinesAsync(sessionId, retryIndexes, cts.Token);
+
+                    foreach (var line in translatedLines)
+                    {
+                        if (retryResults.TryGetValue(line.Index, out var retried))
+                        {
+                            line.TranslatedText = retried.TranslatedText;
+                            line.Success = retried.Success;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Retry translation failed for session {SessionId}", sessionId);
+                }
+            }
+
+            return translatedLines;
+        }
+
+        private async Task<Dictionary<int, TranslatedSrtLine>> RetranslateLinesAsync(
+            string sessionId,
+            List<int> lineIndexes,
+            CancellationToken cancellationToken)
+        {
+            var result = new Dictionary<int, TranslatedSrtLine>();
+            if (lineIndexes == null || lineIndexes.Count == 0)
+                return result;
+
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var encryptionService = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
+
+            var job = await context.TranslationJobs.AsNoTracking()
+                .FirstOrDefaultAsync(j => j.SessionId == sessionId, cancellationToken);
+            if (job == null) return result;
+
+            var user = await context.Users.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == job.UserId, cancellationToken);
+            if (user == null) return result;
+
+            var settings = await context.LocalApiSettings.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == 1, cancellationToken) ?? new LocalApiSetting();
+
+            var poolToUse = (user.Tier == SubscriptionTier.Free) ? ApiPoolType.Free : ApiPoolType.Paid;
+
+            var activeModel = await context.AvailableApiModels.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.IsActive && m.PoolType == poolToUse, cancellationToken);
+            if (activeModel == null) return result;
+
+            var availableKeys = await context.ManagedApiKeys.AsNoTracking()
+                .Where(k => k.IsEnabled && k.PoolType == poolToUse)
+                .ToListAsync(cancellationToken);
+            availableKeys = availableKeys.Where(k => !_cooldownService.IsInCooldown(k.Id)).ToList();
+            if (!availableKeys.Any()) return result;
+
+            foreach (var key in availableKeys)
+            {
+                EnsureKeyRpmLimiter(key.Id, settings.Rpm);
+            }
+
+            var originalLines = await context.OriginalSrtLines.AsNoTracking()
+                .Where(l => l.SessionId == sessionId && lineIndexes.Contains(l.LineIndex))
+                .OrderBy(l => l.LineIndex)
+                .ToListAsync(cancellationToken);
+            if (!originalLines.Any()) return result;
+
+            var batches = originalLines
+                .Select((line, index) => new { line, index })
+                .GroupBy(x => x.index / Math.Max(1, settings.BatchSize))
+                .Select(g => g.Select(x => x.line).ToList())
+                .ToList();
+
+            for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
+            {
+                string? rateLimitSlotId = null;
+                try
+                {
+                    rateLimitSlotId = await _globalRateLimiter.AcquireSlotAsync(
+                        $"{sessionId}_retry_batch{batchIndex}", cancellationToken);
+
+                    var (translatedBatch, tokensUsed, usedKeyId) = await TranslateBatchAsync(
+                        batches[batchIndex],
+                        job,
+                        settings,
+                        activeModel.ModelName,
+                        job.SystemInstruction,
+                        poolToUse,
+                        encryptionService,
+                        availableKeys,
+                        settings.Rpm,
+                        cancellationToken);
+
+                    foreach (var item in translatedBatch)
+                    {
+                        result[item.LineIndex] = new TranslatedSrtLine
+                        {
+                            Index = item.LineIndex,
+                            TranslatedText = item.TranslatedText,
+                            Success = item.Success
+                        };
+                    }
+
+                    if (usedKeyId.HasValue)
+                    {
+                        await UpdateUsageInDb(usedKeyId.Value, tokensUsed);
+                        await _cooldownService.ResetCooldownAsync(usedKeyId.Value);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("Retry translation cancelled for session {SessionId}", sessionId);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error while retrying missing lines for session {SessionId}", sessionId);
+                }
+                finally
+                {
+                    if (rateLimitSlotId != null)
+                    {
+                        _globalRateLimiter.ReleaseSlot(rateLimitSlotId);
+                    }
+                }
+            }
+
+            return result;
         }
 
         public async Task<(bool isCompleted, string errorMessage)> GetJobStatusAsync(string sessionId)

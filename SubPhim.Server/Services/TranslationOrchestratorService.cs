@@ -1073,9 +1073,6 @@ namespace SubPhim.Server.Services
             // 4. Đạt giới hạn API retry (sau khi kết nối thành công với Gemini)
             while (!token.IsCancellationRequested)
             {
-                if (token.IsCancellationRequested)
-                    return ("Lỗi: Tác vụ đã bị hủy.", 0, "CANCELLED", "Task was cancelled", 0);
-
                 // === PROXY SELECTION WITH RPM LIMITING ===
                 // Release previous proxy slot if switching proxy
                 if (currentProxySlotId != null)
@@ -1091,8 +1088,10 @@ namespace SubPhim.Server.Services
                 if (currentProxy == null && failedProxyIds.Count > 0)
                 {
                     // Không còn proxy nào khả dụng sau khi đã thử nhiều proxy
+                    // Thử gửi request trực tiếp (không qua proxy)
                     _logger.LogWarning("Không còn proxy nào khả dụng sau khi đã thử {FailedCount} proxy. Thử gửi request trực tiếp.",
                         failedProxyIds.Count);
+                    // currentProxy = null sẽ khiến request được gửi trực tiếp
                 }
                 
                 // Acquire RPM slot for this proxy (if proxy is available)
@@ -1495,7 +1494,8 @@ namespace SubPhim.Server.Services
                 triedProxyIds.Add(nextProxy.Id);
             }
             
-            // Cancellation requested, return the first available proxy
+            // Loop exited due to cancellation or no more proxies to try
+            // Return the first proxy found (will wait for slot if needed)
             return proxy;
         }
         

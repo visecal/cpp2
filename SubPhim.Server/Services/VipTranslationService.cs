@@ -835,6 +835,42 @@ namespace SubPhim.Server.Services
                         string errorType = $"HTTP_{statusCode}";
                         string errorMsg = $"HTTP Error {statusCode}";
 
+                        // === THÊM MỚI: Kiểm tra lỗi FAILED_PRECONDITION "location is not supported" từ Gemini API ===
+                        // Lỗi này cho biết proxy IP location không được hỗ trợ bởi Gemini API
+                        // Cần disable proxy ngay lập tức để tránh tái sử dụng
+                        if (statusCode == 400 && currentProxy != null)
+                        {
+                            try
+                            {
+                                var errorBody = JObject.Parse(responseBody);
+                                var errorStatus = errorBody?["error"]?["status"]?.ToString();
+                                var errorMessage = errorBody?["error"]?["message"]?.ToString() ?? "";
+                                
+                                if (errorStatus == "FAILED_PRECONDITION" && 
+                                    errorMessage.Contains("location is not supported", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _logger.LogError("🚫 Proxy {ProxyId} ({Host}:{Port}) bị khoá do lỗi FAILED_PRECONDITION: {ErrorMessage}. Disable proxy ngay lập tức.",
+                                        currentProxy.Id, currentProxy.Host, currentProxy.Port, errorMessage);
+                                    
+                                    await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, "location is not supported");
+                                    failedProxyIds.Add(currentProxy.Id);
+                                    
+                                    // Thử ngay với proxy khác (không delay)
+                                    if (attempt < settings.MaxRetries)
+                                    {
+                                        continue;
+                                    }
+                                    
+                                    return ($"Lỗi API: {errorMessage}", 0, "FAILED_PRECONDITION", errorMessage, statusCode);
+                                }
+                            }
+                            catch (JsonReaderException)
+                            {
+                                // Không parse được JSON, tiếp tục xử lý như HTTP error bình thường
+                            }
+                        }
+                        // === KẾT THÚC THÊM MỚI ===
+
                         _logger.LogWarning("HTTP Error {StatusCode}. Retrying in {Delay}ms... (Attempt {Attempt}/{MaxRetries})",
                             statusCode, settings.RetryDelayMs * attempt, attempt, settings.MaxRetries);
 

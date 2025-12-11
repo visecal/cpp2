@@ -573,6 +573,13 @@ namespace SubPhim.Server.Data
         [Display(Name = "Request/Phút/Proxy (RPM)")]
         public int RpmPerProxy { get; set; } = 10;
 
+        // --- BATCH PROCESSING SETTINGS ---
+        [Display(Name = "Xử lý hàng loạt (gửi tất cả batch đồng thời)")]
+        public bool EnableBatchProcessing { get; set; } = false;
+        
+        [Display(Name = "Timeout mỗi batch (phút)")]
+        public int BatchTimeoutMinutes { get; set; } = 3;
+
         // --- KẾT THÚC THÊM CÁC TRƯỜNG MỚI ---
     }
     

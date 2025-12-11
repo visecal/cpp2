@@ -89,6 +89,33 @@
                         </div>
                     </div>
                     
+                    <hr class="my-3" />
+                    <h6 class="text-primary mb-3"><i class="bi bi-lightning-charge me-1"></i> Xử lý hàng loạt (Batch Processing)</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" asp-for="GlobalSettings.EnableBatchProcessing" id="enableBatchProcessing">
+                                <label class="form-check-label fw-bold" for="enableBatchProcessing">Bật xử lý hàng loạt</label>
+                            </div>
+                            <small class="text-muted d-block mt-1">Khi bật, tất cả các batch sẽ được gửi đồng thời thay vì tuần tự</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="GlobalSettings.BatchTimeoutMinutes" class="form-label">Timeout mỗi batch (phút)</label>
+                            <input asp-for="GlobalSettings.BatchTimeoutMinutes" class="form-control" />
+                            <small class="text-muted">Nếu batch chưa hoàn thành trong thời gian này, sẽ hủy và thử proxy khác</small>
+                        </div>
+                        <div class="col-md-4 mb-3 d-flex align-items-center">
+                            <div class="alert alert-primary mb-0 py-2 w-100">
+                                <small>
+                                    <strong>⚡ Tối ưu tốc độ:</strong><br/>
+                                    <i class="bi bi-speedometer2 me-1"></i>Gửi tất cả batch đồng thời với các cặp (API key, Proxy) khác nhau<br/>
+                                    <i class="bi bi-arrow-repeat me-1"></i>Tự động chuyển proxy nếu lỗi hoặc timeout<br/>
+                                    <i class="bi bi-shield-check me-1"></i>Tuân thủ RPM limit cho key và proxy
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <button type="submit" class="btn btn-info">Lưu Cài Đặt Chung</button>
                 </form>
             </div>

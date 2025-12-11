@@ -46,6 +46,12 @@ namespace SubPhim.Server.Services
         private const int KEY_ACQUISITION_TIMEOUT_MS = 60000; // Timeout khi đợi key (60 giây)
         private const int ALL_KEYS_BUSY_RETRY_DELAY_MS = 5000; // Delay khi tất cả keys bận
 
+        // === Batch Processing Mode Constants ===
+        private const int DEFAULT_BATCH_TIMEOUT_MINUTES = 3; // Timeout mặc định cho mỗi batch (phút)
+        private const int BATCH_MODE_MIN_RETRY_DELAY_MS = 1000; // Delay tối thiểu giữa các retry trong batch mode
+        private const int BATCH_MODE_REQUEST_TIMEOUT_SECONDS = 90; // Timeout cho mỗi HTTP request trong batch mode
+        private const int MAX_PROXY_ATTEMPTS_IN_BATCH_MODE = 50; // Số lần thử proxy tối đa trong batch mode
+
         // User-Agent templates
         private static readonly string[] _chromeTemplates = new[]
         {
@@ -161,115 +167,224 @@ namespace SubPhim.Server.Services
                     .Select(g => g.Select(x => x.line).ToList())
                     .ToList();
 
-                _logger.LogInformation("Job {SessionId}: Processing {BatchCount} batches with {KeyCount} keys, RPM={Rpm}",
-                    sessionId, batches.Count, enabledKeys.Count, rpmPerKey);
+                _logger.LogInformation("Job {SessionId}: Processing {BatchCount} batches with {KeyCount} keys, RPM={Rpm}, BatchProcessingMode={BatchMode}",
+                    sessionId, batches.Count, enabledKeys.Count, rpmPerKey, settings.EnableBatchProcessing);
 
                 // =================================================================
-                // CẢI TIẾN QUAN TRỌNG: XỬ LÝ BATCH TUẦN TỰ VỚI CONCURRENT LIMIT
+                // XỬ LÝ BATCH - HỖ TRỢ CHẾ ĐỘ XỬ LÝ HÀNG LOẠT
                 // =================================================================
 
-                int maxConcurrentBatches = Math.Min(enabledKeys.Count * 2, 10); // Giới hạn concurrent
-                var semaphore = new SemaphoreSlim(maxConcurrentBatches);
                 var batchResults = new ConcurrentDictionary<int, BatchProcessResult>();
                 var processingTasks = new List<Task>();
 
-                for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
+                if (settings.EnableBatchProcessing)
                 {
-                    if (cancellationToken.IsCancellationRequested)
+                    // === CHẾ ĐỘ XỬ LÝ HÀNG LOẠT: GỬI TẤT CẢ BATCH ĐỒNG THỜI ===
+                    _logger.LogInformation("🚀 Job {SessionId}: Batch Processing Mode ENABLED - Sending all {Count} batches simultaneously", 
+                        sessionId, batches.Count);
+
+                    // Không giới hạn concurrent - gửi tất cả cùng lúc
+                    // Mỗi batch sẽ tự tìm key/proxy khả dụng với RPM limit
+                    int batchTimeoutMs = (settings.BatchTimeoutMinutes > 0 ? settings.BatchTimeoutMinutes : DEFAULT_BATCH_TIMEOUT_MINUTES) * 60 * 1000;
+
+                    for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                     {
-                        _logger.LogWarning("Job {SessionId}: Cancellation requested at batch {BatchIndex}", sessionId, batchIndex);
-                        break;
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            _logger.LogWarning("Job {SessionId}: Cancellation requested at batch {BatchIndex}", sessionId, batchIndex);
+                            break;
+                        }
+
+                        var batch = batches[batchIndex];
+                        int currentBatchIndex = batchIndex;
+
+                        // Gửi tất cả batch ngay lập tức, không chờ
+                        processingTasks.Add(Task.Run(async () =>
+                        {
+                            var result = new BatchProcessResult { BatchIndex = currentBatchIndex, Success = false };
+                            string? rateLimitSlotId = null;
+
+                            try
+                            {
+                                // Tạo timeout riêng cho mỗi batch
+                                using var batchCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                                batchCts.CancelAfter(batchTimeoutMs);
+                                var batchToken = batchCts.Token;
+
+                                rateLimitSlotId = await _globalRateLimiter.AcquireSlotAsync(
+                                    $"{sessionId}_batch{currentBatchIndex}", batchToken);
+
+                                // Xử lý batch với timeout và retry proxy
+                                var batchResult = await ProcessBatchWithTimeoutAndProxyRetryAsync(
+                                    batch, job, settings, activeModel.ModelName,
+                                    poolToUse, encryptionService, enabledKeys, rpmPerKey,
+                                    currentBatchIndex, batchTimeoutMs, batchToken);
+
+                                result.Success = batchResult.success;
+                                result.Results = batchResult.results;
+                                result.UsedKeyId = batchResult.usedKeyId;
+                                result.TokensUsed = batchResult.tokensUsed;
+
+                                if (batchResult.results != null && batchResult.results.Any())
+                                {
+                                    await SaveResultsToDb(sessionId, batchResult.results);
+                                }
+
+                                if (batchResult.usedKeyId.HasValue)
+                                {
+                                    await UpdateUsageInDb(batchResult.usedKeyId.Value, batchResult.tokensUsed);
+                                    await _cooldownService.ResetCooldownAsync(batchResult.usedKeyId.Value);
+                                }
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                _logger.LogWarning("⏰ Batch {BatchIndex} timed out or cancelled for job {SessionId}", currentBatchIndex, sessionId);
+
+                                var cancelledResults = batch.Select(l => new TranslatedSrtLineDb
+                                {
+                                    SessionId = sessionId,
+                                    LineIndex = l.LineIndex,
+                                    TranslatedText = "[TIMEOUT - Batch xử lý quá lâu]",
+                                    Success = false,
+                                    ErrorType = "BATCH_TIMEOUT",
+                                    ErrorDetail = $"Batch timed out after {batchTimeoutMs / 1000}s"
+                                }).ToList();
+
+                                await SaveResultsToDb(sessionId, cancelledResults);
+                                result.Results = cancelledResults;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Exception processing batch {BatchIndex} for job {SessionId}", currentBatchIndex, sessionId);
+
+                                var errorResults = batch.Select(l => new TranslatedSrtLineDb
+                                {
+                                    SessionId = sessionId,
+                                    LineIndex = l.LineIndex,
+                                    TranslatedText = $"[LỖI: {ex.Message.Substring(0, Math.Min(100, ex.Message.Length))}]",
+                                    Success = false,
+                                    ErrorType = "EXCEPTION",
+                                    ErrorDetail = ex.Message
+                                }).ToList();
+
+                                await SaveResultsToDb(sessionId, errorResults);
+                                result.Results = errorResults;
+                            }
+                            finally
+                            {
+                                if (rateLimitSlotId != null)
+                                {
+                                    _globalRateLimiter.ReleaseSlot(rateLimitSlotId);
+                                }
+                                batchResults[currentBatchIndex] = result;
+                            }
+                        }, cancellationToken));
                     }
+                }
+                else
+                {
+                    // === CHẾ ĐỘ TUẦN TỰ TRUYỀN THỐNG ===
+                    int maxConcurrentBatches = Math.Min(enabledKeys.Count * 2, 10); // Giới hạn concurrent
+                    var semaphore = new SemaphoreSlim(maxConcurrentBatches);
 
-                    var batch = batches[batchIndex];
-                    int currentBatchIndex = batchIndex;
-
-                    // === QUAN TRỌNG: Delay thực sự giữa các batch ===
-                    if (batchIndex > 0 && settings.DelayBetweenBatchesMs > 0)
+                    for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                     {
-                        await Task.Delay(settings.DelayBetweenBatchesMs, cancellationToken);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            _logger.LogWarning("Job {SessionId}: Cancellation requested at batch {BatchIndex}", sessionId, batchIndex);
+                            break;
+                        }
+
+                        var batch = batches[batchIndex];
+                        int currentBatchIndex = batchIndex;
+
+                        // === QUAN TRỌNG: Delay thực sự giữa các batch ===
+                        if (batchIndex > 0 && settings.DelayBetweenBatchesMs > 0)
+                        {
+                            await Task.Delay(settings.DelayBetweenBatchesMs, cancellationToken);
+                        }
+
+                        // Đợi semaphore để giới hạn concurrent
+                        await semaphore.WaitAsync(cancellationToken);
+
+                        processingTasks.Add(Task.Run(async () =>
+                        {
+                            string? rateLimitSlotId = null;
+                            var result = new BatchProcessResult { BatchIndex = currentBatchIndex, Success = false };
+
+                            try
+                            {
+                                rateLimitSlotId = await _globalRateLimiter.AcquireSlotAsync(
+                                    $"{sessionId}_batch{currentBatchIndex}", cancellationToken);
+
+                                // === CẢI TIẾN: Retry batch với timeout ===
+                                var batchResult = await ProcessBatchWithRetryAsync(
+                                    batch, job, settings, activeModel.ModelName,
+                                    poolToUse, encryptionService, enabledKeys, rpmPerKey,
+                                    currentBatchIndex, cancellationToken);
+
+                                result.Success = batchResult.success;
+                                result.Results = batchResult.results;
+                                result.UsedKeyId = batchResult.usedKeyId;
+                                result.TokensUsed = batchResult.tokensUsed;
+
+                                if (batchResult.results != null && batchResult.results.Any())
+                                {
+                                    await SaveResultsToDb(sessionId, batchResult.results);
+                                }
+
+                                if (batchResult.usedKeyId.HasValue)
+                                {
+                                    await UpdateUsageInDb(batchResult.usedKeyId.Value, batchResult.tokensUsed);
+                                    await _cooldownService.ResetCooldownAsync(batchResult.usedKeyId.Value);
+                                }
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                // === SỬA LỖI QUAN TRỌNG: LƯU RESULTS KHI CANCELLED ===
+                                _logger.LogWarning("Batch {BatchIndex} cancelled for job {SessionId}", currentBatchIndex, sessionId);
+
+                                var cancelledResults = batch.Select(l => new TranslatedSrtLineDb
+                                {
+                                    SessionId = sessionId,
+                                    LineIndex = l.LineIndex,
+                                    TranslatedText = "[CANCELLED - Đợi quá lâu]",
+                                    Success = false,
+                                    ErrorType = "CANCELLED",
+                                    ErrorDetail = "Operation was cancelled due to timeout"
+                                }).ToList();
+
+                                await SaveResultsToDb(sessionId, cancelledResults);
+                                result.Results = cancelledResults;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Exception processing batch {BatchIndex} for job {SessionId}", currentBatchIndex, sessionId);
+
+                                var errorResults = batch.Select(l => new TranslatedSrtLineDb
+                                {
+                                    SessionId = sessionId,
+                                    LineIndex = l.LineIndex,
+                                    TranslatedText = $"[LỖI: {ex.Message.Substring(0, Math.Min(100, ex.Message.Length))}]",
+                                    Success = false,
+                                    ErrorType = "EXCEPTION",
+                                    ErrorDetail = ex.Message
+                                }).ToList();
+
+                                await SaveResultsToDb(sessionId, errorResults);
+                                result.Results = errorResults;
+                            }
+                            finally
+                            {
+                                if (rateLimitSlotId != null)
+                                {
+                                    _globalRateLimiter.ReleaseSlot(rateLimitSlotId);
+                                }
+                                semaphore.Release();
+                                batchResults[currentBatchIndex] = result;
+                            }
+                        }, cancellationToken));
                     }
-
-                    // Đợi semaphore để giới hạn concurrent
-                    await semaphore.WaitAsync(cancellationToken);
-
-                    processingTasks.Add(Task.Run(async () =>
-                    {
-                        string? rateLimitSlotId = null;
-                        var result = new BatchProcessResult { BatchIndex = currentBatchIndex, Success = false };
-
-                        try
-                        {
-                            rateLimitSlotId = await _globalRateLimiter.AcquireSlotAsync(
-                                $"{sessionId}_batch{currentBatchIndex}", cancellationToken);
-
-                            // === CẢI TIẾN: Retry batch với timeout ===
-                            var batchResult = await ProcessBatchWithRetryAsync(
-                                batch, job, settings, activeModel.ModelName,
-                                poolToUse, encryptionService, enabledKeys, rpmPerKey,
-                                currentBatchIndex, cancellationToken);
-
-                            result.Success = batchResult.success;
-                            result.Results = batchResult.results;
-                            result.UsedKeyId = batchResult.usedKeyId;
-                            result.TokensUsed = batchResult.tokensUsed;
-
-                            if (batchResult.results != null && batchResult.results.Any())
-                            {
-                                await SaveResultsToDb(sessionId, batchResult.results);
-                            }
-
-                            if (batchResult.usedKeyId.HasValue)
-                            {
-                                await UpdateUsageInDb(batchResult.usedKeyId.Value, batchResult.tokensUsed);
-                                await _cooldownService.ResetCooldownAsync(batchResult.usedKeyId.Value);
-                            }
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // === SỬA LỖI QUAN TRỌNG: LƯU RESULTS KHI CANCELLED ===
-                            _logger.LogWarning("Batch {BatchIndex} cancelled for job {SessionId}", currentBatchIndex, sessionId);
-
-                            var cancelledResults = batch.Select(l => new TranslatedSrtLineDb
-                            {
-                                SessionId = sessionId,
-                                LineIndex = l.LineIndex,
-                                TranslatedText = "[CANCELLED - Đợi quá lâu]",
-                                Success = false,
-                                ErrorType = "CANCELLED",
-                                ErrorDetail = "Operation was cancelled due to timeout"
-                            }).ToList();
-
-                            await SaveResultsToDb(sessionId, cancelledResults);
-                            result.Results = cancelledResults;
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Exception processing batch {BatchIndex} for job {SessionId}", currentBatchIndex, sessionId);
-
-                            var errorResults = batch.Select(l => new TranslatedSrtLineDb
-                            {
-                                SessionId = sessionId,
-                                LineIndex = l.LineIndex,
-                                TranslatedText = $"[LỖI: {ex.Message.Substring(0, Math.Min(100, ex.Message.Length))}]",
-                                Success = false,
-                                ErrorType = "EXCEPTION",
-                                ErrorDetail = ex.Message
-                            }).ToList();
-
-                            await SaveResultsToDb(sessionId, errorResults);
-                            result.Results = errorResults;
-                        }
-                        finally
-                        {
-                            if (rateLimitSlotId != null)
-                            {
-                                _globalRateLimiter.ReleaseSlot(rateLimitSlotId);
-                            }
-                            semaphore.Release();
-                            batchResults[currentBatchIndex] = result;
-                        }
-                    }, cancellationToken));
                 }
 
                 await Task.WhenAll(processingTasks);
@@ -384,6 +499,565 @@ namespace SubPhim.Server.Services
             }).ToList();
 
             return (false, failedResults, 0, null);
+        }
+
+        // =====================================================================
+        // MỚI: XỬ LÝ BATCH VỚI TIMEOUT VÀ TỰ ĐỘNG ĐỔI PROXY
+        // Được sử dụng trong chế độ xử lý hàng loạt (EnableBatchProcessing)
+        // =====================================================================
+
+        private async Task<(bool success, List<TranslatedSrtLineDb> results, int tokensUsed, int? usedKeyId)> ProcessBatchWithTimeoutAndProxyRetryAsync(
+            List<OriginalSrtLineDb> batch,
+            TranslationJobDb job,
+            LocalApiSetting settings,
+            string modelName,
+            ApiPoolType poolType,
+            IEncryptionService encryptionService,
+            List<ManagedApiKey> availableKeys,
+            int rpmPerKey,
+            int batchIndex,
+            int batchTimeoutMs,
+            CancellationToken token)
+        {
+            int batchRetryCount = 0;
+            var failedProxyIds = new HashSet<int>(); // Track các proxy đã thất bại
+
+            while (batchRetryCount < MAX_BATCH_RETRY_ATTEMPTS && !token.IsCancellationRequested)
+            {
+                try
+                {
+                    _logger.LogDebug("🔄 Batch {BatchIndex}: Attempt {Attempt}/{Max}", 
+                        batchIndex, batchRetryCount + 1, MAX_BATCH_RETRY_ATTEMPTS);
+
+                    // Gọi TranslateBatchAsync với danh sách proxy đã loại trừ
+                    var (results, tokensUsed, usedKeyId) = await TranslateBatchWithProxyExclusionAsync(
+                        batch, job, settings, modelName, job.SystemInstruction,
+                        poolType, encryptionService, availableKeys, rpmPerKey, 
+                        failedProxyIds, token);
+
+                    // Kiểm tra kết quả
+                    int successCount = results.Count(r => r.Success);
+                    int totalCount = results.Count;
+                    double successRate = (double)successCount / totalCount;
+
+                    if (successRate >= 0.7) // Ít nhất 70% thành công
+                    {
+                        _logger.LogInformation("✅ Batch {BatchIndex} completed: {Success}/{Total} lines ({Rate:P0})",
+                            batchIndex, successCount, totalCount, successRate);
+                        return (true, results, tokensUsed, usedKeyId);
+                    }
+
+                    // Quá nhiều lỗi, retry batch với proxy khác
+                    _logger.LogWarning("⚠️ Batch {BatchIndex} has low success rate ({Rate:P0}). Retry {Retry}/{Max}",
+                        batchIndex, successRate, batchRetryCount + 1, MAX_BATCH_RETRY_ATTEMPTS);
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException))
+                {
+                    _logger.LogWarning(ex, "❌ Batch {BatchIndex} failed with exception. Retry {Retry}/{Max}",
+                        batchIndex, batchRetryCount + 1, MAX_BATCH_RETRY_ATTEMPTS);
+                }
+
+                batchRetryCount++;
+                if (batchRetryCount < MAX_BATCH_RETRY_ATTEMPTS)
+                {
+                    // Delay ngắn trước khi retry với proxy khác
+                    await Task.Delay(Math.Min(BATCH_RETRY_DELAY_MS, BATCH_MODE_MIN_RETRY_DELAY_MS) * batchRetryCount, token);
+                }
+            }
+
+            // Tất cả retry thất bại
+            _logger.LogError("💀 Batch {BatchIndex} FAILED after {Max} retry attempts with different proxies", 
+                batchIndex, MAX_BATCH_RETRY_ATTEMPTS);
+
+            var failedResults = batch.Select(l => new TranslatedSrtLineDb
+            {
+                SessionId = job.SessionId,
+                LineIndex = l.LineIndex,
+                TranslatedText = "[LỖI: Không thể dịch sau nhiều lần thử với các proxy khác nhau]",
+                Success = false,
+                ErrorType = "BATCH_PROCESSING_FAILED",
+                ErrorDetail = $"Failed after {MAX_BATCH_RETRY_ATTEMPTS} attempts"
+            }).ToList();
+
+            return (false, failedResults, 0, null);
+        }
+
+        // =====================================================================
+        // MỚI: TRANSLATE BATCH VỚI KHẢ NĂNG LOẠI TRỪ PROXY ĐÃ THẤT BẠI
+        // =====================================================================
+
+        private async Task<(List<TranslatedSrtLineDb> results, int tokensUsed, int? usedKeyId)> TranslateBatchWithProxyExclusionAsync(
+            List<OriginalSrtLineDb> batch, TranslationJobDb job, LocalApiSetting settings,
+            string modelName, string systemInstruction, ApiPoolType poolType,
+            IEncryptionService encryptionService, List<ManagedApiKey> availableKeys, int rpmPerKey, 
+            HashSet<int> excludeProxyIds, CancellationToken token)
+        {
+            var payloadBuilder = new StringBuilder();
+            foreach (var line in batch)
+            {
+                payloadBuilder.AppendLine($"{line.LineIndex}: {line.OriginalText.Replace("\r\n", " ").Replace("\n", " ")}");
+            }
+            string payload = payloadBuilder.ToString().TrimEnd();
+
+            var generationConfig = new JObject
+            {
+                ["temperature"] = (decimal)settings.Temperature,
+                ["topP"] = 0.95,
+                ["maxOutputTokens"] = settings.MaxOutputTokens
+            };
+
+            if (settings.EnableThinkingBudget && settings.ThinkingBudget > 0)
+            {
+                generationConfig["thinking_config"] = new JObject { ["thinking_budget"] = settings.ThinkingBudget };
+            }
+
+            var requestPayloadObject = new
+            {
+                contents = new[] { new { role = "user", parts = new[] { new { text = $"Dịch các câu thoại sau sang {job.TargetLanguage}:\n\n{payload}" } } } },
+                system_instruction = new { parts = new[] { new { text = systemInstruction } } },
+                generationConfig
+            };
+
+            string jsonPayload = JsonConvert.SerializeObject(requestPayloadObject, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+
+            HashSet<int> triedKeyIds = new HashSet<int>();
+            int? successfulKeyId = null;
+
+            for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
+            {
+                ManagedApiKey? selectedKey = null;
+
+                try
+                {
+                    // Lấy key khả dụng
+                    selectedKey = await GetAvailableKeyWithTimeoutAsync(
+                        availableKeys, poolType, triedKeyIds, rpmPerKey,
+                        KEY_ACQUISITION_TIMEOUT_MS, token);
+
+                    if (selectedKey == null)
+                    {
+                        _logger.LogWarning("Attempt {Attempt}: No key available. Waiting before retry...", attempt);
+                        triedKeyIds.Clear();
+                        await Task.Delay(ALL_KEYS_BUSY_RETRY_DELAY_MS, token);
+                        continue;
+                    }
+
+                    triedKeyIds.Add(selectedKey.Id);
+
+                    var apiKey = encryptionService.Decrypt(selectedKey.EncryptedApiKey, selectedKey.Iv);
+                    string apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={apiKey}";
+
+                    // Gọi API với proxy exclusion
+                    var (responseText, tokensUsed, errorType, errorDetail, httpStatusCode) =
+                        await CallApiWithProxyExclusionAsync(apiUrl, jsonPayload, settings, selectedKey.Id, excludeProxyIds, token);
+
+                    // Xử lý lỗi 429
+                    if (httpStatusCode == 429)
+                    {
+                        _logger.LogWarning("Key ID {KeyId} hit rate limit. Setting cooldown...", selectedKey.Id);
+                        await _cooldownService.SetCooldownAsync(selectedKey.Id, $"HTTP 429 on attempt {attempt}");
+
+                        if (attempt < settings.MaxRetries)
+                        {
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+                    }
+
+                    // Xử lý lỗi nghiêm trọng
+                    if (httpStatusCode == 401 || httpStatusCode == 403 ||
+                        errorType == "INVALID_ARGUMENT" || errorDetail?.Contains("API key") == true)
+                    {
+                        _logger.LogError("Key ID {KeyId} has critical error. Disabling permanently.", selectedKey.Id);
+                        await _cooldownService.DisableKeyPermanentlyAsync(selectedKey.Id, $"{errorType}: {errorDetail}");
+
+                        if (attempt < settings.MaxRetries) continue;
+                    }
+
+                    // === THÀNH CÔNG ===
+                    if (responseText != null && !responseText.StartsWith("Lỗi", StringComparison.OrdinalIgnoreCase))
+                    {
+                        successfulKeyId = selectedKey.Id;
+
+                        var results = new List<TranslatedSrtLineDb>();
+                        var translatedLinesDict = new Dictionary<int, string>();
+                        var regex = new Regex(@"^\s*(\d+):\s*(.*)$", RegexOptions.Multiline);
+
+                        foreach (Match m in regex.Matches(responseText))
+                        {
+                            if (int.TryParse(m.Groups[1].Value, out int idx))
+                                translatedLinesDict[idx] = m.Groups[2].Value.Trim();
+                        }
+
+                        int batchCount = batch.Count;
+                        int missingCount = batch.Count(line => !translatedLinesDict.ContainsKey(line.LineIndex));
+                        double missingRate = (double)missingCount / batchCount;
+
+                        if (missingRate > MISSING_INDEX_RETRY_THRESHOLD && attempt < settings.MaxRetries)
+                        {
+                            _logger.LogWarning("Batch has {MissingCount}/{TotalCount} missing lines ({Rate:P0}). Retrying...",
+                                missingCount, batchCount, missingRate);
+
+                            await Task.Delay(settings.RetryDelayMs * attempt, token);
+                            continue;
+                        }
+
+                        // Build results
+                        foreach (var line in batch)
+                        {
+                            if (translatedLinesDict.TryGetValue(line.LineIndex, out string? translated))
+                            {
+                                results.Add(new TranslatedSrtLineDb
+                                {
+                                    SessionId = job.SessionId,
+                                    LineIndex = line.LineIndex,
+                                    TranslatedText = string.IsNullOrWhiteSpace(translated) ? "[API DỊCH RỖNG]" : translated,
+                                    Success = true
+                                });
+                            }
+                            else
+                            {
+                                results.Add(new TranslatedSrtLineDb
+                                {
+                                    SessionId = job.SessionId,
+                                    LineIndex = line.LineIndex,
+                                    TranslatedText = "[API KHÔNG TRẢ VỀ DÒNG NÀY]",
+                                    Success = false,
+                                    ErrorType = "MISSING_LINE",
+                                    ErrorDetail = "API response missing this line"
+                                });
+                            }
+                        }
+
+                        return (results, tokensUsed, successfulKeyId);
+                    }
+
+                    // Lỗi khác - retry
+                    if (attempt < settings.MaxRetries)
+                    {
+                        int delayMs = settings.RetryDelayMs * attempt;
+                        _logger.LogWarning("Attempt {Attempt} failed: {Error}. Retrying after {Delay}ms...",
+                            attempt, errorType ?? responseText, delayMs);
+                        await Task.Delay(delayMs, token);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Exception during attempt {Attempt} with Key ID {KeyId}",
+                        attempt, selectedKey?.Id);
+
+                    if (attempt >= settings.MaxRetries) break;
+                    await Task.Delay(settings.RetryDelayMs * attempt, token);
+                }
+            }
+
+            // Tất cả attempts thất bại
+            _logger.LogError("Batch translation FAILED after {MaxRetries} attempts", settings.MaxRetries);
+
+            var failedResults = batch.Select(l => new TranslatedSrtLineDb
+            {
+                SessionId = job.SessionId,
+                LineIndex = l.LineIndex,
+                TranslatedText = "[LỖI: Không thể dịch sau nhiều lần thử]",
+                Success = false,
+                ErrorType = "MAX_RETRIES_EXCEEDED",
+                ErrorDetail = $"Failed after {settings.MaxRetries} API attempts"
+            }).ToList();
+
+            return (failedResults, 0, null);
+        }
+
+        // =====================================================================
+        // MỚI: API CALL VỚI PROXY EXCLUSION VÀ TỰ ĐỘNG ĐỔI PROXY KHI TIMEOUT
+        // =====================================================================
+
+        private async Task<(string responseText, int tokensUsed, string? errorType, string? errorDetail, int httpStatusCode)> CallApiWithProxyExclusionAsync(
+            string url, string jsonPayload, LocalApiSetting settings, int apiKeyId, HashSet<int> excludeProxyIds, CancellationToken token)
+        {
+            // Kết hợp proxy đã exclude từ bên ngoài với internal tracking
+            var failedProxyIds = new HashSet<int>(excludeProxyIds);
+            string userAgent = GenerateRandomUserAgent();
+            string? currentProxySlotId = null;
+            Proxy? currentProxy = null;
+            string requestId = $"key{apiKeyId}_{Guid.NewGuid():N}";
+            int apiRetryCount = 0;
+            int maxProxyAttempts = MAX_PROXY_ATTEMPTS_IN_BATCH_MODE;
+            int proxyAttempts = 0;
+
+            while (!token.IsCancellationRequested && proxyAttempts < maxProxyAttempts)
+            {
+                proxyAttempts++;
+
+                // Release previous proxy slot
+                if (currentProxySlotId != null)
+                {
+                    _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                    currentProxySlotId = null;
+                }
+
+                // Get proxy (loại trừ các proxy đã thất bại)
+                currentProxy = await GetProxyWithAvailableRpmSlotAsync(failedProxyIds, requestId, token);
+
+                if (currentProxy == null && failedProxyIds.Count > 0)
+                {
+                    _logger.LogWarning("No proxy available after {Count} failures. Trying with different key...", failedProxyIds.Count);
+                }
+
+                // Acquire proxy slot
+                if (currentProxy != null)
+                {
+                    currentProxySlotId = await _proxyRateLimiter.TryAcquireSlotWithTimeoutAsync(
+                        currentProxy.Id, requestId, PROXY_RPM_WAIT_TIMEOUT_MS, token);
+
+                    if (currentProxySlotId == null)
+                    {
+                        failedProxyIds.Add(currentProxy.Id);
+                        await Task.Delay(100, token);
+                        continue;
+                    }
+                }
+
+                try
+                {
+                    using var httpClient = _proxyService.CreateHttpClientWithProxy(currentProxy);
+                    
+                    // Set shorter timeout for batch processing mode
+                    httpClient.Timeout = TimeSpan.FromSeconds(BATCH_MODE_REQUEST_TIMEOUT_SECONDS);
+                    
+                    using var request = new HttpRequestMessage(HttpMethod.Post, url)
+                    {
+                        Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
+                    };
+                    request.Headers.Add("User-Agent", userAgent);
+
+                    using HttpResponseMessage response = await httpClient.SendAsync(request, token);
+                    string responseBody = await response.Content.ReadAsStringAsync(token);
+
+                    // Mark slot as used
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.MarkSlotAsUsed(currentProxySlotId);
+                        currentProxySlotId = null;
+                    }
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        int statusCode = (int)response.StatusCode;
+
+                        // Xử lý FAILED_PRECONDITION (location not supported)
+                        if (statusCode == 400 && currentProxy != null)
+                        {
+                            try
+                            {
+                                var errorBody = JObject.Parse(responseBody);
+                                var errorStatus = errorBody?["error"]?["status"]?.ToString();
+                                var errorMessage = errorBody?["error"]?["message"]?.ToString() ?? "";
+
+                                if (errorStatus == "FAILED_PRECONDITION" &&
+                                    errorMessage.Contains("location is not supported", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _logger.LogError("🚫 Proxy {ProxyId} blocked: {Error}. Disabling...",
+                                        currentProxy.Id, errorMessage);
+
+                                    await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, "location not supported");
+                                    failedProxyIds.Add(currentProxy.Id);
+                                    excludeProxyIds.Add(currentProxy.Id); // Cũng thêm vào danh sách exclude bên ngoài
+                                    continue;
+                                }
+                            }
+                            catch (JsonReaderException) { }
+                        }
+
+                        apiRetryCount++;
+
+                        if (currentProxy != null && statusCode != 429)
+                        {
+                            await _proxyService.RecordProxyFailureAsync(currentProxy.Id, $"HTTP {statusCode}");
+                            failedProxyIds.Add(currentProxy.Id);
+                        }
+
+                        if (apiRetryCount >= settings.MaxRetries)
+                        {
+                            return ($"Lỗi API: HTTP {statusCode}", 0, $"HTTP_{statusCode}", responseBody, statusCode);
+                        }
+
+                        await Task.Delay(settings.RetryDelayMs * apiRetryCount, token);
+                        continue;
+                    }
+
+                    // Success - record proxy success
+                    if (currentProxy != null)
+                    {
+                        await _proxyService.RecordProxySuccessAsync(currentProxy.Id);
+                    }
+
+                    // Parse response
+                    JObject parsedBody;
+                    try
+                    {
+                        parsedBody = JObject.Parse(responseBody);
+                    }
+                    catch (JsonReaderException)
+                    {
+                        if (responseBody.TrimStart().StartsWith("<"))
+                        {
+                            // HTML response - proxy error
+                            if (currentProxy != null)
+                            {
+                                await _proxyService.RecordProxyFailureAsync(currentProxy.Id, "HTML response");
+                                failedProxyIds.Add(currentProxy.Id);
+                            }
+                            continue;
+                        }
+
+                        apiRetryCount++;
+                        if (apiRetryCount >= settings.MaxRetries)
+                        {
+                            return ("Lỗi: Response không phải JSON", 0, "INVALID_JSON", "Parse error", 200);
+                        }
+                        continue;
+                    }
+
+                    // Check for API errors in response
+                    if (parsedBody?["error"] != null)
+                    {
+                        string errorMsg = parsedBody["error"]?["message"]?.ToString() ?? "Unknown";
+                        apiRetryCount++;
+
+                        if (apiRetryCount >= settings.MaxRetries)
+                        {
+                            return ($"Lỗi API: {errorMsg}", 0, "API_ERROR", errorMsg, 200);
+                        }
+
+                        await Task.Delay(settings.RetryDelayMs * apiRetryCount, token);
+                        continue;
+                    }
+
+                    // Check blocked content
+                    if (parsedBody?["promptFeedback"]?["blockReason"] != null)
+                    {
+                        string blockReason = parsedBody["promptFeedback"]["blockReason"].ToString();
+                        return ($"Nội dung bị chặn: {blockReason}", 0, "BLOCKED_CONTENT", blockReason, 200);
+                    }
+
+                    // Check finish reason
+                    var finishReason = parsedBody?["candidates"]?[0]?["finishReason"]?.ToString();
+                    if (!string.IsNullOrEmpty(finishReason) && finishReason != "STOP")
+                    {
+                        apiRetryCount++;
+                        if (apiRetryCount >= settings.MaxRetries)
+                        {
+                            return ($"FinishReason: {finishReason}", 0, "FINISH_REASON", finishReason, 200);
+                        }
+                        continue;
+                    }
+
+                    int tokens = parsedBody?["usageMetadata"]?["totalTokenCount"]?.Value<int>() ?? 0;
+                    string? responseText = parsedBody?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
+
+                    if (responseText == null)
+                    {
+                        apiRetryCount++;
+                        if (apiRetryCount >= settings.MaxRetries)
+                        {
+                            return ("Lỗi: Response rỗng", 0, "EMPTY_RESPONSE", "Empty", 200);
+                        }
+                        continue;
+                    }
+
+                    return (responseText, tokens, null, null, 200);
+                }
+                catch (HttpRequestException ex)
+                {
+                    // Release slot early
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                        currentProxySlotId = null;
+                    }
+
+                    if (currentProxy != null)
+                    {
+                        var errorDesc = ProxyService.GetProxyErrorDescription(ex);
+
+                        if (ProxyService.IsCriticalProxyError(ex))
+                        {
+                            _logger.LogWarning("Critical proxy error for {ProxyId}: {Error}. Disabling...",
+                                currentProxy.Id, errorDesc);
+                            await _proxyService.DisableProxyImmediatelyAsync(currentProxy.Id, errorDesc);
+                        }
+                        else
+                        {
+                            await _proxyService.RecordProxyFailureAsync(currentProxy.Id, errorDesc);
+                        }
+
+                        failedProxyIds.Add(currentProxy.Id);
+                    }
+
+                    await Task.Delay(PROXY_SEARCH_DELAY_MS, token);
+                    continue;
+                }
+                catch (TaskCanceledException ex) when (!token.IsCancellationRequested)
+                {
+                    // Timeout - try another proxy
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                        currentProxySlotId = null;
+                    }
+
+                    if (currentProxy != null)
+                    {
+                        _logger.LogWarning("⏰ Proxy {ProxyId} timed out. Trying another proxy...", currentProxy.Id);
+                        await _proxyService.RecordProxyFailureAsync(currentProxy.Id, "Timeout", isTimeoutError: true);
+                        failedProxyIds.Add(currentProxy.Id);
+                    }
+
+                    await Task.Delay(PROXY_SEARCH_DELAY_MS, token);
+                    continue;
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException))
+                {
+                    if (currentProxySlotId != null)
+                    {
+                        _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+                        currentProxySlotId = null;
+                    }
+
+                    if (currentProxy != null)
+                    {
+                        await _proxyService.RecordProxyFailureAsync(currentProxy.Id, ex.Message);
+                        failedProxyIds.Add(currentProxy.Id);
+                    }
+
+                    // Check if no more proxies
+                    var nextProxy = await _proxyService.GetNextProxyAsync(failedProxyIds);
+                    if (nextProxy == null)
+                    {
+                        return ($"Lỗi: Hết proxy ({failedProxyIds.Count} lỗi)", 0, "ALL_PROXIES_FAILED", ex.Message, 0);
+                    }
+
+                    await Task.Delay(PROXY_SEARCH_DELAY_MS, token);
+                    continue;
+                }
+            }
+
+            // Cleanup
+            if (currentProxySlotId != null)
+            {
+                _proxyRateLimiter.ReleaseSlotEarly(currentProxySlotId);
+            }
+
+            if (token.IsCancellationRequested)
+            {
+                return ("Lỗi: Request cancelled", 0, "CANCELLED", "Operation cancelled", 0);
+            }
+
+            return ($"Lỗi: Quá số lần thử proxy ({maxProxyAttempts})", 0, "MAX_PROXY_ATTEMPTS", "Exceeded max attempts", 0);
         }
 
         // =====================================================================

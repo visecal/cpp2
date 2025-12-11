@@ -69,6 +69,10 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
             
             // Proxy Rate Limiting Settings
             [Required][Range(1, 1000)] public int RpmPerProxy { get; set; }
+            
+            // Batch Processing Settings
+            public bool EnableBatchProcessing { get; set; }
+            [Required][Range(1, 10)] public int BatchTimeoutMinutes { get; set; }
         }
         #endregion
 
@@ -87,7 +91,9 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 MaxOutputTokens = settingsFromDb.MaxOutputTokens,
                 EnableThinkingBudget = settingsFromDb.EnableThinkingBudget,
                 ThinkingBudget = settingsFromDb.ThinkingBudget,
-                RpmPerProxy = settingsFromDb.RpmPerProxy
+                RpmPerProxy = settingsFromDb.RpmPerProxy,
+                EnableBatchProcessing = settingsFromDb.EnableBatchProcessing,
+                BatchTimeoutMinutes = settingsFromDb.BatchTimeoutMinutes
             };
         }
         public async Task<IActionResult> OnPostDeleteSelectedKeysAsync([FromForm] int[] selectedKeyIds)
@@ -188,6 +194,8 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 settingsInDb.EnableThinkingBudget = GlobalSettings.EnableThinkingBudget;
                 settingsInDb.ThinkingBudget = GlobalSettings.ThinkingBudget;
                 settingsInDb.RpmPerProxy = GlobalSettings.RpmPerProxy;
+                settingsInDb.EnableBatchProcessing = GlobalSettings.EnableBatchProcessing;
+                settingsInDb.BatchTimeoutMinutes = GlobalSettings.BatchTimeoutMinutes;
                 await _context.SaveChangesAsync();
                 SuccessMessage = "Đã lưu thành công cài đặt chung.";
             }

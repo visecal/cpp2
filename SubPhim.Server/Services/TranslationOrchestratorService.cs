@@ -46,6 +46,12 @@ namespace SubPhim.Server.Services
         private const int KEY_ACQUISITION_TIMEOUT_MS = 60000; // Timeout khi đợi key (60 giây)
         private const int ALL_KEYS_BUSY_RETRY_DELAY_MS = 5000; // Delay khi tất cả keys bận
 
+        // === Batch Processing Mode Constants ===
+        private const int DEFAULT_BATCH_TIMEOUT_MINUTES = 3; // Timeout mặc định cho mỗi batch (phút)
+        private const int BATCH_MODE_MIN_RETRY_DELAY_MS = 1000; // Delay tối thiểu giữa các retry trong batch mode
+        private const int BATCH_MODE_REQUEST_TIMEOUT_SECONDS = 90; // Timeout cho mỗi HTTP request trong batch mode
+        private const int MAX_PROXY_ATTEMPTS_IN_BATCH_MODE = 50; // Số lần thử proxy tối đa trong batch mode
+
         // User-Agent templates
         private static readonly string[] _chromeTemplates = new[]
         {
@@ -179,7 +185,7 @@ namespace SubPhim.Server.Services
 
                     // Không giới hạn concurrent - gửi tất cả cùng lúc
                     // Mỗi batch sẽ tự tìm key/proxy khả dụng với RPM limit
-                    int batchTimeoutMs = (settings.BatchTimeoutMinutes > 0 ? settings.BatchTimeoutMinutes : 3) * 60 * 1000;
+                    int batchTimeoutMs = (settings.BatchTimeoutMinutes > 0 ? settings.BatchTimeoutMinutes : DEFAULT_BATCH_TIMEOUT_MINUTES) * 60 * 1000;
 
                     for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                     {
@@ -555,7 +561,7 @@ namespace SubPhim.Server.Services
                 if (batchRetryCount < MAX_BATCH_RETRY_ATTEMPTS)
                 {
                     // Delay ngắn trước khi retry với proxy khác
-                    await Task.Delay(Math.Min(BATCH_RETRY_DELAY_MS, 1000) * batchRetryCount, token);
+                    await Task.Delay(Math.Min(BATCH_RETRY_DELAY_MS, BATCH_MODE_MIN_RETRY_DELAY_MS) * batchRetryCount, token);
                 }
             }
 
@@ -779,7 +785,7 @@ namespace SubPhim.Server.Services
             Proxy? currentProxy = null;
             string requestId = $"key{apiKeyId}_{Guid.NewGuid():N}";
             int apiRetryCount = 0;
-            int maxProxyAttempts = 50;
+            int maxProxyAttempts = MAX_PROXY_ATTEMPTS_IN_BATCH_MODE;
             int proxyAttempts = 0;
 
             while (!token.IsCancellationRequested && proxyAttempts < maxProxyAttempts)
@@ -820,7 +826,7 @@ namespace SubPhim.Server.Services
                     using var httpClient = _proxyService.CreateHttpClientWithProxy(currentProxy);
                     
                     // Set shorter timeout for batch processing mode
-                    httpClient.Timeout = TimeSpan.FromSeconds(90); // 90 seconds per request
+                    httpClient.Timeout = TimeSpan.FromSeconds(BATCH_MODE_REQUEST_TIMEOUT_SECONDS);
                     
                     using var request = new HttpRequestMessage(HttpMethod.Post, url)
                     {

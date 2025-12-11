@@ -888,6 +888,18 @@ namespace SubPhim.Server.Data
         public DateTime LastAioResetUtc { get; set; } = DateTime.UtcNow;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        
+        /// <summary>
+        /// Tốc độ kết nối proxy với Google (ms). -1 = chưa kiểm tra, 0 = timeout/không kết nối được
+        /// </summary>
+        [Display(Name = "Tốc độ (ms)")]
+        public int SpeedMs { get; set; } = -1;
+        
+        /// <summary>
+        /// Thời điểm kiểm tra tốc độ lần cuối (UTC)
+        /// </summary>
+        [Display(Name = "Lần kiểm tra cuối")]
+        public DateTime? LastSpeedTestAt { get; set; }
     }
 
     // ==================== External API Key Management Entities ====================

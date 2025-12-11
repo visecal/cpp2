@@ -918,5 +918,225 @@ namespace SubPhim.Server.Services
             var proxies = await GetEnabledProxiesAsync();
             return proxies.Count;
         }
+
+        // =====================================================================
+        // PROXY SPEED TESTING - Kiểm tra tốc độ kết nối proxy với Google
+        // =====================================================================
+        
+        private const int SpeedTestTimeoutMs = 10000; // 10 seconds timeout for speed test
+        private const string SpeedTestUrl = "https://generativelanguage.googleapis.com/"; // Google API endpoint
+        private const int MaxConcurrentSpeedTests = 50; // Tối đa 50 proxy kiểm tra cùng lúc
+        
+        /// <summary>
+        /// Kiểm tra tốc độ kết nối của một proxy với Google API.
+        /// Trả về thời gian response (ms), 0 nếu không kết nối được.
+        /// </summary>
+        public async Task<int> TestProxySpeedAsync(Proxy proxy)
+        {
+            try
+            {
+                using var httpClient = CreateHttpClientWithProxy(proxy);
+                httpClient.Timeout = TimeSpan.FromMilliseconds(SpeedTestTimeoutMs);
+                
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                
+                // Chỉ gửi HEAD request để check kết nối, không cần response body
+                using var request = new HttpRequestMessage(HttpMethod.Head, SpeedTestUrl);
+                request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                
+                using var response = await httpClient.SendAsync(request);
+                
+                stopwatch.Stop();
+                
+                // Nếu response thành công hoặc 400/401/403 (Google API trả về khi không có key), proxy hoạt động
+                if (response.IsSuccessStatusCode || 
+                    (int)response.StatusCode == 400 || 
+                    (int)response.StatusCode == 401 || 
+                    (int)response.StatusCode == 403 ||
+                    (int)response.StatusCode == 404)
+                {
+                    _logger.LogDebug("Proxy {ProxyId} ({Host}:{Port}) speed test: {Speed}ms", 
+                        proxy.Id, proxy.Host, proxy.Port, stopwatch.ElapsedMilliseconds);
+                    return (int)stopwatch.ElapsedMilliseconds;
+                }
+                
+                _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) speed test failed with status {Status}", 
+                    proxy.Id, proxy.Host, proxy.Port, (int)response.StatusCode);
+                return 0;
+            }
+            catch (TaskCanceledException)
+            {
+                _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) speed test timeout", proxy.Id, proxy.Host, proxy.Port);
+                return 0;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning("Proxy {ProxyId} ({Host}:{Port}) speed test failed: {Error}", 
+                    proxy.Id, proxy.Host, proxy.Port, ex.Message);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Proxy {ProxyId} ({Host}:{Port}) speed test error", proxy.Id, proxy.Host, proxy.Port);
+                return 0;
+            }
+        }
+        
+        /// <summary>
+        /// Kiểm tra tốc độ của nhiều proxy cùng lúc (tối đa 50 concurrent).
+        /// Cập nhật SpeedMs và LastSpeedTestAt trong database.
+        /// Tự động tắt các proxy không kết nối được.
+        /// </summary>
+        public async Task<List<(int ProxyId, int SpeedMs)>> TestMultipleProxiesSpeedAsync(IEnumerable<Proxy> proxies)
+        {
+            var results = new List<(int ProxyId, int SpeedMs)>();
+            var proxyList = proxies.ToList();
+            
+            if (!proxyList.Any())
+                return results;
+            
+            _logger.LogInformation("🚀 Starting speed test for {Count} proxies (max {MaxConcurrent} concurrent)", 
+                proxyList.Count, MaxConcurrentSpeedTests);
+            
+            // Sử dụng SemaphoreSlim để giới hạn concurrent
+            using var semaphore = new SemaphoreSlim(MaxConcurrentSpeedTests);
+            
+            var tasks = proxyList.Select(async proxy =>
+            {
+                await semaphore.WaitAsync();
+                try
+                {
+                    var speedMs = await TestProxySpeedAsync(proxy);
+                    return (proxy.Id, speedMs);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
+            
+            var testResults = await Task.WhenAll(tasks);
+            
+            // Cập nhật database
+            await ExecuteWithRetryAsync(async () =>
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                
+                int disabledCount = 0;
+                
+                foreach (var (proxyId, speedMs) in testResults)
+                {
+                    var proxy = await context.Proxies.FindAsync(proxyId);
+                    if (proxy != null)
+                    {
+                        proxy.SpeedMs = speedMs;
+                        proxy.LastSpeedTestAt = DateTime.UtcNow;
+                        
+                        // Tự động tắt proxy không kết nối được
+                        if (speedMs == 0 && proxy.IsEnabled)
+                        {
+                            proxy.IsEnabled = false;
+                            proxy.LastFailureReason = "Speed test failed - proxy unreachable";
+                            disabledCount++;
+                            _logger.LogWarning("❌ Proxy {ProxyId} ({Host}:{Port}) disabled due to failed speed test", 
+                                proxyId, proxy.Host, proxy.Port);
+                        }
+                        
+                        results.Add((proxyId, speedMs));
+                    }
+                }
+                
+                await context.SaveChangesAsync();
+                RefreshCache();
+                
+                _logger.LogInformation("✅ Speed test completed: {TestedCount} tested, {DisabledCount} disabled", 
+                    results.Count, disabledCount);
+            }, "TestMultipleProxiesSpeed");
+            
+            return results;
+        }
+        
+        /// <summary>
+        /// Kiểm tra tốc độ của tất cả proxy đang enabled.
+        /// </summary>
+        public async Task<List<(int ProxyId, int SpeedMs)>> TestAllEnabledProxiesSpeedAsync()
+        {
+            var proxies = await GetEnabledProxiesAsync();
+            return await TestMultipleProxiesSpeedAsync(proxies);
+        }
+        
+        // =====================================================================
+        // PROXY SELECTION VỚI ƯU TIÊN TỐC ĐỘ NHANH
+        // =====================================================================
+        
+        /// <summary>
+        /// Get proxy with priority for fast proxies that have available RPM slots.
+        /// Ưu tiên: 1) Proxy có RPM slot khả dụng, 2) Tốc độ nhanh nhất
+        /// </summary>
+        /// <param name="excludeProxyIds">Proxy IDs to exclude</param>
+        /// <param name="proxyRateLimiter">Rate limiter service to check available slots</param>
+        public async Task<Proxy?> GetFastestAvailableProxyAsync(HashSet<int>? excludeProxyIds = null, ProxyRateLimiterService? proxyRateLimiter = null)
+        {
+            var proxies = await GetEnabledProxiesAsync();
+            
+            // Filter out excluded proxies
+            if (excludeProxyIds != null && excludeProxyIds.Count > 0)
+            {
+                proxies = proxies.Where(p => !excludeProxyIds.Contains(p.Id)).ToList();
+            }
+            
+            if (!proxies.Any())
+            {
+                // Try auto-recovery
+                var reEnabledCount = await TryAutoReEnableProxiesAsync();
+                if (reEnabledCount > 0)
+                {
+                    proxies = await GetEnabledProxiesAsync();
+                    if (excludeProxyIds != null && excludeProxyIds.Count > 0)
+                    {
+                        proxies = proxies.Where(p => !excludeProxyIds.Contains(p.Id)).ToList();
+                    }
+                }
+                
+                if (!proxies.Any())
+                {
+                    _logger.LogWarning("No proxies available for GetFastestAvailableProxyAsync");
+                    return null;
+                }
+            }
+            
+            // Nếu có rate limiter, filter proxies có slot khả dụng trước
+            if (proxyRateLimiter != null)
+            {
+                var proxiesWithSlots = proxies.Where(p => proxyRateLimiter.HasAvailableSlot(p.Id)).ToList();
+                if (proxiesWithSlots.Any())
+                {
+                    proxies = proxiesWithSlots;
+                }
+                // Nếu không có proxy nào có slot, vẫn tiếp tục với danh sách gốc
+            }
+            
+            // Sắp xếp theo tốc độ (SpeedMs > 0 ưu tiên, sau đó SpeedMs tăng dần)
+            // SpeedMs = -1: chưa kiểm tra
+            // SpeedMs = 0: không kết nối được
+            // SpeedMs > 0: thời gian phản hồi (ms)
+            var sortedProxies = proxies
+                .OrderByDescending(p => p.SpeedMs > 0 ? 1 : 0) // Ưu tiên proxy đã test thành công
+                .ThenBy(p => p.SpeedMs > 0 ? p.SpeedMs : int.MaxValue) // Sắp xếp theo tốc độ (nhanh nhất trước)
+                .ThenBy(p => p.FailureCount) // Ưu tiên proxy ít lỗi hơn
+                .ToList();
+            
+            var selectedProxy = sortedProxies.FirstOrDefault();
+            
+            if (selectedProxy != null)
+            {
+                _logger.LogDebug("Selected fastest proxy {ProxyId}: {Host}:{Port} (speed: {Speed}ms)", 
+                    selectedProxy.Id, selectedProxy.Host, selectedProxy.Port, 
+                    selectedProxy.SpeedMs > 0 ? selectedProxy.SpeedMs : -1);
+            }
+            
+            return selectedProxy;
+        }
     }
 }

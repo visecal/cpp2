@@ -912,6 +912,9 @@ namespace SubPhim.Server.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("LastSpeedTestAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("LastUsedAt")
                         .HasColumnType("TEXT");
 
@@ -920,6 +923,9 @@ namespace SubPhim.Server.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Port")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SpeedMs")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Type")

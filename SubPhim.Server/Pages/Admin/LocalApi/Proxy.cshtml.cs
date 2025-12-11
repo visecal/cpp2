@@ -21,6 +21,11 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
 
         public List<Proxy> Proxies { get; set; } = new();
         public int ActiveProxyCount { get; set; }
+        
+        /// <summary>
+        /// Kết quả test tốc độ gần nhất (hiển thị trong thông báo)
+        /// </summary>
+        public string? SpeedTestResult { get; set; }
 
         [TempData] public string SuccessMessage { get; set; }
         [TempData] public string ErrorMessage { get; set; }
@@ -34,6 +39,7 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
         {
             Proxies = await _context.Proxies
                 .OrderByDescending(p => p.IsEnabled)
+                .ThenBy(p => p.SpeedMs > 0 ? p.SpeedMs : int.MaxValue) // Sắp xếp theo tốc độ (nhanh nhất trước)
                 .ThenByDescending(p => p.CreatedAt)
                 .ToListAsync();
             
@@ -41,7 +47,7 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
         }
 
         /// <summary>
-        /// Thêm proxy từ danh sách text
+        /// Thêm proxy từ danh sách text - CÓ KIỂM TRA TỐC ĐỘ
         /// </summary>
         public async Task<IActionResult> OnPostAddProxiesAsync([FromForm] string proxyList)
         {
@@ -63,6 +69,7 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
 
                 int addedCount = 0;
                 int duplicateCount = 0;
+                var newProxies = new List<Proxy>();
 
                 foreach (var proxy in parsedProxies)
                 {
@@ -77,22 +84,46 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                     }
 
                     _context.Proxies.Add(proxy);
+                    newProxies.Add(proxy);
                     addedCount++;
                 }
 
                 await _context.SaveChangesAsync();
                 
-                // Refresh cache
-                _proxyService.RefreshCache();
-
-                if (duplicateCount > 0)
+                // Kiểm tra tốc độ các proxy mới thêm
+                if (newProxies.Any())
                 {
-                    SuccessMessage = $"Đã thêm {addedCount} proxy. Bỏ qua {duplicateCount} proxy trùng lặp.";
+                    _logger.LogInformation("Testing speed for {Count} newly added proxies...", newProxies.Count);
+                    
+                    // Reload để có ID
+                    var addedProxiesWithIds = await _context.Proxies
+                        .Where(p => newProxies.Select(np => np.Host + ":" + np.Port).Contains(p.Host + ":" + p.Port))
+                        .ToListAsync();
+                    
+                    var speedResults = await _proxyService.TestMultipleProxiesSpeedAsync(addedProxiesWithIds);
+                    
+                    int workingCount = speedResults.Count(r => r.SpeedMs > 0);
+                    int deadCount = speedResults.Count(r => r.SpeedMs == 0);
+                    
+                    if (duplicateCount > 0)
+                    {
+                        SuccessMessage = $"Đã thêm {addedCount} proxy ({workingCount} hoạt động, {deadCount} không kết nối được). Bỏ qua {duplicateCount} proxy trùng lặp.";
+                    }
+                    else
+                    {
+                        SuccessMessage = $"Đã thêm {addedCount} proxy ({workingCount} hoạt động, {deadCount} không kết nối được).";
+                    }
                 }
                 else
                 {
-                    SuccessMessage = $"Đã thêm thành công {addedCount} proxy.";
+                    if (duplicateCount > 0)
+                    {
+                        SuccessMessage = $"Bỏ qua {duplicateCount} proxy trùng lặp. Không có proxy mới nào được thêm.";
+                    }
                 }
+                
+                // Refresh cache
+                _proxyService.RefreshCache();
 
                 _logger.LogInformation("Added {Count} proxies, skipped {Duplicates} duplicates", addedCount, duplicateCount);
             }
@@ -102,6 +133,42 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 ErrorMessage = $"Lỗi khi thêm proxy: {ex.Message}";
             }
 
+            return RedirectToPage();
+        }
+
+        /// <summary>
+        /// Kiểm tra tốc độ tất cả proxy đang enabled
+        /// </summary>
+        public async Task<IActionResult> OnPostTestAllSpeedAsync()
+        {
+            try
+            {
+                var enabledProxies = await _context.Proxies.Where(p => p.IsEnabled).ToListAsync();
+                
+                if (!enabledProxies.Any())
+                {
+                    ErrorMessage = "Không có proxy nào đang enabled để kiểm tra.";
+                    return RedirectToPage();
+                }
+                
+                _logger.LogInformation("Starting speed test for {Count} enabled proxies", enabledProxies.Count);
+                
+                var results = await _proxyService.TestMultipleProxiesSpeedAsync(enabledProxies);
+                
+                int workingCount = results.Count(r => r.SpeedMs > 0);
+                int deadCount = results.Count(r => r.SpeedMs == 0);
+                var avgSpeed = results.Where(r => r.SpeedMs > 0).Select(r => r.SpeedMs).DefaultIfEmpty(0).Average();
+                
+                SuccessMessage = $"Đã kiểm tra {results.Count} proxy: {workingCount} hoạt động (TB: {avgSpeed:F0}ms), {deadCount} không kết nối được (đã tắt).";
+                
+                _logger.LogInformation("Speed test completed: {Working} working, {Dead} dead", workingCount, deadCount);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error testing proxy speeds");
+                ErrorMessage = $"Lỗi khi kiểm tra tốc độ: {ex.Message}";
+            }
+            
             return RedirectToPage();
         }
 

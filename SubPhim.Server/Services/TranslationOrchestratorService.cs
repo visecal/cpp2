@@ -184,8 +184,7 @@ namespace SubPhim.Server.Services
                         sessionId, batches.Count);
 
                     // Không giới hạn concurrent - gửi tất cả cùng lúc
-                    // Mỗi batch sẽ tự tìm key/proxy khả dụng với RPM limit
-                    int batchTimeoutMs = (settings.BatchTimeoutMinutes > 0 ? settings.BatchTimeoutMinutes : DEFAULT_BATCH_TIMEOUT_MINUTES) * 60 * 1000;
+                    // Mỗi batch sẽ tự tìm key/proxy khả dụng với RPM limit và tự quản lý timeout
 
                     for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                     {
@@ -206,19 +205,17 @@ namespace SubPhim.Server.Services
 
                             try
                             {
-                                // Tạo timeout riêng cho mỗi batch
-                                using var batchCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                                batchCts.CancelAfter(batchTimeoutMs);
-                                var batchToken = batchCts.Token;
-
                                 rateLimitSlotId = await _globalRateLimiter.AcquireSlotAsync(
-                                    $"{sessionId}_batch{currentBatchIndex}", batchToken);
+                                    $"{sessionId}_batch{currentBatchIndex}", cancellationToken);
 
-                                // Xử lý batch với timeout và retry proxy
+                                // Lấy timeout từ settings
+                                int batchTimeoutMsForProcessing = (settings.BatchTimeoutMinutes > 0 ? settings.BatchTimeoutMinutes : DEFAULT_BATCH_TIMEOUT_MINUTES) * 60 * 1000;
+
+                                // Xử lý batch với timeout và retry proxy (method này tự quản lý timeout nội bộ)
                                 var batchResult = await ProcessBatchWithTimeoutAndProxyRetryAsync(
                                     batch, job, settings, activeModel.ModelName,
                                     poolToUse, encryptionService, enabledKeys, rpmPerKey,
-                                    currentBatchIndex, batchTimeoutMs, batchToken);
+                                    currentBatchIndex, batchTimeoutMsForProcessing, cancellationToken);
 
                                 result.Success = batchResult.success;
                                 result.Results = batchResult.results;
@@ -238,16 +235,17 @@ namespace SubPhim.Server.Services
                             }
                             catch (OperationCanceledException)
                             {
-                                _logger.LogWarning("⏰ Batch {BatchIndex} timed out or cancelled for job {SessionId}", currentBatchIndex, sessionId);
+                                // Job cancellation (không phải batch timeout - batch timeout được xử lý nội bộ)
+                                _logger.LogWarning("🛑 Batch {BatchIndex} cancelled due to job cancellation for job {SessionId}", currentBatchIndex, sessionId);
 
                                 var cancelledResults = batch.Select(l => new TranslatedSrtLineDb
                                 {
                                     SessionId = sessionId,
                                     LineIndex = l.LineIndex,
-                                    TranslatedText = "[TIMEOUT - Batch xử lý quá lâu]",
+                                    TranslatedText = "[HỦY - Job đã bị dừng]",
                                     Success = false,
-                                    ErrorType = "BATCH_TIMEOUT",
-                                    ErrorDetail = $"Batch timed out after {batchTimeoutMs / 1000}s"
+                                    ErrorType = "JOB_CANCELLED",
+                                    ErrorDetail = "Job was cancelled by user or timeout"
                                 }).ToList();
 
                                 await SaveResultsToDb(sessionId, cancelledResults);
@@ -504,6 +502,8 @@ namespace SubPhim.Server.Services
         // =====================================================================
         // MỚI: XỬ LÝ BATCH VỚI TIMEOUT VÀ TỰ ĐỘNG ĐỔI PROXY
         // Được sử dụng trong chế độ xử lý hàng loạt (EnableBatchProcessing)
+        // Quan trọng: Method này KHÔNG throw OperationCanceledException khi timeout request riêng lẻ
+        // Chỉ throw khi token từ job bị cancel (user cancel hoặc job timeout tổng)
         // =====================================================================
 
         private async Task<(bool success, List<TranslatedSrtLineDb> results, int tokensUsed, int? usedKeyId)> ProcessBatchWithTimeoutAndProxyRetryAsync(
@@ -521,19 +521,46 @@ namespace SubPhim.Server.Services
         {
             int batchRetryCount = 0;
             var failedProxyIds = new HashSet<int>(); // Track các proxy đã thất bại
+            var batchStartTime = DateTime.UtcNow;
+            int remainingTimeMs = batchTimeoutMs;
 
-            while (batchRetryCount < MAX_BATCH_RETRY_ATTEMPTS && !token.IsCancellationRequested)
+            while (batchRetryCount < MAX_BATCH_RETRY_ATTEMPTS)
             {
+                // Kiểm tra token từ job level (không phải batch timeout)
+                if (token.IsCancellationRequested)
+                {
+                    _logger.LogWarning("🛑 Batch {BatchIndex}: Job cancellation requested", batchIndex);
+                    throw new OperationCanceledException(token);
+                }
+
+                // Tính thời gian còn lại cho batch này
+                var elapsed = (DateTime.UtcNow - batchStartTime).TotalMilliseconds;
+                remainingTimeMs = batchTimeoutMs - (int)elapsed;
+
+                // Nếu hết thời gian, trả về kết quả thất bại thay vì throw exception
+                if (remainingTimeMs <= BATCH_MODE_MIN_RETRY_DELAY_MS)
+                {
+                    _logger.LogWarning("⏰ Batch {BatchIndex}: Timeout after {Elapsed}ms, tried {Retries} times with {FailedProxies} failed proxies",
+                        batchIndex, elapsed, batchRetryCount, failedProxyIds.Count);
+                    break;
+                }
+
                 try
                 {
-                    _logger.LogDebug("🔄 Batch {BatchIndex}: Attempt {Attempt}/{Max}", 
-                        batchIndex, batchRetryCount + 1, MAX_BATCH_RETRY_ATTEMPTS);
+                    _logger.LogDebug("🔄 Batch {BatchIndex}: Attempt {Attempt}/{Max}, remaining time: {RemainingMs}ms", 
+                        batchIndex, batchRetryCount + 1, MAX_BATCH_RETRY_ATTEMPTS, remainingTimeMs);
 
-                    // Gọi TranslateBatchAsync với danh sách proxy đã loại trừ
+                    // Tạo timeout riêng cho mỗi request - KHÔNG sử dụng batchToken
+                    // Chỉ sử dụng job cancellation token
+                    using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    // Timeout cho mỗi request = min(remaining time, per-request timeout)
+                    int requestTimeoutMs = Math.Min(remainingTimeMs, BATCH_MODE_REQUEST_TIMEOUT_SECONDS * 1000);
+                    requestCts.CancelAfter(requestTimeoutMs);
+
                     var (results, tokensUsed, usedKeyId) = await TranslateBatchWithProxyExclusionAsync(
                         batch, job, settings, modelName, job.SystemInstruction,
                         poolType, encryptionService, availableKeys, rpmPerKey, 
-                        failedProxyIds, token);
+                        failedProxyIds, requestCts.Token);
 
                     // Kiểm tra kết quả
                     int successCount = results.Count(r => r.Success);
@@ -551,7 +578,19 @@ namespace SubPhim.Server.Services
                     _logger.LogWarning("⚠️ Batch {BatchIndex} has low success rate ({Rate:P0}). Retry {Retry}/{Max}",
                         batchIndex, successRate, batchRetryCount + 1, MAX_BATCH_RETRY_ATTEMPTS);
                 }
-                catch (Exception ex) when (!(ex is OperationCanceledException))
+                catch (OperationCanceledException ex) when (!token.IsCancellationRequested)
+                {
+                    // Request timeout (không phải job cancellation) - retry với proxy khác
+                    _logger.LogWarning("⏰ Batch {BatchIndex}: Request timed out on attempt {Attempt}, trying another proxy...",
+                        batchIndex, batchRetryCount + 1);
+                    // Không throw, tiếp tục retry loop
+                }
+                catch (OperationCanceledException)
+                {
+                    // Job level cancellation - propagate exception
+                    throw;
+                }
+                catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "❌ Batch {BatchIndex} failed with exception. Retry {Retry}/{Max}",
                         batchIndex, batchRetryCount + 1, MAX_BATCH_RETRY_ATTEMPTS);
@@ -561,13 +600,24 @@ namespace SubPhim.Server.Services
                 if (batchRetryCount < MAX_BATCH_RETRY_ATTEMPTS)
                 {
                     // Delay ngắn trước khi retry với proxy khác
-                    await Task.Delay(Math.Min(BATCH_RETRY_DELAY_MS, BATCH_MODE_MIN_RETRY_DELAY_MS) * batchRetryCount, token);
+                    int delayMs = Math.Min(BATCH_RETRY_DELAY_MS, BATCH_MODE_MIN_RETRY_DELAY_MS) * batchRetryCount;
+                    // Không delay quá thời gian còn lại
+                    delayMs = Math.Min(delayMs, Math.Max(100, remainingTimeMs / 2));
+                    
+                    try
+                    {
+                        await Task.Delay(delayMs, token);
+                    }
+                    catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                    {
+                        // Delay bị cancel do timeout - tiếp tục vòng lặp để check điều kiện
+                    }
                 }
             }
 
-            // Tất cả retry thất bại
-            _logger.LogError("💀 Batch {BatchIndex} FAILED after {Max} retry attempts with different proxies", 
-                batchIndex, MAX_BATCH_RETRY_ATTEMPTS);
+            // Tất cả retry thất bại hoặc hết thời gian
+            _logger.LogError("💀 Batch {BatchIndex} FAILED after {Max} retry attempts with {FailedProxies} different proxies", 
+                batchIndex, batchRetryCount, failedProxyIds.Count);
 
             var failedResults = batch.Select(l => new TranslatedSrtLineDb
             {
@@ -576,7 +626,7 @@ namespace SubPhim.Server.Services
                 TranslatedText = "[LỖI: Không thể dịch sau nhiều lần thử với các proxy khác nhau]",
                 Success = false,
                 ErrorType = "BATCH_PROCESSING_FAILED",
-                ErrorDetail = $"Failed after {MAX_BATCH_RETRY_ATTEMPTS} attempts"
+                ErrorDetail = $"Failed after {batchRetryCount} attempts with {failedProxyIds.Count} proxies"
             }).ToList();
 
             return (false, failedResults, 0, null);
@@ -1715,14 +1765,26 @@ namespace SubPhim.Server.Services
         // HELPER METHODS
         // =====================================================================
 
+        /// <summary>
+        /// Lấy proxy có RPM slot khả dụng, ưu tiên proxy có tốc độ nhanh.
+        /// </summary>
         private async Task<Proxy?> GetProxyWithAvailableRpmSlotAsync(HashSet<int> excludeProxyIds, string requestId, CancellationToken token)
         {
+            // Thử lấy proxy nhanh nhất có slot khả dụng
+            var fastestProxy = await _proxyService.GetFastestAvailableProxyAsync(excludeProxyIds, _proxyRateLimiter);
+            if (fastestProxy != null && _proxyRateLimiter.HasAvailableSlot(fastestProxy.Id))
+            {
+                return fastestProxy;
+            }
+
+            // Fallback: round-robin nếu không tìm được proxy nhanh có slot
             var proxy = await _proxyService.GetNextProxyAsync(excludeProxyIds);
             if (proxy == null) return null;
 
             if (_proxyRateLimiter.HasAvailableSlot(proxy.Id)) return proxy;
 
             var triedProxyIds = new HashSet<int>(excludeProxyIds) { proxy.Id };
+            if (fastestProxy != null) triedProxyIds.Add(fastestProxy.Id);
 
             while (!token.IsCancellationRequested)
             {

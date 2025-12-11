@@ -65,7 +65,10 @@ http://admin:pass123@proxy.example.com:8080
                             • <code>socks4://host:port</code> - SOCKS4 proxy<br/>
                             • <code>http://host:port</code> - HTTP proxy<br/>
                             • <code>type://user:pass@host:port</code> - Proxy với authentication<br/>
-                            • <code>host:port</code> - Mặc định là SOCKS5
+                            • <code>host:port</code> - Mặc định là SOCKS5<br/>
+                            <hr class="my-1"/>
+                            <i class="bi bi-lightning-charge text-warning me-1"></i>
+                            <strong>Proxy mới sẽ được tự động kiểm tra tốc độ</strong>
                         </small>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
@@ -82,6 +85,12 @@ http://admin:pass123@proxy.example.com:8080
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Danh sách Proxy</h5>
                 <div>
+                    <form method="post" asp-page-handler="TestAllSpeed" class="d-inline me-2">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-primary btn-sm" title="Kiểm tra tốc độ tất cả proxy đang bật">
+                            <i class="bi bi-speedometer2 me-1"></i>Test All
+                        </button>
+                    </form>
                     <form method="post" asp-page-handler="DeleteAllProxies" class="d-inline">
                         @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Bạn có chắc muốn XÓA TẤT CẢ proxy?');">
@@ -112,6 +121,7 @@ http://admin:pass123@proxy.example.com:8080
                                     <th class="text-center" style="width: 5%;"><input class="form-check-input" type="checkbox" id="selectAll"></th>
                                     <th>Proxy</th>
                                     <th class="text-center">Loại</th>
+                                    <th class="text-center">Tốc độ</th>
                                     <th class="text-center">Sử dụng</th>
                                     <th class="text-center">Lỗi</th>
                                     <th class="text-center">Trạng thái</th>
@@ -130,6 +140,36 @@ http://admin:pass123@proxy.example.com:8080
                                             SubPhim.Server.Data.ProxyType.Http => "bg-secondary",
                                             _ => "bg-dark"
                                         };
+                                        
+                                        // Determine speed badge class
+                                        string speedBadgeClass;
+                                        string speedText;
+                                        if (proxy.SpeedMs < 0)
+                                        {
+                                            speedBadgeClass = "bg-secondary";
+                                            speedText = "N/A";
+                                        }
+                                        else if (proxy.SpeedMs == 0)
+                                        {
+                                            speedBadgeClass = "bg-danger";
+                                            speedText = "✗";
+                                        }
+                                        else if (proxy.SpeedMs < 1000)
+                                        {
+                                            speedBadgeClass = "bg-success";
+                                            speedText = $"{proxy.SpeedMs}ms";
+                                        }
+                                        else if (proxy.SpeedMs < 3000)
+                                        {
+                                            speedBadgeClass = "bg-warning text-dark";
+                                            speedText = $"{proxy.SpeedMs}ms";
+                                        }
+                                        else
+                                        {
+                                            speedBadgeClass = "bg-danger";
+                                            speedText = $"{proxy.SpeedMs}ms";
+                                        }
+                                        
                                         <tr class="@(!proxy.IsEnabled ? "table-secondary" : "")">
                                             <td class="text-center"><input class="form-check-input proxy-checkbox" type="checkbox" name="selectedProxyIds" value="@proxy.Id"></td>
                                             <td>
@@ -149,6 +189,11 @@ http://admin:pass123@proxy.example.com:8080
                                             </td>
                                             <td class="text-center">
                                                 <span class="badge @typeBadgeClass">@proxy.Type</span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge @speedBadgeClass" title="@(proxy.LastSpeedTestAt.HasValue ? "Kiểm tra: " + proxy.LastSpeedTestAt.Value.ToString("dd/MM HH:mm") : "Chưa kiểm tra")">
+                                                    @speedText
+                                                </span>
                                             </td>
                                             <td class="text-center">
                                                 <span class="badge bg-success">@proxy.UsageCount</span>
@@ -179,7 +224,7 @@ http://admin:pass123@proxy.example.com:8080
                                 else
                                 {
                                     <tr>
-                                        <td colspan="7" class="text-center p-4">
+                                        <td colspan="8" class="text-center p-4">
                                             <i class="bi bi-router text-muted fs-1 d-block mb-2"></i>
                                             <span class="text-muted">Chưa có proxy nào. Thêm proxy để tránh lỗi 429 khi gọi API Google.</span>
                                         </td>
@@ -211,24 +256,23 @@ http://admin:pass123@proxy.example.com:8080
             <div class="col-md-6">
                 <h6><i class="bi bi-gear text-primary me-2"></i>Cách hoạt động</h6>
                 <p class="small text-muted">
-                    Hệ thống sẽ tự động luân phiên (round-robin) qua danh sách proxy khi gửi request đến API Google.
+                    Hệ thống sẽ <strong>ưu tiên proxy nhanh nhất</strong> có slot RPM khả dụng khi gửi request đến API Google.
                     Nếu không có proxy nào được cấu hình, request sẽ được gửi trực tiếp.
+                </p>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="bi bi-speedometer2 text-info me-2"></i>Kiểm tra tốc độ</h6>
+                <p class="small text-muted mb-0">
+                    Proxy mới thêm sẽ được <strong>tự động kiểm tra tốc độ</strong>. Proxy không kết nối được sẽ bị tắt.
+                    Bạn có thể dùng nút <strong>Test All</strong> để kiểm tra lại tất cả proxy.
                 </p>
             </div>
             <div class="col-md-6">
                 <h6><i class="bi bi-shield-check text-success me-2"></i>Tự động vô hiệu hóa</h6>
                 <p class="small text-muted mb-0">
-                    Proxy sẽ tự động bị tắt nếu gặp <strong>5 lỗi liên tiếp</strong>. 
+                    Proxy sẽ tự động bị tắt nếu gặp <strong>5 lỗi liên tiếp</strong> hoặc tốc độ = 0. 
                     Bạn có thể reset thống kê và bật lại proxy thủ công.
                 </p>
-            </div>
-            <div class="col-md-6">
-                <h6><i class="bi bi-router text-info me-2"></i>Loại Proxy hỗ trợ</h6>
-                <ul class="small text-muted mb-0">
-                    <li><strong>SOCKS5</strong> - Khuyến nghị, hỗ trợ authentication và UDP</li>
-                    <li><strong>SOCKS4</strong> - Phiên bản cũ hơn, không hỗ trợ authentication</li>
-                    <li><strong>HTTP</strong> - Proxy HTTP thông thường</li>
-                </ul>
             </div>
         </div>
     </div>

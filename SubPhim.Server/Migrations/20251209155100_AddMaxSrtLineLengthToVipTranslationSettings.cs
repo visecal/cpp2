@@ -10,20 +10,17 @@ namespace SubPhim.Server.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "MaxSrtLineLength",
-                table: "VipTranslationSettings",
-                type: "INTEGER",
-                nullable: false,
-                defaultValue: 3000); // Default max characters per line
+            // NOTE: Column MaxSrtLineLength is now added via EnsureMissingColumnsExist() in Program.cs
+            // This migration is kept for history but does nothing since SQLite doesn't support
+            // IF NOT EXISTS for ALTER TABLE ADD COLUMN
+            // The column addition was moved to Program.cs to handle cases where it already exists
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "MaxSrtLineLength",
-                table: "VipTranslationSettings");
+            // NOTE: Column is managed by EnsureMissingColumnsExist() in Program.cs
+            // Don't drop it here as it may break other functionality
         }
     }
 }

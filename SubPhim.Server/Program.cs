@@ -410,7 +410,9 @@ static void EnsureMissingColumnsExist(AppDbContext context, ILogger logger)
             ("Users", "VipSrtLinesUsedToday", "INTEGER NOT NULL DEFAULT 0"),
             ("Users", "LastVipSrtResetUtc", "TEXT NOT NULL DEFAULT '0001-01-01 00:00:00'"),
             ("TierDefaultSettings", "DailyVipSrtLimit", "INTEGER NOT NULL DEFAULT 0"),
-            ("VipTranslationSettings", "MaxSrtLineLength", "INTEGER NOT NULL DEFAULT 3000")
+            ("VipTranslationSettings", "MaxSrtLineLength", "INTEGER NOT NULL DEFAULT 3000"),
+            ("LocalApiSettings", "EnableBatchProcessing", "INTEGER NOT NULL DEFAULT 0"),
+            ("LocalApiSettings", "BatchTimeoutMinutes", "INTEGER NOT NULL DEFAULT 3")
         };
 
         foreach (var (tableName, columnName, columnDefinition) in columnsToAdd)

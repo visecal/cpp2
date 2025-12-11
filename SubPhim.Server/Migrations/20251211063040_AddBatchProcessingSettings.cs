@@ -10,12 +10,8 @@ namespace SubPhim.Server.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "MaxSrtLineLength",
-                table: "VipTranslationSettings",
-                type: "INTEGER",
-                nullable: false,
-                defaultValue: 0);
+            // NOTE: MaxSrtLineLength is already added in migration 20251209155100 and handled by EnsureMissingColumnsExist
+            // Removed to prevent duplicate column error
 
             migrationBuilder.AddColumn<int>(
                 name: "BatchTimeoutMinutes",
@@ -35,9 +31,8 @@ namespace SubPhim.Server.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "MaxSrtLineLength",
-                table: "VipTranslationSettings");
+            // NOTE: MaxSrtLineLength is managed by migration 20251209155100
+            // Don't drop it here
 
             migrationBuilder.DropColumn(
                 name: "BatchTimeoutMinutes",

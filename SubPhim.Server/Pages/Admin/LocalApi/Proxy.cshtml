@@ -1,4 +1,5 @@
 @page
+@using System.Globalization
 @model SubPhim.Server.Pages.Admin.LocalApi.ProxyModel
 @{
     ViewData["Title"] = "Quản lý Proxy";
@@ -191,7 +192,7 @@ http://admin:pass123@proxy.example.com:8080
                                                 <span class="badge @typeBadgeClass">@proxy.Type</span>
                                             </td>
                                             <td class="text-center">
-                                                <span class="badge @speedBadgeClass" title="@(proxy.LastSpeedTestAt.HasValue ? "Kiểm tra: " + proxy.LastSpeedTestAt.Value.ToString("dd/MM HH:mm") : "Chưa kiểm tra")">
+                                                <span class="badge @speedBadgeClass" title="@(proxy.LastSpeedTestAt.HasValue ? "Kiểm tra: " + proxy.LastSpeedTestAt.Value.ToString("dd/MM HH:mm", CultureInfo.InvariantCulture) : "Chưa kiểm tra")">
                                                     @speedText
                                                 </span>
                                             </td>
@@ -199,7 +200,7 @@ http://admin:pass123@proxy.example.com:8080
                                                 <span class="badge bg-success">@proxy.UsageCount</span>
                                                 @if (proxy.LastUsedAt.HasValue)
                                                 {
-                                                    <br/><small class="text-muted">@proxy.LastUsedAt.Value.ToString("dd/MM HH:mm")</small>
+                                                    <br/><small class="text-muted">@proxy.LastUsedAt.Value.ToString("dd/MM HH:mm", CultureInfo.InvariantCulture)</small>
                                                 }
                                             </td>
                                             <td class="text-center">

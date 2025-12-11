@@ -95,10 +95,13 @@ namespace SubPhim.Server.Pages.Admin.LocalApi
                 {
                     _logger.LogInformation("Testing speed for {Count} newly added proxies...", newProxies.Count);
                     
-                    // Reload để có ID
-                    var addedProxiesWithIds = await _context.Proxies
-                        .Where(p => newProxies.Select(np => np.Host + ":" + np.Port).Contains(p.Host + ":" + p.Port))
-                        .ToListAsync();
+                    // Tạo HashSet để lookup hiệu quả hơn
+                    var newProxyKeys = newProxies.Select(np => $"{np.Host}:{np.Port}").ToHashSet();
+                    
+                    // Reload để có ID - sử dụng AsEnumerable để filter client-side với HashSet
+                    var addedProxiesWithIds = (await _context.Proxies.ToListAsync())
+                        .Where(p => newProxyKeys.Contains($"{p.Host}:{p.Port}"))
+                        .ToList();
                     
                     var speedResults = await _proxyService.TestMultipleProxiesSpeedAsync(addedProxiesWithIds);
                     

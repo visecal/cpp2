@@ -940,15 +940,15 @@ namespace SubPhim.Server.Services
                 
                 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
                 
-                // Chỉ gửi HEAD request để check kết nối, không cần response body
-                using var request = new HttpRequestMessage(HttpMethod.Head, SpeedTestUrl);
+                // Sử dụng GET request thay vì HEAD vì nhiều API không hỗ trợ HEAD
+                using var request = new HttpRequestMessage(HttpMethod.Get, SpeedTestUrl);
                 request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
                 
-                using var response = await httpClient.SendAsync(request);
+                using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                 
                 stopwatch.Stop();
                 
-                // Nếu response thành công hoặc 400/401/403 (Google API trả về khi không có key), proxy hoạt động
+                // Nếu response thành công hoặc 400/401/403/404 (Google API trả về khi không có key), proxy hoạt động
                 if (response.IsSuccessStatusCode || 
                     (int)response.StatusCode == 400 || 
                     (int)response.StatusCode == 401 || 
@@ -1121,10 +1121,17 @@ namespace SubPhim.Server.Services
             // SpeedMs = -1: chưa kiểm tra
             // SpeedMs = 0: không kết nối được
             // SpeedMs > 0: thời gian phản hồi (ms)
+            // Sử dụng Select để tính sortKey một lần cho mỗi proxy
             var sortedProxies = proxies
-                .OrderByDescending(p => p.SpeedMs > 0 ? 1 : 0) // Ưu tiên proxy đã test thành công
-                .ThenBy(p => p.SpeedMs > 0 ? p.SpeedMs : int.MaxValue) // Sắp xếp theo tốc độ (nhanh nhất trước)
-                .ThenBy(p => p.FailureCount) // Ưu tiên proxy ít lỗi hơn
+                .Select(p => new { 
+                    Proxy = p, 
+                    HasSpeed = p.SpeedMs > 0,
+                    EffectiveSpeed = p.SpeedMs > 0 ? p.SpeedMs : int.MaxValue 
+                })
+                .OrderByDescending(x => x.HasSpeed ? 1 : 0) // Ưu tiên proxy đã test thành công
+                .ThenBy(x => x.EffectiveSpeed) // Sắp xếp theo tốc độ (nhanh nhất trước)
+                .ThenBy(x => x.Proxy.FailureCount) // Ưu tiên proxy ít lỗi hơn
+                .Select(x => x.Proxy)
                 .ToList();
             
             var selectedProxy = sortedProxies.FirstOrDefault();

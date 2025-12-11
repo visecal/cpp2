@@ -610,7 +610,8 @@ namespace SubPhim.Server.Services
                     }
                     catch (OperationCanceledException) when (!token.IsCancellationRequested)
                     {
-                        // Delay bị cancel do timeout - tiếp tục vòng lặp để check điều kiện
+                        // Delay bị cancel - tiếp tục vòng lặp để check điều kiện timeout ở đầu loop
+                        // batchRetryCount đã được tăng, loop sẽ check timeout condition và break nếu hết thời gian
                     }
                 }
             }

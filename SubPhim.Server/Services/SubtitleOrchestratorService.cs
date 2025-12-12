@@ -27,11 +27,14 @@ namespace SubPhim.Server.Services
         // Track cooldown keys in memory
         private static readonly ConcurrentDictionary<int, DateTime> _apiKeyCooldowns = new();
 
+        // Track failed tasks for retry
+        private static readonly ConcurrentDictionary<string, ConcurrentQueue<FailedTaskInfo>> _failedTasksQueue = new();
+
         public SubtitleOrchestratorService(
-    IServiceScopeFactory scopeFactory,
-    IEncryptionService encryptionService,
-    IHttpClientFactory httpClientFactory,
-    ILogger<SubtitleOrchestratorService> logger)
+            IServiceScopeFactory scopeFactory,
+            IEncryptionService encryptionService,
+            IHttpClientFactory httpClientFactory,
+            ILogger<SubtitleOrchestratorService> logger)
         {
             _scopeFactory = scopeFactory;
             _encryptionService = encryptionService;
@@ -59,6 +62,43 @@ namespace SubPhim.Server.Services
                 throw new InvalidOperationException($"Session {request.SessionId} đã tồn tại.");
             }
 
+            // === KIỂM TRA VÀ TRỪ LƯỢT DỊCH LOCAL SRT CHO USER ===
+            int linesToTranslate = request.Lines.Count;
+            User? user = null;
+
+            if (userId.HasValue)
+            {
+                user = await context.Users.FindAsync(userId.Value);
+                if (user != null)
+                {
+                    // Reset counter nếu qua ngày mới
+                    await ResetUserDailyCountersIfNeeded(context, user);
+
+                    // Kiểm tra giới hạn LocalSRT (dùng chung với LocalApi)
+                    int remainingLines = user.DailyLocalSrtLimit - user.LocalSrtLinesUsedToday;
+                    if (remainingLines <= 0)
+                    {
+                        throw new InvalidOperationException($"Bạn đã hết lượt dịch SRT Local hôm nay. Giới hạn: {user.DailyLocalSrtLimit} dòng/ngày.");
+                    }
+
+                    // Nếu số dòng yêu cầu vượt quá giới hạn còn lại, chỉ dịch số dòng còn lại
+                    if (linesToTranslate > remainingLines)
+                    {
+                        _logger.LogWarning("User {UserId} requested {Requested} lines but only {Remaining} remaining. Limiting to {Remaining}.",
+                            userId.Value, linesToTranslate, remainingLines, remainingLines);
+                        linesToTranslate = remainingLines;
+                        request.Lines = request.Lines.Take(linesToTranslate).ToList();
+                    }
+
+                    // Trừ lượt trước (sẽ hoàn lại nếu có lỗi)
+                    user.LocalSrtLinesUsedToday += linesToTranslate;
+                    await context.SaveChangesAsync();
+
+                    _logger.LogInformation("User {UserId} charged {Lines} LocalSRT lines. Used: {Used}/{Limit}",
+                        userId.Value, linesToTranslate, user.LocalSrtLinesUsedToday, user.DailyLocalSrtLimit);
+                }
+            }
+
             // Get available servers
             var availableServers = await context.SubtitleTranslationServers
                 .Where(s => s.IsEnabled && !s.IsBusy)
@@ -68,6 +108,12 @@ namespace SubPhim.Server.Services
 
             if (!availableServers.Any())
             {
+                // Hoàn lượt nếu không có server
+                if (user != null)
+                {
+                    user.LocalSrtLinesUsedToday -= linesToTranslate;
+                    await context.SaveChangesAsync();
+                }
                 throw new InvalidOperationException("Không có server dịch nào khả dụng.");
             }
 
@@ -80,6 +126,12 @@ namespace SubPhim.Server.Services
 
             if (!availableKeys.Any())
             {
+                // Hoàn lượt nếu không có key
+                if (user != null)
+                {
+                    user.LocalSrtLinesUsedToday -= linesToTranslate;
+                    await context.SaveChangesAsync();
+                }
                 throw new InvalidOperationException("Không có API key nào khả dụng.");
             }
 
@@ -111,6 +163,9 @@ namespace SubPhim.Server.Services
             _logger.LogInformation("Job {SessionId} created: {Lines} lines, {Batches} batches",
                 request.SessionId, request.Lines.Count, batchPlan.Count);
 
+            // Initialize failed tasks queue for this session
+            _failedTasksQueue[request.SessionId] = new ConcurrentQueue<FailedTaskInfo>();
+
             // Start distribution in background
             _ = Task.Run(async () => await DistributeJobAsync(job.SessionId, request.Lines, batchPlan, settings, availableServers, availableKeys));
 
@@ -123,6 +178,25 @@ namespace SubPhim.Server.Services
                 ServersAssigned = Math.Min(batchPlan.Count, availableServers.Count),
                 Message = "Job đã được tạo và đang phân phối đến các server."
             };
+        }
+
+        /// <summary>
+        /// Reset các counter hàng ngày của user nếu đã qua ngày mới
+        /// </summary>
+        private async Task ResetUserDailyCountersIfNeeded(AppDbContext context, User user)
+        {
+            var now = DateTime.UtcNow;
+            var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(now, vietnamTimeZone);
+            var vietnamLastReset = TimeZoneInfo.ConvertTimeFromUtc(user.LastLocalSrtResetUtc, vietnamTimeZone);
+
+            if (vietnamNow.Date > vietnamLastReset.Date)
+            {
+                user.LocalSrtLinesUsedToday = 0;
+                user.LastLocalSrtResetUtc = now;
+                await context.SaveChangesAsync();
+                _logger.LogInformation("Reset LocalSRT counter for user {UserId}", user.Id);
+            }
         }
 
         private List<BatchInfo> CalculateBatchPlan(int totalLines, SubtitleApiSetting settings, int availableServerCount)
@@ -252,19 +326,22 @@ namespace SubPhim.Server.Services
             // Wait for all tasks
             await Task.WhenAll(tasks);
 
+            // Process retry queue if any failed tasks
+            await ProcessRetryQueueAsync(sessionId, lines, settings);
+
             // Aggregate results
             await AggregateResultsAsync(sessionId);
         }
 
         private async Task SendToServerAsync(
-    HttpClient httpClient,
-    SubtitleTranslationServer server,
-    SubtitleServerTask task,
-    SubtitleTranslationJob job,
-    List<SubtitleLine> lines,
-    List<string> apiKeys,
-    SubtitleApiSetting settings,
-    SemaphoreSlim semaphore)
+            HttpClient httpClient,
+            SubtitleTranslationServer server,
+            SubtitleServerTask task,
+            SubtitleTranslationJob job,
+            List<SubtitleLine> lines,
+            List<string> apiKeys,
+            SubtitleApiSetting settings,
+            SemaphoreSlim semaphore)
         {
             await semaphore.WaitAsync();
 
@@ -299,6 +376,10 @@ namespace SubPhim.Server.Services
                     callbackUrl = $"{settings.MainServerUrl.TrimEnd('/')}/api/subtitle/callback/{job.SessionId}/{task.BatchIndex}";
                 }
 
+                // === THÊM delayBetweenBatchesMs VÀO REQUEST GỬI CHO SERVER PHÂN TÁN ===
+                // Tính số batch nội bộ mà server phân tán sẽ xử lý
+                int internalBatchCount = (int)Math.Ceiling((double)lines.Count / settings.BatchSizePerServer);
+
                 var serverRequest = new
                 {
                     model = job.Model,
@@ -309,7 +390,13 @@ namespace SubPhim.Server.Services
                     apiKeys = apiKeys,
                     batchSize = settings.BatchSizePerServer,
                     thinkingBudget = job.ThinkingBudget,
-                    callbackUrl = callbackUrl
+                    callbackUrl = callbackUrl,
+                    // === MỚI: Truyền delay giữa các batch cho server phân tán ===
+                    delayBetweenBatchesMs = settings.DelayBetweenServerBatchesMs > 0
+                        ? settings.DelayBetweenServerBatchesMs
+                        : 500, // Mặc định 500ms nếu không cài đặt
+                    totalInternalBatches = internalBatchCount, // Số batch nội bộ
+                    maxRetries = settings.MaxServerRetries // Số lần retry tối đa
                 };
 
                 var startTime = DateTime.UtcNow;
@@ -338,6 +425,9 @@ namespace SubPhim.Server.Services
                         serverInDb.LastFailedAt = DateTime.UtcNow;
                         serverInDb.LastFailureReason = taskInDb.ErrorMessage;
                         _logger.LogError("Failed to send Batch {BatchIndex}. Server {ServerUrl} responded with {StatusCode}: {Error}", task.BatchIndex, server.ServerUrl, (int)response.StatusCode, error);
+
+                        // === MỚI: Thêm vào queue retry ===
+                        AddToRetryQueue(job.SessionId, task, lines);
                     }
                 }
                 catch (Exception ex)
@@ -349,6 +439,9 @@ namespace SubPhim.Server.Services
                     serverInDb.LastFailedAt = DateTime.UtcNow;
                     serverInDb.LastFailureReason = ex.Message;
                     _logger.LogError(ex, "CRITICAL EXCEPTION sending Batch {BatchIndex} to server {ServerId}", task.BatchIndex, server.Id);
+
+                    // === MỚI: Thêm vào queue retry ===
+                    AddToRetryQueue(job.SessionId, task, lines);
                 }
                 finally
                 {
@@ -375,6 +468,248 @@ namespace SubPhim.Server.Services
                 semaphore.Release();
             }
         }
+
+        /// <summary>
+        /// Thêm task thất bại vào queue để retry
+        /// </summary>
+        private void AddToRetryQueue(string sessionId, SubtitleServerTask task, List<SubtitleLine> lines)
+        {
+            if (!_failedTasksQueue.ContainsKey(sessionId))
+            {
+                _failedTasksQueue[sessionId] = new ConcurrentQueue<FailedTaskInfo>();
+            }
+
+            _failedTasksQueue[sessionId].Enqueue(new FailedTaskInfo
+            {
+                TaskId = task.Id,
+                BatchIndex = task.BatchIndex,
+                StartLineIndex = task.StartLineIndex,
+                LineCount = task.LineCount,
+                Lines = lines,
+                RetryCount = task.RetryCount + 1
+            });
+
+            _logger.LogInformation("Added Batch {BatchIndex} to retry queue for session {SessionId}. Retry #{RetryCount}",
+                task.BatchIndex, sessionId, task.RetryCount + 1);
+        }
+
+        /// <summary>
+        /// Xử lý queue các task thất bại với API key mới
+        /// </summary>
+        private async Task ProcessRetryQueueAsync(string sessionId, List<SubtitleLine> allLines, SubtitleApiSetting settings)
+        {
+            if (!_failedTasksQueue.TryGetValue(sessionId, out var retryQueue) || retryQueue.IsEmpty)
+            {
+                return;
+            }
+
+            using var scope = _scopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var job = await context.SubtitleTranslationJobs.FindAsync(sessionId);
+            if (job == null) return;
+
+            // Lấy API key mới (không bị cooldown)
+            var now = DateTime.UtcNow;
+            var freshKeys = await context.SubtitleApiKeys
+                .Where(k => k.IsEnabled && (k.CooldownUntil == null || k.CooldownUntil <= now))
+                .OrderBy(k => k.TotalSuccessRequests)
+                .ToListAsync();
+
+            if (!freshKeys.Any())
+            {
+                _logger.LogWarning("No fresh API keys available for retry. Session: {SessionId}", sessionId);
+                return;
+            }
+
+            // Lấy server khả dụng
+            var availableServers = await context.SubtitleTranslationServers
+                .Where(s => s.IsEnabled && !s.IsBusy)
+                .OrderBy(s => s.Priority)
+                .ThenBy(s => s.FailureCount)
+                .ToListAsync();
+
+            if (!availableServers.Any())
+            {
+                _logger.LogWarning("No available servers for retry. Session: {SessionId}", sessionId);
+                return;
+            }
+
+            var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(settings.ServerTimeoutSeconds);
+
+            var retryTasks = new List<Task>();
+            var semaphore = new SemaphoreSlim(availableServers.Count);
+            int serverIndex = 0;
+            int keyIndex = 0;
+
+            while (retryQueue.TryDequeue(out var failedTask))
+            {
+                // Kiểm tra số lần retry
+                if (failedTask.RetryCount > settings.MaxServerRetries)
+                {
+                    _logger.LogWarning("Batch {BatchIndex} exceeded max retries ({Max}). Skipping.",
+                        failedTask.BatchIndex, settings.MaxServerRetries);
+                    continue;
+                }
+
+                var server = availableServers[serverIndex % availableServers.Count];
+                serverIndex++;
+
+                // Lấy key mới cho retry
+                var keysForServer = new List<string>();
+                for (int i = 0; i < settings.ApiKeysPerServer && keyIndex < freshKeys.Count * 2; i++)
+                {
+                    var key = freshKeys[keyIndex % freshKeys.Count];
+                    keyIndex++;
+                    if (_apiKeyCooldowns.TryGetValue(key.Id, out var cooldownUntil) && cooldownUntil > DateTime.UtcNow)
+                        continue;
+                    try
+                    {
+                        keysForServer.Add(_encryptionService.Decrypt(key.EncryptedApiKey, key.Iv));
+                    }
+                    catch { /* ... */ }
+                }
+
+                if (!keysForServer.Any())
+                {
+                    _logger.LogWarning("No keys available for retry batch {BatchIndex}", failedTask.BatchIndex);
+                    continue;
+                }
+
+                // Cập nhật task status
+                var taskInDb = await context.SubtitleServerTasks.FindAsync(failedTask.TaskId);
+                if (taskInDb != null)
+                {
+                    taskInDb.Status = ServerTaskStatus.Retrying;
+                    taskInDb.RetryCount = failedTask.RetryCount;
+                    taskInDb.ServerId = server.Id;
+                    await context.SaveChangesAsync();
+                }
+
+                _logger.LogInformation("Retrying Batch {BatchIndex} with new API keys. Retry #{RetryCount}",
+                    failedTask.BatchIndex, failedTask.RetryCount);
+
+                retryTasks.Add(SendRetryToServerAsync(
+                    httpClient,
+                    server,
+                    failedTask,
+                    job,
+                    keysForServer,
+                    settings,
+                    semaphore
+                ));
+
+                // Delay giữa các retry
+                await Task.Delay(settings.DelayBetweenServerBatchesMs > 0 ? settings.DelayBetweenServerBatchesMs : 500);
+            }
+
+            if (retryTasks.Any())
+            {
+                await Task.WhenAll(retryTasks);
+            }
+
+            // Cleanup
+            _failedTasksQueue.TryRemove(sessionId, out _);
+        }
+
+        /// <summary>
+        /// Gửi retry request đến server với API key mới
+        /// </summary>
+        private async Task SendRetryToServerAsync(
+            HttpClient httpClient,
+            SubtitleTranslationServer server,
+            FailedTaskInfo failedTask,
+            SubtitleTranslationJob job,
+            List<string> apiKeys,
+            SubtitleApiSetting settings,
+            SemaphoreSlim semaphore)
+        {
+            await semaphore.WaitAsync();
+
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                var taskInDb = await context.SubtitleServerTasks.FindAsync(failedTask.TaskId);
+                var serverInDb = await context.SubtitleTranslationServers.FindAsync(server.Id);
+
+                if (taskInDb == null || serverInDb == null) return;
+
+                taskInDb.SentAt = DateTime.UtcNow;
+                serverInDb.IsBusy = true;
+                serverInDb.CurrentSessionId = job.SessionId;
+                await context.SaveChangesAsync();
+
+                string? callbackUrl = null;
+                if (settings.EnableCallback && !string.IsNullOrWhiteSpace(settings.MainServerUrl))
+                {
+                    callbackUrl = $"{settings.MainServerUrl.TrimEnd('/')}/api/subtitle/callback/{job.SessionId}/{failedTask.BatchIndex}";
+                }
+
+                int internalBatchCount = (int)Math.Ceiling((double)failedTask.Lines.Count / settings.BatchSizePerServer);
+
+                var serverRequest = new
+                {
+                    model = job.Model,
+                    prompt = job.Prompt,
+                    lines = failedTask.Lines.Select(l => new { index = l.Index, text = l.Text }),
+                    systemInstruction = job.SystemInstruction,
+                    sessionId = $"{job.SessionId}_batch{failedTask.BatchIndex}",
+                    apiKeys = apiKeys,
+                    batchSize = settings.BatchSizePerServer,
+                    thinkingBudget = job.ThinkingBudget,
+                    callbackUrl = callbackUrl,
+                    delayBetweenBatchesMs = settings.DelayBetweenServerBatchesMs > 0
+                        ? settings.DelayBetweenServerBatchesMs
+                        : 500,
+                    totalInternalBatches = internalBatchCount,
+                    maxRetries = settings.MaxServerRetries,
+                    isRetry = true,
+                    retryCount = failedTask.RetryCount
+                };
+
+                var startTime = DateTime.UtcNow;
+
+                try
+                {
+                    var response = await httpClient.PostAsJsonAsync($"{server.ServerUrl}/translate", serverRequest);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        taskInDb.Status = ServerTaskStatus.Processing;
+                        _logger.LogInformation("Retry successful for Batch {BatchIndex}.", failedTask.BatchIndex);
+                    }
+                    else
+                    {
+                        var error = await response.Content.ReadAsStringAsync();
+                        taskInDb.Status = ServerTaskStatus.Failed;
+                        taskInDb.ErrorMessage = $"Retry failed - HTTP Error {(int)response.StatusCode}: {error}";
+                        _logger.LogError("Retry failed for Batch {BatchIndex}: {Error}", failedTask.BatchIndex, error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    taskInDb.Status = ServerTaskStatus.Failed;
+                    taskInDb.ErrorMessage = $"Retry exception: {ex.Message}";
+                    _logger.LogError(ex, "Retry exception for Batch {BatchIndex}", failedTask.BatchIndex);
+                }
+                finally
+                {
+                    taskInDb.ProcessingTimeMs = (int)(DateTime.UtcNow - startTime).TotalMilliseconds;
+                    serverInDb.IsBusy = false;
+                    serverInDb.CurrentSessionId = null;
+                    serverInDb.LastUsedAt = DateTime.UtcNow;
+                    await context.SaveChangesAsync();
+                }
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
         public async Task ProcessCallbackAsync(ServerCallbackData callback)
         {
             // === THÊM DEBUG LOG: Ghi lại toàn bộ callback nhận được ===
@@ -411,6 +746,8 @@ namespace SubPhim.Server.Services
                 return;
             }
 
+            var settings = await context.SubtitleApiSettings.FindAsync(1) ?? new SubtitleApiSetting();
+
             task.Status = callback.Status == "completed" ? ServerTaskStatus.Completed : ServerTaskStatus.Failed;
             task.CompletedAt = DateTime.UtcNow;
             task.ErrorMessage = callback.Error;
@@ -421,7 +758,10 @@ namespace SubPhim.Server.Services
                 task.ResultJson = JsonSerializer.Serialize(callback.Results);
             }
 
-            // Process API key usage
+            // === XỬ LÝ API KEY USAGE VÀ RETRY NẾU CẦN ===
+            bool shouldRetry = false;
+            List<string> failedKeyMasks = new();
+
             if (callback.ApiKeyUsage != null)
             {
                 foreach (var usage in callback.ApiKeyUsage)
@@ -429,29 +769,109 @@ namespace SubPhim.Server.Services
                     // Update key stats
                     if (usage.FailureCount > 0)
                     {
-                        // Check if it's 429 error
-                        var key = await context.SubtitleApiKeys
-                            .FirstOrDefaultAsync(k => k.EncryptedApiKey.StartsWith(usage.MaskedKey.Substring(0, 8)));
+                        failedKeyMasks.Add(usage.MaskedKey);
 
-                        if (key != null)
+                        // Check if it's 429 error - tìm key để đặt cooldown
+                        var allKeys = await context.SubtitleApiKeys.ToListAsync();
+                        SubtitleApiKey? matchedKey = null;
+
+                        foreach (var key in allKeys)
                         {
-                            key.TotalFailedRequests += usage.FailureCount;
-                            key.TotalSuccessRequests += usage.SuccessCount;
-
-                            // Put in cooldown if needed
-                            if (usage.FailureCount > 0)
+                            try
                             {
-                                var settings = await context.SubtitleApiSettings.FindAsync(1);
-                                key.CooldownUntil = DateTime.UtcNow.AddMinutes(settings?.ApiKeyCooldownMinutes ?? 5);
-                                key.Consecutive429Count++;
-                                _apiKeyCooldowns[key.Id] = key.CooldownUntil.Value;
+                                var decrypted = _encryptionService.Decrypt(key.EncryptedApiKey, key.Iv);
+                                var mask = decrypted.Length > 12
+                                    ? decrypted.Substring(0, 8) + "****" + decrypted.Substring(decrypted.Length - 4)
+                                    : decrypted;
+
+                                if (mask == usage.MaskedKey || decrypted.StartsWith(usage.MaskedKey.Substring(0, Math.Min(8, usage.MaskedKey.Length))))
+                                {
+                                    matchedKey = key;
+                                    break;
+                                }
                             }
+                            catch { /* ... */ }
+                        }
+
+                        if (matchedKey != null)
+                        {
+                            matchedKey.TotalFailedRequests += usage.FailureCount;
+                            matchedKey.TotalSuccessRequests += usage.SuccessCount;
+
+                            // Put in cooldown
+                            matchedKey.CooldownUntil = DateTime.UtcNow.AddMinutes(settings.ApiKeyCooldownMinutes);
+                            matchedKey.Consecutive429Count++;
+                            _apiKeyCooldowns[matchedKey.Id] = matchedKey.CooldownUntil.Value;
+
+                            _logger.LogWarning("API Key {MaskedKey} put in cooldown until {CooldownUntil}",
+                                usage.MaskedKey, matchedKey.CooldownUntil);
                         }
                     }
+                    else if (usage.SuccessCount > 0)
+                    {
+                        // Reset consecutive failure count on success
+                        var allKeys = await context.SubtitleApiKeys.ToListAsync();
+                        foreach (var key in allKeys)
+                        {
+                            try
+                            {
+                                var decrypted = _encryptionService.Decrypt(key.EncryptedApiKey, key.Iv);
+                                if (decrypted.StartsWith(usage.MaskedKey.Substring(0, Math.Min(8, usage.MaskedKey.Length))))
+                                {
+                                    key.TotalSuccessRequests += usage.SuccessCount;
+                                    key.Consecutive429Count = 0;
+                                    key.LastUsedAt = DateTime.UtcNow;
+                                    break;
+                                }
+                            }
+                            catch { /* ... */ }
+                        }
+                    }
+                }
+
+                // === MỚI: Nếu có lỗi key và task failed, queue để retry với key mới ===
+                if (callback.Status != "completed" && failedKeyMasks.Any() && task.RetryCount < settings.MaxServerRetries)
+                {
+                    shouldRetry = true;
                 }
             }
 
             await context.SaveChangesAsync();
+
+            // === XỬ LÝ RETRY NẾU CẦN ===
+            if (shouldRetry)
+            {
+                var job = await context.SubtitleTranslationJobs.FindAsync(originalSessionId);
+                if (job != null && !string.IsNullOrEmpty(job.OriginalLinesJson))
+                {
+                    var allLines = JsonSerializer.Deserialize<List<SubtitleLine>>(job.OriginalLinesJson);
+                    if (allLines != null)
+                    {
+                        var taskLines = allLines.Skip(task.StartLineIndex).Take(task.LineCount).ToList();
+
+                        if (!_failedTasksQueue.ContainsKey(originalSessionId))
+                        {
+                            _failedTasksQueue[originalSessionId] = new ConcurrentQueue<FailedTaskInfo>();
+                        }
+
+                        _failedTasksQueue[originalSessionId].Enqueue(new FailedTaskInfo
+                        {
+                            TaskId = task.Id,
+                            BatchIndex = task.BatchIndex,
+                            StartLineIndex = task.StartLineIndex,
+                            LineCount = task.LineCount,
+                            Lines = taskLines,
+                            RetryCount = task.RetryCount + 1
+                        });
+
+                        _logger.LogInformation("Queued Batch {BatchIndex} for retry due to API key failures. Failed keys: {FailedKeys}",
+                            batchIndex, string.Join(", ", failedKeyMasks));
+
+                        // Trigger retry processing in background
+                        _ = Task.Run(async () => await ProcessRetryQueueAsync(originalSessionId, allLines, settings));
+                    }
+                }
+            }
 
             // Check if all tasks are complete
             await AggregateResultsAsync(originalSessionId);
@@ -518,6 +938,24 @@ namespace SubPhim.Server.Services
 
                 _logger.LogInformation("Job {SessionId} {Status}: {Completed}/{Total} lines",
                     sessionId, job.Status, job.CompletedLines, job.TotalLines);
+
+                // === MỚI: HOÀN LƯỢT DỊCH NẾU CÓ LỖI ===
+                if (job.UserId.HasValue && failedTasks.Any())
+                {
+                    var user = await context.Users.FindAsync(job.UserId.Value);
+                    if (user != null)
+                    {
+                        int failedLines = failedTasks.Sum(t => t.LineCount);
+                        int linesToRefund = Math.Min(failedLines, user.LocalSrtLinesUsedToday);
+
+                        if (linesToRefund > 0)
+                        {
+                            user.LocalSrtLinesUsedToday -= linesToRefund;
+                            _logger.LogInformation("Refunded {Lines} LocalSRT lines to user {UserId} due to failed batches. New usage: {Used}/{Limit}",
+                                linesToRefund, job.UserId.Value, user.LocalSrtLinesUsedToday, user.DailyLocalSrtLimit);
+                        }
+                    }
+                }
             }
 
             await context.SaveChangesAsync();
@@ -712,6 +1150,19 @@ namespace SubPhim.Server.Services
         public int RequestCount { get; set; }
         public int SuccessCount { get; set; }
         public int FailureCount { get; set; }
+    }
+
+    /// <summary>
+    /// Thông tin task thất bại để retry
+    /// </summary>
+    public class FailedTaskInfo
+    {
+        public int TaskId { get; set; }
+        public int BatchIndex { get; set; }
+        public int StartLineIndex { get; set; }
+        public int LineCount { get; set; }
+        public List<SubtitleLine> Lines { get; set; } = new();
+        public int RetryCount { get; set; }
     }
     #endregion
 }

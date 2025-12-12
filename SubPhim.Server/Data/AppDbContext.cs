@@ -41,6 +41,13 @@ namespace SubPhim.Server.Data
         public DbSet<ExternalApiCreditTransaction> ExternalApiCreditTransactions { get; set; }
         public DbSet<ExternalApiSettings> ExternalApiSettings { get; set; }
 
+        // Subtitle Translation (Distributed Servers) DbSets
+        public DbSet<SubtitleApiSetting> SubtitleApiSettings { get; set; }
+        public DbSet<SubtitleApiKey> SubtitleApiKeys { get; set; }
+        public DbSet<SubtitleTranslationServer> SubtitleTranslationServers { get; set; }
+        public DbSet<SubtitleTranslationJob> SubtitleTranslationJobs { get; set; }
+        public DbSet<SubtitleServerTask> SubtitleServerTasks { get; set; }
+
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) 
         {
             // Configure SQLite for better concurrency on every connection
@@ -263,13 +270,66 @@ namespace SubPhim.Server.Data
             
             // Seed default External API Settings
             modelBuilder.Entity<ExternalApiSettings>()
-                .HasData(new ExternalApiSettings 
-                { 
+                .HasData(new ExternalApiSettings
+                {
                     Id = 1,
                     CreditsPerCharacter = 5,
                     VndPerCredit = 10,
                     DefaultRpm = 100,
                     DefaultInitialCredits = 0,
+                    UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                });
+
+            // Configure Subtitle Translation entities
+            modelBuilder.Entity<SubtitleTranslationJob>(entity =>
+            {
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.UserId);
+
+                entity.HasMany(j => j.ServerTasks)
+                    .WithOne(t => t.Job)
+                    .HasForeignKey(t => t.SessionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<SubtitleServerTask>(entity =>
+            {
+                entity.HasIndex(e => e.SessionId);
+                entity.HasIndex(e => e.ServerId);
+                entity.HasIndex(e => e.Status);
+            });
+
+            modelBuilder.Entity<SubtitleTranslationServer>(entity =>
+            {
+                entity.HasIndex(e => e.IsEnabled);
+                entity.HasIndex(e => e.IsBusy);
+                entity.HasIndex(e => e.ServerUrl).IsUnique();
+            });
+
+            modelBuilder.Entity<SubtitleApiKey>(entity =>
+            {
+                entity.HasIndex(e => e.IsEnabled);
+                entity.HasIndex(e => e.CooldownUntil);
+            });
+
+            // Seed default Subtitle API Settings
+            modelBuilder.Entity<SubtitleApiSetting>()
+                .HasData(new SubtitleApiSetting
+                {
+                    Id = 1,
+                    LinesPerServer = 120,
+                    BatchSizePerServer = 40,
+                    ApiKeysPerServer = 5,
+                    MergeBatchThreshold = 10,
+                    ServerTimeoutSeconds = 300,
+                    MaxServerRetries = 3,
+                    DelayBetweenServerBatchesMs = 500,
+                    ApiKeyCooldownMinutes = 5,
+                    EnableCallback = true,
+                    DefaultModel = "gemini-2.5-flash",
+                    Temperature = 0.3m,
+                    ThinkingBudget = 0,
                     UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                 });
         }

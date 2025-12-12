@@ -55,6 +55,7 @@ builder.Services.AddHttpClient("AioLauncherClient", client =>
 builder.Services.AddControllers();
 builder.Services.AddSingleton<TranslationOrchestratorService>();
 builder.Services.AddSingleton<VipTranslationService>();
+builder.Services.AddScoped<ISubtitleOrchestratorService, SubtitleOrchestratorService>(); // Subtitle distributed translation
 builder.Services.AddMemoryCache();
 
 // External API Key Management Services

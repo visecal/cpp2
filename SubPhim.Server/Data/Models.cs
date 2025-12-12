@@ -1090,24 +1090,321 @@ namespace SubPhim.Server.Data
     public class ExternalApiSettings
     {
         public int Id { get; set; } = 1; // Singleton pattern
-        
+
         // Credit Conversion Rates
         [Display(Name = "Credit/Ký tự")]
         public int CreditsPerCharacter { get; set; } = 5; // 5 credit = 1 character
-        
+
         [Display(Name = "VND/Credit")]
         [Column(TypeName = "decimal(18,4)")]
         public decimal VndPerCredit { get; set; } = 10; // 10 VND = 1 credit (so 10,000 VND = 1,000 credit)
-        
+
         // Defaults for new API keys
         [Display(Name = "RPM mặc định")]
         public int DefaultRpm { get; set; } = 100;
-        
+
         [Display(Name = "Credit khởi tạo mặc định")]
         public long DefaultInitialCredits { get; set; } = 0;
-        
+
         [Display(Name = "Cập nhật lần cuối")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    // ==================== Subtitle Translation (Distributed Servers) ====================
+
+    /// <summary>
+    /// Cài đặt chung cho hệ thống dịch phụ đề phân tán
+    /// </summary>
+    public class SubtitleApiSetting
+    {
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
+        public int Id { get; set; } = 1;
+
+        [Display(Name = "Số dòng/Server (Lines per Server)")]
+        public int LinesPerServer { get; set; } = 120; // Số dòng gửi cho mỗi server dịch
+
+        [Display(Name = "Số dòng/Batch cho server dịch")]
+        public int BatchSizePerServer { get; set; } = 40; // Số dòng/request gửi cho server dịch
+
+        [Display(Name = "Số API Key gửi cho mỗi server")]
+        public int ApiKeysPerServer { get; set; } = 5; // Số key gửi cho mỗi server dịch
+
+        [Display(Name = "Ngưỡng gộp batch cuối (dòng)")]
+        public int MergeBatchThreshold { get; set; } = 10; // Nếu batch cuối <= X dòng thì gộp vào batch trước
+
+        [Display(Name = "Timeout cho mỗi server (giây)")]
+        public int ServerTimeoutSeconds { get; set; } = 300; // 5 phút timeout
+
+        [Display(Name = "Số lần retry khi server lỗi")]
+        public int MaxServerRetries { get; set; } = 3;
+
+        [Display(Name = "Delay giữa các server batch (ms)")]
+        public int DelayBetweenServerBatchesMs { get; set; } = 500;
+
+        [Display(Name = "Thời gian Cooldown khi key lỗi 429 (phút)")]
+        public int ApiKeyCooldownMinutes { get; set; } = 5;
+
+        [Display(Name = "Bật callback về server chính")]
+        public bool EnableCallback { get; set; } = true;
+
+        [Display(Name = "Model mặc định")]
+        [StringLength(100)]
+        public string DefaultModel { get; set; } = "gemini-2.5-flash";
+
+        [Display(Name = "Temperature")]
+        [Column(TypeName = "decimal(3, 2)")]
+        public decimal Temperature { get; set; } = 0.3m;
+
+        [Display(Name = "Thinking Budget (0 = tắt)")]
+        public int ThinkingBudget { get; set; } = 0;
+
+        [Display(Name = "Cập nhật lần cuối")]
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// API Key cho hệ thống dịch phụ đề phân tán
+    /// </summary>
+    public class SubtitleApiKey
+    {
+        public int Id { get; set; }
+
+        [Required]
+        public string EncryptedApiKey { get; set; }
+
+        [Required]
+        public string Iv { get; set; }
+
+        [Display(Name = "Đang hoạt động")]
+        public bool IsEnabled { get; set; } = true;
+
+        [Display(Name = "Số Request Hôm Nay")]
+        public int RequestsToday { get; set; } = 0;
+
+        [Display(Name = "Tổng Request thành công")]
+        public long TotalSuccessRequests { get; set; } = 0;
+
+        [Display(Name = "Tổng Request thất bại")]
+        public long TotalFailedRequests { get; set; } = 0;
+
+        [Display(Name = "Lần cuối reset bộ đếm (UTC)")]
+        public DateTime LastResetUtc { get; set; } = DateTime.UtcNow;
+
+        [Display(Name = "Tạm thời vô hiệu đến (UTC)")]
+        public DateTime? CooldownUntil { get; set; } // Cooldown khi gặp lỗi 429
+
+        [Display(Name = "Số lần lỗi 429 liên tiếp")]
+        public int Consecutive429Count { get; set; } = 0;
+
+        [Display(Name = "Lý do bị vô hiệu hóa")]
+        [StringLength(300)]
+        public string? DisabledReason { get; set; }
+
+        [Display(Name = "Lần cuối sử dụng")]
+        public DateTime? LastUsedAt { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Danh sách server dịch phụ đề (deploy trên fly.io)
+    /// </summary>
+    public class SubtitleTranslationServer
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [StringLength(500)]
+        [Display(Name = "URL Server")]
+        public string ServerUrl { get; set; } // https://subtitle-server-1.fly.dev
+
+        [StringLength(100)]
+        [Display(Name = "Tên hiển thị")]
+        public string? DisplayName { get; set; }
+
+        [Display(Name = "Đang hoạt động")]
+        public bool IsEnabled { get; set; } = true;
+
+        [Display(Name = "RPM của server")]
+        public int RpmLimit { get; set; } = 5; // Request per minute của server này
+
+        [Display(Name = "Đang xử lý job")]
+        public bool IsBusy { get; set; } = false;
+
+        [Display(Name = "Session đang xử lý")]
+        [StringLength(100)]
+        public string? CurrentSessionId { get; set; }
+
+        [Display(Name = "Số lần sử dụng")]
+        public long UsageCount { get; set; } = 0;
+
+        [Display(Name = "Số lần thất bại")]
+        public long FailureCount { get; set; } = 0;
+
+        [Display(Name = "Thời gian phản hồi trung bình (ms)")]
+        public int AvgResponseTimeMs { get; set; } = 0;
+
+        [Display(Name = "Lần cuối sử dụng")]
+        public DateTime? LastUsedAt { get; set; }
+
+        [Display(Name = "Lần cuối lỗi")]
+        public DateTime? LastFailedAt { get; set; }
+
+        [StringLength(500)]
+        [Display(Name = "Lý do lỗi cuối")]
+        public string? LastFailureReason { get; set; }
+
+        [Display(Name = "Thứ tự ưu tiên")]
+        public int Priority { get; set; } = 0; // Số nhỏ = ưu tiên cao
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Trạng thái job dịch phụ đề phân tán
+    /// </summary>
+    public enum SubtitleJobStatus
+    {
+        Pending = 0,      // Chờ xử lý
+        Distributing = 1, // Đang phân phối đến các server
+        Processing = 2,   // Đang dịch
+        Aggregating = 3,  // Đang tổng hợp kết quả
+        Completed = 4,    // Hoàn thành
+        Failed = 5,       // Thất bại
+        PartialCompleted = 6 // Hoàn thành một phần (có lỗi)
+    }
+
+    /// <summary>
+    /// Job dịch phụ đề - lưu thông tin từ client
+    /// </summary>
+    public class SubtitleTranslationJob
+    {
+        [Key]
+        [StringLength(100)]
+        public string SessionId { get; set; }
+
+        public int? UserId { get; set; } // Nullable nếu là external API call
+
+        [StringLength(100)]
+        public string? ExternalApiKeyPrefix { get; set; } // Nếu gọi từ External API
+
+        public SubtitleJobStatus Status { get; set; } = SubtitleJobStatus.Pending;
+
+        [Display(Name = "Tổng số dòng")]
+        public int TotalLines { get; set; }
+
+        [Display(Name = "Số dòng đã dịch")]
+        public int CompletedLines { get; set; } = 0;
+
+        [Display(Name = "Tiến độ (%)")]
+        public float Progress { get; set; } = 0;
+
+        [Column(TypeName = "TEXT")]
+        [Display(Name = "System Instruction")]
+        public string SystemInstruction { get; set; }
+
+        [Column(TypeName = "TEXT")]
+        [Display(Name = "Prompt")]
+        public string Prompt { get; set; }
+
+        [StringLength(100)]
+        [Display(Name = "Model")]
+        public string Model { get; set; } = "gemini-2.5-flash";
+
+        [Display(Name = "Thinking Budget")]
+        public int? ThinkingBudget { get; set; }
+
+        [StringLength(500)]
+        [Display(Name = "Callback URL")]
+        public string? CallbackUrl { get; set; }
+
+        [Column(TypeName = "TEXT")]
+        [Display(Name = "Lỗi")]
+        public string? ErrorMessage { get; set; }
+
+        [Column(TypeName = "TEXT")]
+        [Display(Name = "Dữ liệu gốc (JSON)")]
+        public string? OriginalLinesJson { get; set; } // Lưu JSON của lines để retry
+
+        [Column(TypeName = "TEXT")]
+        [Display(Name = "Kết quả (JSON)")]
+        public string? ResultsJson { get; set; } // Kết quả dịch dạng JSON
+
+        [Column(TypeName = "TEXT")]
+        [Display(Name = "Thống kê API Key (JSON)")]
+        public string? ApiKeyUsageJson { get; set; } // Thống kê sử dụng key
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? CompletedAt { get; set; }
+
+        // Navigation
+        public ICollection<SubtitleServerTask> ServerTasks { get; set; } = new List<SubtitleServerTask>();
+    }
+
+    /// <summary>
+    /// Trạng thái task gửi cho từng server
+    /// </summary>
+    public enum ServerTaskStatus
+    {
+        Pending = 0,
+        Sent = 1,
+        Processing = 2,
+        Completed = 3,
+        Failed = 4,
+        Retrying = 5
+    }
+
+    /// <summary>
+    /// Task con - phần việc gửi cho từng server dịch
+    /// </summary>
+    public class SubtitleServerTask
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public string SessionId { get; set; }
+
+        [ForeignKey("SessionId")]
+        public SubtitleTranslationJob Job { get; set; }
+
+        public int ServerId { get; set; }
+
+        [ForeignKey("ServerId")]
+        public SubtitleTranslationServer Server { get; set; }
+
+        [Display(Name = "Batch Index")]
+        public int BatchIndex { get; set; } // Thứ tự batch (0, 1, 2...)
+
+        [Display(Name = "Dòng bắt đầu")]
+        public int StartLineIndex { get; set; }
+
+        [Display(Name = "Số dòng")]
+        public int LineCount { get; set; }
+
+        public ServerTaskStatus Status { get; set; } = ServerTaskStatus.Pending;
+
+        [Display(Name = "Số lần retry")]
+        public int RetryCount { get; set; } = 0;
+
+        [Column(TypeName = "TEXT")]
+        [Display(Name = "Kết quả (JSON)")]
+        public string? ResultJson { get; set; }
+
+        [StringLength(500)]
+        [Display(Name = "Lỗi")]
+        public string? ErrorMessage { get; set; }
+
+        [Display(Name = "Thời gian gửi")]
+        public DateTime? SentAt { get; set; }
+
+        [Display(Name = "Thời gian hoàn thành")]
+        public DateTime? CompletedAt { get; set; }
+
+        [Display(Name = "Thời gian xử lý (ms)")]
+        public int? ProcessingTimeMs { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
 }
